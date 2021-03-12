@@ -1,6 +1,11 @@
 
 # nervex-operator version
 VERSION ?= v0.0.1-alpha.0
+
+ifeq ($(CI),true)
+VERSION := $(VERSION)-${CI_COMMIT_SHORT_SHA}
+endif
+
 # Image URL to use all building/pushing image targets
 IMG ?= registry.sensetime.com/cloudnative4ai/nervex-operator:${VERSION}
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)

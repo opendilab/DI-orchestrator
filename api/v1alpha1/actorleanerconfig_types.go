@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The SensePhoenix authors.
+
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,48 +17,88 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ActorLeanerConfigSpec defines the desired state of ActorLeanerConfig
-type ActorLeanerConfigSpec struct {
+// ActorLearnerConfigSpec defines the desired state of ActorLearnerConfig
+type ActorLearnerConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of ActorLeanerConfig. Edit actorleanerconfig_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Actor Actor `json:"actor,"`
+
+	Learner Learner `json:"learner,"`
 }
 
-// ActorLeanerConfigStatus defines the observed state of ActorLeanerConfig
-type ActorLeanerConfigStatus struct {
+// Actor defines the desired state of Actor
+type Actor struct {
+	EnableAutoRestore bool `json:"enableAutoRestore,omitempty"`
+
+	RestoreStrategy string `json:"restoreStrategy,omitempty"`
+
+	Template corev1.PodTemplateSpec `json:"template,"`
+}
+
+// Learner defines the desired state of Learner
+type Learner struct {
+	EnableAggregator bool `json:"enableAggregator,omitempty"`
+
+	EnableAutoRestore bool `json:"enableAutoRestore,omitempty"`
+
+	RestoreStrategy string `json:"restoreStrategy,omitempty"`
+
+	Template corev1.PodTemplateSpec `json:"template,"`
+}
+
+// ActorLearnerConfigStatus defines the observed state of ActorLearnerConfig
+type ActorLearnerConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	Actors *ReplicaStatus `json:"actors,omitempty"`
+
+	Learners *ReplicaStatus `json:"learners,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// ReplicaStatus defines the observed state of actors' and learners' replicas
+type ReplicaStatus struct {
+	Total int32 `json:"total,omitempty"`
 
-// ActorLeanerConfig is the Schema for the actorleanerconfigs API
-type ActorLeanerConfig struct {
+	Active int32 `json:"active,omitempty"`
+
+	Idle int32 `json:"idle,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster,shortName=alconfig
+// +kubebuilder:printcolumn:name="TotalActors",type=integer,JSONPath=`.status.Actors.Total`
+// +kubebuilder:printcolumn:name="ActiveActors",type=integer,JSONPath=`.status.Actors.Active`
+// +kubebuilder:printcolumn:name="TotalLearners",type=integer,JSONPath=`.status.Learners.Total`
+// +kubebuilder:printcolumn:name="ActiveLearners",type=integer,JSONPath=`.status.Learners.Active`
+
+// ActorLearnerConfig is the Schema for the ActorLearnerConfigs API
+type ActorLearnerConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ActorLeanerConfigSpec   `json:"spec,omitempty"`
-	Status ActorLeanerConfigStatus `json:"status,omitempty"`
+	Spec   ActorLearnerConfigSpec   `json:"spec,omitempty"`
+	Status ActorLearnerConfigStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
-// ActorLeanerConfigList contains a list of ActorLeanerConfig
-type ActorLeanerConfigList struct {
+// ActorLearnerConfigList contains a list of ActorLearnerConfig
+type ActorLearnerConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ActorLeanerConfig `json:"items"`
+	Items           []ActorLearnerConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ActorLeanerConfig{}, &ActorLeanerConfigList{})
+	SchemeBuilder.Register(&ActorLearnerConfig{}, &ActorLearnerConfigList{})
 }

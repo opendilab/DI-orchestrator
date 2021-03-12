@@ -26,7 +26,7 @@ spec:
             cd $EXECTIONPATH;
             python3 -u -c 'import os; import nervex.entry.parallel_entry as pe; pe.launch_actor(filename="$REALFILENAME", name="actor{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
           ports:
-          - containerPort: 22278
+          - containerPort: 22270
           resources:
             requests:
               cpu: 2
@@ -69,7 +69,7 @@ spec:
             mpirun -np $REPEATNUM python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
             python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
           ports:
-          - containerPort: 22279
+          - containerPort: 22272
           resources:
             requests:
               cpu: 2
@@ -111,7 +111,7 @@ spec:
             cd /data/nervex/test_atari/test3;
             python3 -u -c 'import os; import nervex.entry.parallel_entry as pe; pe.launch_learner_aggregator(filename="atari_impala_default_config.py.pkl", name="aggregator{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
           ports:
-          - containerPort: 22280
+          - containerPort: 22273
           volumeMounts:
           - name: config
             mountPath: /data/nervex

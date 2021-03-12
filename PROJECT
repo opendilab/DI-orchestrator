@@ -1,0 +1,23 @@
+domain: sensetime.com
+layout: go.kubebuilder.io/v3
+projectName: nervex
+repo: go-sensephoenix.sensetime.com/nervex-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: sensetime.com
+  group: nervex
+  kind: NervexJob
+  path: go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: sensetime.com
+  group: nervex
+  kind: ActorLeanerConfig
+  path: go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1
+  version: v1alpha1
+version: "3"

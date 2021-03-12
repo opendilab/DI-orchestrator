@@ -1,0 +1,7 @@
+apiVersion: nervex.sensetime.com/v1alpha1
+kind: ActorLeanerConfig
+metadata:
+  name: actorleanerconfig-sample
+spec:
+  # Add fields here
+  foo: bar

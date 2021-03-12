@@ -1,6 +1,8 @@
 
+# nervex-operator version
+VERSION ?= v0.0.1-alpha.0
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= registry.sensetime.com/cloudnative4ai/nervex-operator:${VERSION}
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
@@ -33,6 +35,8 @@ help: ## Display this help.
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	./hack/update-image-tags.sh config/manager ${VERSION}
+	./hack/update-version.sh ${VERSION}
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -42,6 +46,10 @@ fmt: ## Run go fmt against code.
 
 vet: ## Run go vet against code.
 	go vet ./...
+
+# Run golangci-lint
+lint:
+	golangci-lint run -v --timeout=5m
 
 ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 test: manifests generate fmt vet ## Run tests.

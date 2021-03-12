@@ -29,7 +29,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: controller:latest
+        image: registry.sensetime.com/cloudnative4ai/nervex-operator:v0.0.1-alpha.0
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

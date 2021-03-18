@@ -32,25 +32,22 @@ type ActorLearnerConfigSpec struct {
 	Actor Actor `json:"actor,"`
 
 	Learner Learner `json:"learner,"`
+
+	Aggregator Aggregator `json:"aggregator,"`
 }
 
 // Actor defines the desired state of Actor
 type Actor struct {
-	EnableAutoRestore bool `json:"enableAutoRestore,omitempty"`
-
-	RestoreStrategy string `json:"restoreStrategy,omitempty"`
-
 	Template corev1.PodTemplateSpec `json:"template,"`
 }
 
 // Learner defines the desired state of Learner
 type Learner struct {
-	EnableAggregator bool `json:"enableAggregator,omitempty"`
+	Template corev1.PodTemplateSpec `json:"template,"`
+}
 
-	EnableAutoRestore bool `json:"enableAutoRestore,omitempty"`
-
-	RestoreStrategy string `json:"restoreStrategy,omitempty"`
-
+//
+type Aggregator struct {
 	Template corev1.PodTemplateSpec `json:"template,"`
 }
 
@@ -62,6 +59,8 @@ type ActorLearnerConfigStatus struct {
 	Actors *ReplicaStatus `json:"actors,omitempty"`
 
 	Learners *ReplicaStatus `json:"learners,omitempty"`
+
+	Aggregator *ReplicaStatus `json:"aggregator,omitempty"`
 }
 
 // ReplicaStatus defines the observed state of actors' and learners' replicas

@@ -87,7 +87,18 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}
 
+	if err := r.reconcilePods(ctx, actors, learners, coordinator); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
 	return ctrl.Result{}, nil
+}
+
+func (r *NervexJobReconciler) reconcilePods(ctx context.Context, actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod) error {
+	if coordinator != nil {
+
+	}
+	return nil
 }
 
 func (r *NervexJobReconciler) listPods(ctx context.Context, job *nervexv1alpha1.NervexJob) ([]*corev1.Pod, error) {

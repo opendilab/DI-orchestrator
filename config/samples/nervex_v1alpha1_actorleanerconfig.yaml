@@ -4,8 +4,6 @@ metadata:
   name: nervexjob-actor-learner-config
 spec:
   actor:
-    enableAutoRestore: true
-    restoreStrategy: xxx
     template:
       spec:
         containers:
@@ -45,9 +43,6 @@ spec:
             path: /data/nfs/nervex
             server: 10.152.197.14
   learner:
-    enableAggregator: false
-    enableAutoRestore: true
-    restoreStrategy: xxx
     template:
       spec:
         containers:
@@ -69,7 +64,7 @@ spec:
             mpirun -np $REPEATNUM python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
             python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
           ports:
-          - containerPort: 22272
+          - containerPort: 22271
           resources:
             requests:
               cpu: 2
@@ -84,6 +79,10 @@ spec:
             mountPath: /data/nervex
           - name: cache-volume
             mountPath: /dev/shm
+  aggregator:
+    template:
+      spec:
+        containers:
         - name: aggregator
           image: registry.sensetime.com/cloudnative4ai/nervex-parallel-linklink-migration:v0.10
           imagePullPolicy: Always
@@ -111,7 +110,7 @@ spec:
             cd /data/nervex/test_atari/test3;
             python3 -u -c 'import os; import nervex.entry.parallel_entry as pe; pe.launch_learner_aggregator(filename="atari_impala_default_config.py.pkl", name="aggregator{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
           ports:
-          - containerPort: 22273
+          - containerPort: 22272
           volumeMounts:
           - name: config
             mountPath: /data/nervex

@@ -32,9 +32,6 @@ type NervexJobSpec struct {
 	// Group is a collection of nervex jobs
 	Group string `json:"group,omitempty"`
 
-	// NervexCfgPath is the config path of nervex jobs
-	NervexCfgPath string `json:"nervexCfgPath,omitempty"`
-
 	//Priority labels the priority of nervex job
 	Priority Priority `json:"priority,omitempty"`
 
@@ -46,7 +43,7 @@ type Priority string
 
 const (
 	// NormalPriority is normal priority
-	NormalPriority Priority = "Normal"
+	NormalPriority Priority = "Default"
 
 	// HighPriority is high priority
 	HighPriority Priority = "High"
@@ -54,12 +51,6 @@ const (
 
 // CoordinatorSpec defines the desired state of coordinators
 type CoordinatorSpec struct {
-	// EnableAutoRestore defines whether to use auto restore
-	EnableAutoRestore bool `json:"enableAutoRestore,omitempty"`
-
-	// RestoreStrategy defines the restore strategy
-	RestoreStrategy string `json:"restoreStrategy,omitempty"`
-
 	Template corev1.PodTemplateSpec `json:"template"`
 }
 

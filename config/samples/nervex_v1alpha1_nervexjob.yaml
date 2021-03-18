@@ -4,11 +4,8 @@ metadata:
   name: nervexjob-sample
 spec:
   group: xxx
-  nervexCfgPath: path/to/nervex/config
-  priority: Normal
+  priority: Default
   coordinator:
-    enableAutoRestore: true
-    restoreStrategy: xxx
     template:
       spec:
         containers:
@@ -29,7 +26,7 @@ spec:
             python3 -u -c 'import nervex.entry.parallel_entry as pe; pe.launch_coordinator(filename="atari_impala_default_config.py.pkl")';
             while true; do sleep 30; done;
           ports:
-          - containerPort: 22274
+          - containerPort: 22273
           resources:
             requests:
               cpu: 2

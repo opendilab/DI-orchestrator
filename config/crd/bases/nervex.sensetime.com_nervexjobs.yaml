@@ -43,12 +43,6 @@ spec:
               coordinator:
                 description: CoordinatorSpec defines the desired state of coordinators
                 properties:
-                  enableAutoRestore:
-                    description: EnableAutoRestore defines whether to use auto restore
-                    type: boolean
-                  restoreStrategy:
-                    description: RestoreStrategy defines the restore strategy
-                    type: string
                   template:
                     description: PodTemplateSpec describes the data a pod should have
                       when created from a template
@@ -6622,9 +6616,6 @@ spec:
                 type: object
               group:
                 description: Group is a collection of nervex jobs
-                type: string
-              nervexCfgPath:
-                description: NervexCfgPath is the config path of nervex jobs
                 type: string
               priority:
                 description: Priority labels the priority of nervex job

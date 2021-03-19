@@ -42,6 +42,7 @@ type NervexJobReconciler struct {
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=pods;services,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -59,9 +60,9 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	nvxJob := &nervexv1alpha1.NervexJob{}
 	err := r.Get(ctx, req.NamespacedName, nvxJob)
 	if err != nil {
-		log.Error(err, "unable to fetch NervexJob")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	log.Info("nervexjob", "nervexjob", nvxJob.Spec.PriorityClassName)
 
 	// list pods of NervexJob
 	pods, err := r.listPods(ctx, nvxJob)
@@ -71,7 +72,7 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// classify pods
-	actors, learners, coordinator, err := r.classifyPods(pods)
+	_, _, coordinator, err := r.classifyPods(pods)
 	if err != nil {
 		log.Error(err, "unable to classify pods")
 	}
@@ -79,26 +80,19 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// check the phase of NervexJob
 	if isSucceeded(nvxJob) || isFailed(nvxJob) {
 		// delete actors and learners owned by nvcJob
-		if err := r.deletePods(ctx, actors); err != nil {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
-		}
-		if err := r.deletePods(ctx, learners); err != nil {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
-		}
+		// if err := r.deletePods(ctx, actors); err != nil {
+		// 	return ctrl.Result{}, client.IgnoreNotFound(err)
+		// }
+		// if err := r.deletePods(ctx, learners); err != nil {
+		// 	return ctrl.Result{}, client.IgnoreNotFound(err)
+		// }
 	}
 
-	if err := r.reconcilePods(ctx, actors, learners, coordinator); err != nil {
+	if err := r.reconcilePods(ctx, nvxJob, coordinator); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	return ctrl.Result{}, nil
-}
-
-func (r *NervexJobReconciler) reconcilePods(ctx context.Context, actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod) error {
-	if coordinator != nil {
-
-	}
-	return nil
 }
 
 func (r *NervexJobReconciler) listPods(ctx context.Context, job *nervexv1alpha1.NervexJob) ([]*corev1.Pod, error) {

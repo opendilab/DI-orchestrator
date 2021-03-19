@@ -6617,7 +6617,7 @@ spec:
               group:
                 description: Group is a collection of nervex jobs
                 type: string
-              priority:
+              priorityClassName:
                 description: Priority labels the priority of nervex job
                 type: string
             required:

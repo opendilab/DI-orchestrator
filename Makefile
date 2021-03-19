@@ -1,9 +1,18 @@
 
 # nervex-operator version
 VERSION ?= v0.0.1-alpha.0
+MASTER_VERSION := $(VERSION)
 
-ifeq ($(CI),true)
-VERSION := $(VERSION)-${CI_COMMIT_SHORT_SHA}
+COMMIT_SHORT_SHA=$(shell git log -n 1 | head -n 1 | sed -e 's/^commit //' | head -c 8)
+
+VERSION := $(VERSION)-${COMMIT_SHORT_SHA}
+
+ifeq ($(GIT_BRANCH),master)
+VERSION := $(MASTER_VERSION)
+endif
+
+ifneq ($(findstring release,$(GIT_BRANCH)),)
+VERSION := $(MASTER_VERSION)
 endif
 
 # Image URL to use all building/pushing image targets
@@ -40,8 +49,8 @@ help: ## Display this help.
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	./hack/update-image-tags.sh config/manager ${VERSION}
-	./hack/update-version.sh ${VERSION}
+	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
+	./hack/update-version.sh ${MASTER_VERSION}
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -69,6 +78,9 @@ build: generate fmt vet ## Build manager binary.
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
+
+dev-images: build
+	docker build -t ${IMG} -f Dockerfile.dev .
 
 docker-build: ## Build docker image with the manager.
 	docker build -t ${IMG} .

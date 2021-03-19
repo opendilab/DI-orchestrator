@@ -33,20 +33,20 @@ type NervexJobSpec struct {
 	Group string `json:"group,omitempty"`
 
 	//Priority labels the priority of nervex job
-	Priority Priority `json:"priority,omitempty"`
+	PriorityClassName PriorityClassName `json:"priorityClassName,omitempty"`
 
 	Coordinator CoordinatorSpec `json:"coordinator"`
 }
 
 // Priority defines the priority of nervex job
-type Priority string
+type PriorityClassName string
 
 const (
 	// NormalPriority is normal priority
-	NormalPriority Priority = "Default"
+	NormalPriority PriorityClassName = "default"
 
 	// HighPriority is high priority
-	HighPriority Priority = "High"
+	HighPriority PriorityClassName = "high"
 )
 
 // CoordinatorSpec defines the desired state of coordinators

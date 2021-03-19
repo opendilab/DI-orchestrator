@@ -3,13 +3,13 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-  name: system
+  name: nervex-system
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
+  namespace: nervex-system
   labels:
     control-plane: controller-manager
 spec:
@@ -22,14 +22,13 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
-      securityContext:
-        runAsNonRoot: true
       containers:
       - command:
         - /manager
         args:
         - --leader-elect
         image: registry.sensetime.com/cloudnative4ai/nervex-operator:v0.0.1-alpha.0
+        imagePullPolicy: Always
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

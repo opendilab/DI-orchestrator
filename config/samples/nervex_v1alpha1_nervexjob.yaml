@@ -4,7 +4,7 @@ metadata:
   name: nervexjob-sample
 spec:
   group: xxx
-  priority: Default
+  priorityClassName: default
   coordinator:
     template:
       spec:
@@ -31,11 +31,9 @@ spec:
             requests:
               cpu: 2
               memory: 5Gi
-              nvidia.com/gpu: 1
             limits:
               cpu: 2
               memory: 5Gi
-              nvidia.com/gpu: 1
           volumeMounts:
           - name: config
             mountPath: /data/nervex

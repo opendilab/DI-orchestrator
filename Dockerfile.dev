@@ -1,0 +1,5 @@
+FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0
+WORKDIR /
+COPY /bin/manager  .
+
+ENTRYPOINT ["/manager"]

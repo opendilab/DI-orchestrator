@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
+	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/util"
 )
 
 // NervexJobReconciler reconciles a NervexJob object
@@ -55,6 +55,7 @@ type NervexJobReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("nervexjob", req.NamespacedName)
+	log.Info("reconcile nervexjob", "nervexjob", req.NamespacedName)
 
 	// get NervexJob object
 	nvxJob := &nervexv1alpha1.NervexJob{}
@@ -62,7 +63,6 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Info("nervexjob", "nervexjob", nvxJob.Spec.PriorityClassName)
 
 	// list pods of NervexJob
 	pods, err := r.listPods(ctx, nvxJob)
@@ -100,7 +100,7 @@ func (r *NervexJobReconciler) listPods(ctx context.Context, job *nervexv1alpha1.
 
 	// generate label selector
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: GenLabels(job.Name),
+		MatchLabels: nervexutil.GenLabels(job.Name),
 	})
 	if err != nil {
 		return nil, err
@@ -121,20 +121,19 @@ func (r *NervexJobReconciler) listPods(ctx context.Context, job *nervexv1alpha1.
 
 func (r *NervexJobReconciler) classifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, err error) {
 	// filter out actors
-	actors, err = filterOutReplicaPods(pods, ActorName)
+	actors, err = filterOutReplicaPods(pods, nervexutil.ActorName)
 	if err != nil {
 		return
 	}
 
 	// filter out leader pods
-	learners, err = filterOutReplicaPods(pods, LearnerName)
+	learners, err = filterOutReplicaPods(pods, nervexutil.LearnerName)
 	if err != nil {
 		return
 	}
 
 	// filter out coordinator pod
-	coordinators := []*corev1.Pod{}
-	coordinators, err = filterOutReplicaPods(pods, CoordinatorName)
+	coordinators, err := filterOutReplicaPods(pods, nervexutil.CoordinatorName)
 	if err != nil {
 		return
 	}
@@ -152,7 +151,7 @@ func (r *NervexJobReconciler) classifyPods(pods []*corev1.Pod) (actors []*corev1
 
 func filterOutReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: map[string]string{ReplicaTypeLabel: replicaType},
+		MatchLabels: map[string]string{nervexutil.ReplicaTypeLabel: replicaType},
 	})
 	if err != nil {
 		return nil, err
@@ -175,15 +174,6 @@ func (r *NervexJobReconciler) deletePods(ctx context.Context, pods []*corev1.Pod
 		}
 	}
 	return nil
-}
-
-func GenLabels(jobName string) map[string]string {
-	groupName := nervexv1alpha1.GroupVersion.Group
-	return map[string]string{
-		GroupNameLabel:      groupName,
-		JobNameLabel:        strings.Replace(jobName, "/", "-", -1),
-		ControllerNameLabel: ControllerName,
-	}
 }
 
 // SetupWithManager sets up the controller with the Manager.

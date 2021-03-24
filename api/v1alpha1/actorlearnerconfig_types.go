@@ -74,11 +74,11 @@ type ReplicaStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=alconfig
-// +kubebuilder:printcolumn:name="TotalActors",type=integer,JSONPath=`.status.Actors.Total`
-// +kubebuilder:printcolumn:name="ActiveActors",type=integer,JSONPath=`.status.Actors.Active`
-// +kubebuilder:printcolumn:name="TotalLearners",type=integer,JSONPath=`.status.Learners.Total`
-// +kubebuilder:printcolumn:name="ActiveLearners",type=integer,JSONPath=`.status.Learners.Active`
+// +kubebuilder:resource:shortName=alconfig
+// +kubebuilder:printcolumn:name="Total-Actors",type=integer,JSONPath=`.status.Actors.Total`
+// +kubebuilder:printcolumn:name="Active-Actors",type=integer,JSONPath=`.status.Actors.Active`
+// +kubebuilder:printcolumn:name="Total-Learners",type=integer,JSONPath=`.status.Learners.Total`
+// +kubebuilder:printcolumn:name="Active-Learners",type=integer,JSONPath=`.status.Learners.Active`
 
 // ActorLearnerConfig is the Schema for the ActorLearnerConfigs API
 type ActorLearnerConfig struct {

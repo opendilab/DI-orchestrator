@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
+	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -15,7 +17,7 @@ func (r *NervexJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 			return err
 		}
 	} else {
-		if err := r.createPod(ctx, job, CoordinatorName); err != nil {
+		if err := r.createPod(ctx, job, nervexutil.CoordinatorName); err != nil {
 			return err
 		}
 	}
@@ -23,6 +25,7 @@ func (r *NervexJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 }
 
 func (r *NervexJobReconciler) checkPodStatus(ctx context.Context, pod *corev1.Pod) error {
+
 	return nil
 }
 
@@ -31,7 +34,7 @@ func (r *NervexJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 	podTemplate := job.Spec.Coordinator.Template.DeepCopy()
 
 	if podTemplate.Name == "" {
-		podTemplate.Name = job.Name
+		podTemplate.Name = fmt.Sprintf("%s-%s", job.Name, "coordinator")
 	}
 	if podTemplate.Namespace == "" {
 		podTemplate.Namespace = job.Namespace
@@ -42,7 +45,20 @@ func (r *NervexJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 	}
 
 	// add labels
-	addLabelsToPodTemplate(podTemplate, job, replicaType)
+	labels := nervexutil.GenLabels(job.Name)
+	labels[nervexutil.ReplicaTypeLabel] = replicaType
+	nervexutil.AddLabelsToPodTemplate(podTemplate, labels)
+
+	// add env
+	for i := range podTemplate.Spec.Containers {
+		if len(podTemplate.Spec.Containers[i].Env) == 0 {
+			podTemplate.Spec.Containers[i].Env = make([]corev1.EnvVar, 0)
+		}
+		podTemplate.Spec.Containers[i].Env = append(podTemplate.Spec.Containers[i].Env, corev1.EnvVar{
+			Name:  "KUBERNETES_POD_NAMESPACE",
+			Value: podTemplate.Namespace,
+		})
+	}
 
 	// set owner reference
 	ownRefer := metav1.OwnerReference{
@@ -54,33 +70,10 @@ func (r *NervexJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 	}
 	podTemplate.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
 
-	pod := buildPodFromTemplate(podTemplate, job)
+	pod := nervexutil.BuildPodFromTemplate(podTemplate)
 	log.Info("create pod ", "pod name:", pod)
 	if err := r.Create(ctx, pod, &client.CreateOptions{}); err != nil {
 		return err
 	}
 	return nil
-}
-
-func addLabelsToPodTemplate(podTemplate *corev1.PodTemplateSpec, job *nervexv1alpha1.NervexJob, replicaType string) {
-	labels := GenLabels(job.Name)
-	labels[ReplicaTypeLabel] = replicaType
-	if podTemplate.ObjectMeta.Labels == nil {
-		podTemplate.ObjectMeta.Labels = make(map[string]string)
-	}
-	for k, v := range labels {
-		podTemplate.ObjectMeta.Labels[k] = v
-	}
-}
-
-func buildPodFromTemplate(template *corev1.PodTemplateSpec, job *nervexv1alpha1.NervexJob) *corev1.Pod {
-	pod := &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-	}
-	pod.Spec = *template.Spec.DeepCopy()
-	pod.ObjectMeta = *template.ObjectMeta.DeepCopy()
-	return pod
 }

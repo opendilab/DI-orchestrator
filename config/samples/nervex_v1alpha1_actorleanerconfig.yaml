@@ -24,7 +24,8 @@ spec:
             cd $EXECTIONPATH;
             python3 -u -c 'import os; import nervex.entry.parallel_entry as pe; pe.launch_actor(filename="$REALFILENAME", name="actor{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
           ports:
-          - containerPort: 22270
+          - name: actor-port
+            containerPort: 22270
           resources:
             requests:
               cpu: 2
@@ -64,7 +65,8 @@ spec:
             mpirun -np $REPEATNUM python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
             python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
           ports:
-          - containerPort: 22271
+          - name: learner-port
+            containerPort: 22271
           resources:
             requests:
               cpu: 2
@@ -79,6 +81,15 @@ spec:
             mountPath: /data/nervex
           - name: cache-volume
             mountPath: /dev/shm
+        volumes:
+        - name: config
+          nfs:
+            path: /data/nfs/nervex
+            server: 10.152.197.14
+        - name: cache-volume
+          emptyDir:
+            medium: Memory
+            sizeLimit: 128Mi
   aggregator:
     template:
       spec:
@@ -110,7 +121,8 @@ spec:
             cd /data/nervex/test_atari/test3;
             python3 -u -c 'import os; import nervex.entry.parallel_entry as pe; pe.launch_learner_aggregator(filename="atari_impala_default_config.py.pkl", name="aggregator{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
           ports:
-          - containerPort: 22272
+          - name: aggregator-port
+            containerPort: 22272
           volumeMounts:
           - name: config
             mountPath: /data/nervex
@@ -119,10 +131,6 @@ spec:
           nfs:
             path: /data/nfs/nervex
             server: 10.152.197.14
-        - name: cache-volume
-          emptyDir:
-            medium: Memory
-            sizeLimit: 128Mi
 status:
   actors:
     total: 4

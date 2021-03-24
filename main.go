@@ -88,6 +88,8 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "NervexJob")
 		os.Exit(1)
 	}
+
+	// TODO: add ALConfig reconciler
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

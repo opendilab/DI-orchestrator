@@ -13,7 +13,7 @@ import (
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	serverdynamic "go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
-	"go-sensephoenix.sensetime.com/nervex-operator/server/http"
+	serverhttp "go-sensephoenix.sensetime.com/nervex-operator/server/http"
 )
 
 var (
@@ -43,7 +43,7 @@ func main() {
 		Version:  nervexv1alpha1.GroupVersion.Version,
 		Resource: "actorlearnerconfigs",
 	}
-	alconfigDyInformer := serverdynamic.NewDynamicInformer(dynamicClient, alconfigGVR)
+	alconfigDyInformer := serverdynamic.NewDynamicInformer(dynamicClient, alconfigGVR, nil)
 	serverdynamic.AddEventHandlers(alconfigDyInformer)
 
 	// add NervexJob informer
@@ -52,7 +52,7 @@ func main() {
 		Version:  nervexv1alpha1.GroupVersion.Version,
 		Resource: "nervexjobs",
 	}
-	njDyInformer := serverdynamic.NewDynamicInformer(dynamicClient, njGVR)
+	njDyInformer := serverdynamic.NewDynamicInformer(dynamicClient, njGVR, nil)
 	serverdynamic.AddEventHandlers(njDyInformer)
 
 	// start dynamic informer
@@ -68,7 +68,7 @@ func main() {
 
 	logger := zap.New(zap.UseFlagOptions(&opts))
 
-	nervexServer := http.NewNervexServer(kubeClient, dynamicClient, logger, alconfigDyInformer, njDyInformer, alconfigName)
+	nervexServer := serverhttp.NewNervexServer(kubeClient, dynamicClient, logger, alconfigDyInformer, njDyInformer, alconfigName)
 
 	if err := nervexServer.Start(); err != nil {
 		log.Fatalf("Failed to start NervexServer: %v", err)

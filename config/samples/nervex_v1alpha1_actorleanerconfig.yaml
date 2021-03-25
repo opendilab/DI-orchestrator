@@ -30,11 +30,9 @@ spec:
             requests:
               cpu: 2
               memory: 5Gi
-              nvidia.com/gpu: 1
             limits:
               cpu: 2
               memory: 5Gi
-              nvidia.com/gpu: 1
           volumeMounts:
           - name: config
             mountPath: /data/nervex
@@ -71,11 +69,9 @@ spec:
             requests:
               cpu: 2
               memory: 5Gi
-              nvidia.com/gpu: 1
             limits:
               cpu: 2
               memory: 5Gi
-              nvidia.com/gpu: 1
           volumeMounts:
           - name: config
             mountPath: /data/nervex
@@ -101,11 +97,9 @@ spec:
             requests:
               cpu: 2
               memory: 5Gi
-              nvidia.com/gpu: 1
             limits:
               cpu: 2
               memory: 5Gi
-              nvidia.com/gpu: 1
           env:
           - name: LC_ALL
             value: "en_US.utf-8"
@@ -121,7 +115,7 @@ spec:
             cd /data/nervex/test_atari/test3;
             python3 -u -c 'import os; import nervex.entry.parallel_entry as pe; pe.launch_learner_aggregator(filename="atari_impala_default_config.py.pkl", name="aggregator{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
           ports:
-          - name: aggregator-port
+          - name: aggt-port
             containerPort: 22272
           volumeMounts:
           - name: config

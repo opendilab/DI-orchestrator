@@ -1,6 +1,7 @@
 package dynamic
 
 import (
+	"log"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -9,15 +10,14 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
 	resyncPeriod = 30 * time.Second
 )
 
-func NewDynamicInformer(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource) cache.SharedIndexInformer {
-	dif := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resyncPeriod, corev1.NamespaceAll, nil)
+func NewDynamicInformer(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, tweakListOptions dynamicinformer.TweakListOptionsFunc) cache.SharedIndexInformer {
+	dif := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, resyncPeriod, corev1.NamespaceAll, tweakListOptions)
 	dynamicInformer := dif.ForResource(gvr).Informer()
 	return dynamicInformer
 }
@@ -27,7 +27,7 @@ func AddEventHandlers(s cache.SharedIndexInformer) {
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				// on add alconfig
-				log.Log.Info("new object", obj.(*unstructured.Unstructured).GetName())
+				log.Printf("new object: %s/%s", obj.(*unstructured.Unstructured).GetNamespace(), obj.(*unstructured.Unstructured).GetName())
 			},
 			UpdateFunc: func(old, new interface{}) {
 				// on update alconfig

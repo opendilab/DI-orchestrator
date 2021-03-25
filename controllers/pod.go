@@ -49,16 +49,20 @@ func (r *NervexJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 	labels[nervexutil.ReplicaTypeLabel] = replicaType
 	nervexutil.AddLabelsToPodTemplate(podTemplate, labels)
 
-	// add env
-	for i := range podTemplate.Spec.Containers {
-		if len(podTemplate.Spec.Containers[i].Env) == 0 {
-			podTemplate.Spec.Containers[i].Env = make([]corev1.EnvVar, 0)
-		}
-		podTemplate.Spec.Containers[i].Env = append(podTemplate.Spec.Containers[i].Env, corev1.EnvVar{
-			Name:  "KUBERNETES_POD_NAMESPACE",
-			Value: podTemplate.Namespace,
-		})
+	// get port
+	port, ok := nervexutil.GetPortFromPodTemplate(podTemplate, nervexutil.DefaultCoordinatorContainerName, nervexutil.DefaultCoordinatorPortName)
+	if !ok {
+		port = nervexutil.DefaultCoordinatorPort
+		log.Info("no port found, use default port", "port", port)
+		nervexutil.SetPodTemplatePort(podTemplate, nervexutil.DefaultCoordinatorContainerName, nervexutil.DefaultCoordinatorPortName, port)
 	}
+
+	// add env
+	envs := make(map[string]string, 0)
+	envs["KUBERNETES_POD_NAMESPACE"] = podTemplate.Namespace
+	envs["KUBERNETES_POD_NAME"] = podTemplate.Name
+	envs["COORDINATOR_PORT"] = fmt.Sprintf("%d", port)
+	nervexutil.SetPodTemplateEnv(podTemplate, envs)
 
 	// set owner reference
 	ownRefer := metav1.OwnerReference{

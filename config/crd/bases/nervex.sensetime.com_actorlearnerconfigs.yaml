@@ -20,16 +20,16 @@ spec:
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.Actors.Total
-      name: TotalActors
+      name: Total-Actors
       type: integer
     - jsonPath: .status.Actors.Active
-      name: ActiveActors
+      name: Active-Actors
       type: integer
     - jsonPath: .status.Learners.Total
-      name: TotalLearners
+      name: Total-Learners
       type: integer
     - jsonPath: .status.Learners.Active
-      name: ActiveLearners
+      name: Active-Learners
       type: integer
     name: v1alpha1
     schema:

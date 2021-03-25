@@ -17,6 +17,7 @@ endif
 
 # Image URL to use all building/pushing image targets
 IMG ?= registry.sensetime.com/cloudnative4ai/nervex-operator:${VERSION}
+SERVER_IMG ?= registry.sensetime.com/cloudnative4ai/nervex-server:${VERSION}
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
@@ -52,6 +53,11 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
 	./hack/update-version.sh ${MASTER_VERSION}
 
+dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	./hack/update-image-tags.sh config/manager ${VERSION}
+	./hack/update-version.sh ${VERSION}
+
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
@@ -75,18 +81,21 @@ test: manifests generate fmt vet ## Run tests.
 
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
+	go build -o bin/nervex-server server/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 dev-images: build
 	docker build -t ${IMG} -f Dockerfile.dev .
+	docker build -t ${SERVER_IMG} -f Dockerfile.server .
 
 docker-build: ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
+	docker push ${SERVER_IMG}
 
 ##@ Deployment
 
@@ -100,9 +109,15 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
+dev-deploy: dev-manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default | kubectl apply -f -
+
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
+dev-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.

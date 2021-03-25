@@ -1,6 +1,7 @@
 resources:
 - manager.yaml
 - priority_class.yaml
+- nervex_server.yaml
 
 generatorOptions:
   disableNameSuffixHash: true
@@ -14,4 +15,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: registry.sensetime.com/cloudnative4ai/nervex-operator
-  newTag: v0.0.1-alpha.0-962d399c
+  newTag: v0.0.1-alpha.0-63ba161d

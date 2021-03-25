@@ -19,8 +19,8 @@ const (
 
 	DefaultActorPortName       = "actor-port"
 	DefaultLearnerPortName     = "learner-port"
-	DefaultAggregatorPortName  = "aggregator-port"
-	DefaultCoordinatorPortName = "coordinator-port"
+	DefaultAggregatorPortName  = "aggt-port"
+	DefaultCoordinatorPortName = "cood-port"
 
 	DefaultActorPort       = 22270
 	DefaultLearnerPort     = 22271

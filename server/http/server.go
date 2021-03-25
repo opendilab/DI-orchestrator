@@ -35,10 +35,10 @@ type NervexJobRequest struct {
 }
 
 type ResourceQuantity struct {
-	Number int               `json:"number"`
-	CPUs   resource.Quantity `json:"cpus"`
-	GPUs   resource.Quantity `json:"gpus"`
-	Memory resource.Quantity `json:"memory"`
+	Replicas int               `json:"replicas"`
+	Cpu      resource.Quantity `json:"cpus"`
+	Gpu      resource.Quantity `json:"gpus"`
+	Memory   resource.Quantity `json:"memory"`
 }
 
 type NervexJobResponse struct {
@@ -70,6 +70,7 @@ func (s *NervexServer) Start() error {
 	log := s.Log.WithName("NervexServer")
 	http.HandleFunc("/api/v1alpha1/add", s.Add)
 	http.HandleFunc("/api/v1alpha1/delete", s.Delete)
+	http.HandleFunc("/healthz", healthz)
 
 	log.Info("Start listening on :8080")
 	http.ListenAndServe(":8080", nil)
@@ -77,7 +78,7 @@ func (s *NervexServer) Start() error {
 }
 
 func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
-	log := s.Log.WithName("NernexServer")
+	log := s.Log.WithName("NervexServer")
 
 	// parse request body
 	var njreq NervexJobRequest
@@ -91,7 +92,8 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 	// get ALConfig
 	obj, exists, err := s.alconfigDyInformer.GetIndexer().GetByKey(s.alconfig)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errMsg := fmt.Sprintf("failed to get ALConfig: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
 		return
 	}
 
@@ -110,7 +112,8 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 	// get coordinator
 	coordinator, err := s.KubeClient.CoreV1().Pods(njreq.Namespace).Get(context.Background(), njreq.Coordinator, metav1.GetOptions{})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errMsg := fmt.Sprintf("failed to get coordinator: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
 		return
 	}
 
@@ -131,7 +134,8 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 	njKey := fmt.Sprintf("%s/%s", njreq.Namespace, ownRefer.Name)
 	obj, exists, err = s.njDyInformer.GetIndexer().GetByKey(njKey)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errMsg := fmt.Sprintf("failed to get NervexJob: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
 		return
 	}
 
@@ -146,7 +150,8 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 	// create actors and learners
 	actors, learners, err := s.createActorsAndLearnersFromALConfig(alconfig, &njreq, ownRefer)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errMsg := fmt.Sprintf("failed create actors and learners: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
 		return
 	}
 
@@ -160,7 +165,8 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	repJson, err := json.Marshal(rep)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		errMsg := fmt.Sprintf("failed to marshal json: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
 		return
 	}
 	w.Write(repJson)
@@ -173,7 +179,7 @@ func (s *NervexServer) createActorsAndLearnersFromALConfig(
 
 	// create actors
 	actorTemplate := alconfig.Spec.Actor.Template
-	actors, err := s.createPodsAndServices(&actorTemplate, ownRefer, njreq.Namespace, njreq.Coordinator, njreq.Actors.Number,
+	actors, err := s.createPodsAndServices(&actorTemplate, ownRefer, njreq,
 		nervexutil.ActorName, nervexutil.DefaultActorContainerName, nervexutil.DefaultActorPortName, nervexutil.DefaultActorPort)
 
 	if err != nil {
@@ -182,7 +188,7 @@ func (s *NervexServer) createActorsAndLearnersFromALConfig(
 
 	// create learners
 	learnerTemplate := alconfig.Spec.Learner.Template
-	learners, err := s.createPodsAndServices(&learnerTemplate, ownRefer, njreq.Namespace, njreq.Coordinator, njreq.Learners.Number,
+	learners, err := s.createPodsAndServices(&learnerTemplate, ownRefer, njreq,
 		nervexutil.LearnerName, nervexutil.DefaultLearnerContainerName, nervexutil.DefaultLearnerPortName, nervexutil.DefaultLearnerPort)
 
 	if err != nil {
@@ -195,46 +201,58 @@ func (s *NervexServer) createActorsAndLearnersFromALConfig(
 func (s *NervexServer) createPodsAndServices(
 	template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
-	ns, coordinator string,
-	replicas int,
+	njreq *NervexJobRequest,
 	replicaType, containerName, portName string, defaultPort int32) ([]string, error) {
+
+	log := s.Log.WithName("NervexServer")
+	coordinator := njreq.Coordinator
+	ns := njreq.Namespace
+
+	portEnv := ""
+	resources := ResourceQuantity{}
+	if replicaType == nervexutil.ActorName {
+		resources = njreq.Actors
+		portEnv = "ACTOR_PORT"
+	} else if replicaType == nervexutil.LearnerName {
+		resources = njreq.Learners
+		portEnv = "LEARNER_PORT"
+	}
 
 	// add labels to pod template
 	labels := nervexutil.GenLabels(ownRefer.Name)
 	labels[nervexutil.ReplicaTypeLabel] = replicaType
 	nervexutil.AddLabelsToPodTemplate(template, labels)
 
-	// generate pod from template
-	pod := nervexutil.BuildPodFromTemplate(template.DeepCopy())
-	pod.GenerateName = fmt.Sprintf("%s-%s-", coordinator, replicaType)
-	pod.Namespace = ns
-	pod.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
-
+	// setup pod template
+	template.GenerateName = fmt.Sprintf("%s-%s-", coordinator, replicaType)
+	template.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
+	template.Namespace = ns
+	// set pod resource
+	SetPodTemplateResources(template, resources, containerName)
 	// get pod port
-	port, ok := nervexutil.GetPortFromPod(pod, containerName, portName)
+	port, ok := nervexutil.GetPortFromPodTemplate(template, containerName, portName)
 	if !ok {
 		port = defaultPort
+		log.Info("no port found, use default port", "port", port)
+		nervexutil.SetPodTemplatePort(template, containerName, portName, port)
 	}
 
+	// add env
+	envs := make(map[string]string, 0)
+	envs[portEnv] = fmt.Sprintf("%d", port)
+	nervexutil.SetPodTemplateEnv(template, envs)
+
+	// build pod
+	pod := nervexutil.BuildPodFromTemplate(template.DeepCopy())
+
 	// build service
-	svc := corev1.Service{
-		Spec: corev1.ServiceSpec{
-			ClusterIP: "None",
-			Selector:  labels,
-			Ports: []corev1.ServicePort{
-				{
-					Port: port,
-					Name: portName,
-				},
-			},
-		},
-	}
+	svc := nervexutil.BuildService(labels, port, portName)
 	svc.Labels = labels
 	svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
 
 	results := []string{}
 	// create pods and services
-	for i := 0; i < replicas; i++ {
+	for i := 0; i < resources.Replicas; i++ {
 		tempPod := pod.DeepCopy()
 		newPod, err := s.KubeClient.CoreV1().Pods(ns).Create(context.Background(), tempPod, metav1.CreateOptions{})
 		if err != nil {
@@ -253,6 +271,32 @@ func (s *NervexServer) createPodsAndServices(
 	}
 
 	return results, nil
+}
+
+func SetPodTemplateResources(template *corev1.PodTemplateSpec, resources ResourceQuantity, containerName string) {
+	for i := range template.Spec.Containers {
+		if template.Spec.Containers[i].Name != containerName {
+			continue
+		}
+		if template.Spec.Containers[i].Resources.Limits == nil {
+			template.Spec.Containers[i].Resources.Limits = make(corev1.ResourceList, 0)
+		}
+		if template.Spec.Containers[i].Resources.Requests == nil {
+			template.Spec.Containers[i].Resources.Requests = make(corev1.ResourceList, 0)
+		}
+
+		// cpu and memory must not be zero
+		if !resources.Cpu.IsZero() {
+			template.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = resources.Cpu
+			template.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = resources.Cpu
+		}
+		if !resources.Memory.IsZero() {
+			template.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = resources.Memory
+			template.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = resources.Memory
+		}
+		template.Spec.Containers[i].Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = resources.Gpu
+		template.Spec.Containers[i].Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = resources.Gpu
+	}
 }
 
 func (s *NervexServer) Delete(w http.ResponseWriter, r *http.Request) {

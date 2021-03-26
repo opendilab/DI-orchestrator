@@ -58,6 +58,11 @@ dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and 
 	./hack/update-image-tags.sh config/manager ${VERSION}
 	./hack/update-version.sh ${VERSION}
 
+dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	./hack/update-image-tags.sh config/manager ${VERSION}
+	./hack/update-version.sh ${VERSION}
+
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 

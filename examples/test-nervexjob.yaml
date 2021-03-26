@@ -1,0 +1,16 @@
+apiVersion: nervex.sensetime.com/v1alpha1
+kind: NervexJob
+metadata:
+  name: nervexjob-example
+spec:
+  group: xxx
+  priorityClassName: default
+  coordinator:
+    template:
+      spec:
+        containers:
+        - name: coordinator
+          image: registry.sensetime.com/cloudnative4ai/liqingping/coordinator:v0.0.1
+          imagePullPolicy: Always
+          command: ["/coordinator"]
+          args: ["--nervex-server", "http://nervex-server.nervex-system:8080"]

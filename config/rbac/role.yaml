@@ -22,6 +22,7 @@ rules:
 - apiGroups:
   - nervex.sensetime.com
   resources:
+  - actorlearnerconfigs
   - nervexjobs
   verbs:
   - create
@@ -34,12 +35,14 @@ rules:
 - apiGroups:
   - nervex.sensetime.com
   resources:
+  - actorlearnerconfigs/finalizers
   - nervexjobs/finalizers
   verbs:
   - update
 - apiGroups:
   - nervex.sensetime.com
   resources:
+  - actorlearnerconfigs/status
   - nervexjobs/status
   verbs:
   - get

@@ -44,6 +44,7 @@ type ResourceQuantity struct {
 type NervexJobResponse struct {
 	Namespace   string   `json:"namespace"`
 	Coordinator string   `json:"coordinator"`
+	Aggregator  string   `json:"aggregator"`
 	Actors      []string `json:"actors"`
 	Learners    []string `json:"learners"`
 }

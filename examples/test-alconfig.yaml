@@ -8,7 +8,7 @@ spec:
       spec:
         containers:
         - name: actor
-          image: nginx
+          image: registry.sensetime.com/cloudnative4ai/nginx:latest
           ports:
           - name: actor-port
             containerPort: 80
@@ -17,7 +17,7 @@ spec:
       spec:
         containers:
         - name: learner
-          image: nginx
+          image: registry.sensetime.com/cloudnative4ai/nginx:latest
           ports:
           - name: learner-port
             containerPort: 80
@@ -26,7 +26,7 @@ spec:
       spec:
         containers:
         - name: learner
-          image: nginx
+          image: registry.sensetime.com/cloudnative4ai/nginx:latest
           ports:
           - name: aggr-port
             containerPort: 80

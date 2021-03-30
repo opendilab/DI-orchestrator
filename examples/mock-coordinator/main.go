@@ -105,7 +105,7 @@ func waitForStart(pods []interface{}, timeout time.Duration) {
 
 			}
 			startCount++
-			fmt.Printf("pod %s is ready", pod.(string))
+			fmt.Printf("pod %s is ready\n", pod.(string))
 		}
 
 		time.Sleep(2 * time.Second)
@@ -114,7 +114,7 @@ func waitForStart(pods []interface{}, timeout time.Duration) {
 		}
 
 		if time.Now().Sub(start) > timeout {
-			fmt.Printf("timeout waiting for pods to start!")
+			fmt.Printf("timeout waiting for pods to start!\n")
 			break
 		}
 	}

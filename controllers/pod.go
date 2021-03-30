@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/util"
+	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,19 +13,24 @@ import (
 
 func (r *NervexJobReconciler) reconcilePods(ctx context.Context, job *nervexv1alpha1.NervexJob, coordinator *corev1.Pod) error {
 	if coordinator != nil {
-		if err := r.checkPodStatus(ctx, coordinator); err != nil {
+		if err := r.checkPodStatus(ctx, job, coordinator); err != nil {
 			return err
 		}
 	} else {
 		if err := r.createPod(ctx, job, nervexutil.CoordinatorName); err != nil {
 			return err
 		}
+
+		// update job status
+		job.Status.Phase = nervexv1alpha1.JobPending
 	}
 	return nil
 }
 
-func (r *NervexJobReconciler) checkPodStatus(ctx context.Context, pod *corev1.Pod) error {
-
+func (r *NervexJobReconciler) checkPodStatus(ctx context.Context, job *nervexv1alpha1.NervexJob, pod *corev1.Pod) error {
+	if pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodPending {
+		job.Status.Phase = nervexv1alpha1.JobRunning
+	}
 	return nil
 }
 
@@ -58,7 +63,7 @@ func (r *NervexJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 	}
 
 	// add env
-	envs := make(map[string]string, 0)
+	envs := make(map[string]string)
 	envs["KUBERNETES_POD_NAMESPACE"] = podTemplate.Namespace
 	envs["KUBERNETES_POD_NAME"] = podTemplate.Name
 	envs["COORDINATOR_PORT"] = fmt.Sprintf("%d", port)

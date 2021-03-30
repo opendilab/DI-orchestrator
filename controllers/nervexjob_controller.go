@@ -22,6 +22,7 @@ import (
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/util"
+	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
 // NervexJobReconciler reconciles a NervexJob object
@@ -64,6 +65,8 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	jobStatus := nvxJob.Status.DeepCopy()
+
 	// list pods of NervexJob
 	pods, err := r.listPods(ctx, nvxJob)
 	if err != nil {
@@ -78,20 +81,24 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// check the phase of NervexJob
-	if isSucceeded(nvxJob) || isFailed(nvxJob) {
-		// delete actors and learners owned by nvcJob
-		// if err := r.deletePods(ctx, actors); err != nil {
-		// 	return ctrl.Result{}, client.IgnoreNotFound(err)
-		// }
-		// if err := r.deletePods(ctx, learners); err != nil {
-		// 	return ctrl.Result{}, client.IgnoreNotFound(err)
-		// }
-	}
+	// if isSucceeded(nvxJob) || isFailed(nvxJob) {
+	// 	// delete actors and learners owned by nvcJob
+	// 	// if err := r.deletePods(ctx, actors); err != nil {
+	// 	// 	return ctrl.Result{}, client.IgnoreNotFound(err)
+	// 	// }
+	// 	// if err := r.deletePods(ctx, learners); err != nil {
+	// 	// 	return ctrl.Result{}, client.IgnoreNotFound(err)
+	// 	// }
+	// }
 
 	if err := r.reconcilePods(ctx, nvxJob, coordinator); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// update status
+	if !apiequality.Semantic.DeepEqual(*jobStatus, nvxJob.Status) {
+		r.Status().Update(ctx, nvxJob, &client.UpdateOptions{})
+	}
 	return ctrl.Result{}, nil
 }
 

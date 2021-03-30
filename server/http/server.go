@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/util"
+	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
 type NervexServer struct {
@@ -74,7 +74,9 @@ func (s *NervexServer) Start() error {
 	http.HandleFunc("/healthz", healthz)
 
 	log.Info("Start listening on :8080")
-	http.ListenAndServe(":8080", nil)
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -147,6 +149,11 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 
 	nj := &nervexv1alpha1.NervexJob{}
 	err = nervexutil.GetObjectFromUnstructured(obj, nj)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to convert NervexJob: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
 
 	// create actors and learners
 	actors, learners, err := s.createActorsAndLearnersFromALConfig(alconfig, &njreq, ownRefer)
@@ -170,7 +177,11 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, errMsg, http.StatusInternalServerError)
 		return
 	}
-	w.Write(repJson)
+	_, err = w.Write(repJson)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to write json: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+	}
 }
 
 func (s *NervexServer) createActorsAndLearnersFromALConfig(
@@ -239,7 +250,7 @@ func (s *NervexServer) createPodsAndServices(
 	}
 
 	// add env
-	envs := make(map[string]string, 0)
+	envs := make(map[string]string)
 	envs[portEnv] = fmt.Sprintf("%d", port)
 	nervexutil.SetPodTemplateEnv(template, envs)
 
@@ -280,10 +291,10 @@ func SetPodTemplateResources(template *corev1.PodTemplateSpec, resources Resourc
 			continue
 		}
 		if template.Spec.Containers[i].Resources.Limits == nil {
-			template.Spec.Containers[i].Resources.Limits = make(corev1.ResourceList, 0)
+			template.Spec.Containers[i].Resources.Limits = make(corev1.ResourceList)
 		}
 		if template.Spec.Containers[i].Resources.Requests == nil {
-			template.Spec.Containers[i].Resources.Requests = make(corev1.ResourceList, 0)
+			template.Spec.Containers[i].Resources.Requests = make(corev1.ResourceList)
 		}
 
 		// cpu and memory must not be zero

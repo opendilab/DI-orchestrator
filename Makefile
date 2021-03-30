@@ -53,11 +53,8 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
 	./hack/update-version.sh ${MASTER_VERSION}
 
-dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	./hack/update-image-tags.sh config/manager ${VERSION}
-	./hack/update-version.sh ${VERSION}
-
+# dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
+# used `make manifests` when commited git
 dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	./hack/update-image-tags.sh config/manager ${VERSION}
@@ -92,11 +89,12 @@ run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 dev-images: build
-	docker build -t ${IMG} -f Dockerfile.dev .
-	docker build -t ${SERVER_IMG} -f Dockerfile.server .
+	docker build -t ${IMG} --target dev-manager .
+	docker build -t ${SERVER_IMG} -f Dockerfile.server --target dev-nervex-server .
 
 docker-build: ## Build docker image with the manager.
-	docker build -t ${IMG} .
+	docker build -t ${IMG} --target manager .
+	docker build -t ${SERVER_IMG} -f Dockerfile.server --target nervex-server .
 
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}

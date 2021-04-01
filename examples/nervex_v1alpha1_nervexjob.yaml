@@ -1,5 +1,5 @@
 apiVersion: nervex.sensetime.com/v1alpha1
-kind: NervexJob
+kind: NerveXJob
 metadata:
   name: nervexjob-example
 spec:

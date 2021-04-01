@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *NervexJobReconciler) reconcilePods(ctx context.Context, job *nervexv1alpha1.NervexJob, coordinator *corev1.Pod) error {
+func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1alpha1.NerveXJob, coordinator *corev1.Pod) error {
 	if coordinator != nil {
 		if err := r.checkPodStatus(ctx, job, coordinator); err != nil {
 			return err
@@ -27,14 +27,28 @@ func (r *NervexJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 	return nil
 }
 
-func (r *NervexJobReconciler) checkPodStatus(ctx context.Context, job *nervexv1alpha1.NervexJob, pod *corev1.Pod) error {
-	if pod.Status.Phase == corev1.PodRunning || pod.Status.Phase == corev1.PodPending {
+func (r *NerveXJobReconciler) checkPodStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob, pod *corev1.Pod) error {
+	if pod.Status.Phase == corev1.PodRunning {
 		job.Status.Phase = nervexv1alpha1.JobRunning
+		msg := "pods are ready"
+		if err := updateNerveXJobConditions(job, nervexv1alpha1.JobReady, NerveXJobPodsReadyReason, msg); err != nil {
+			return err
+		}
+	} else if pod.Status.Phase == corev1.PodFailed {
+		job.Status.Phase = nervexv1alpha1.JobFailed
+		if err := updateNerveXJobConditions(job, nervexv1alpha1.JobConditionType(""), "", ""); err != nil {
+			return err
+		}
+	} else if pod.Status.Phase == corev1.PodSucceeded {
+		job.Status.Phase = nervexv1alpha1.JobSucceeded
+		if err := updateNerveXJobConditions(job, nervexv1alpha1.JobConditionType(""), "", ""); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (r *NervexJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1.NervexJob, replicaType string) error {
+func (r *NerveXJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1.NerveXJob, replicaType string) error {
 	log := r.Log.WithValues("nervexjob", job.Namespace)
 	podTemplate := job.Spec.Coordinator.Template.DeepCopy()
 

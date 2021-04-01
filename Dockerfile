@@ -1,5 +1,5 @@
 # Build manager with local manager binary
-FROM registry.sensetime.com/cloudnative4ai/alpine:3.9 as dev-manager
+FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as dev-manager
 WORKDIR /
 COPY /bin/manager  .
 
@@ -28,7 +28,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager 
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.sensetime.com/cloudnative4ai/alpine:3.9 as manager
+FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as manager
 WORKDIR /
 COPY --from=builder /workspace/manager .
 

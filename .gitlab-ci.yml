@@ -1,6 +1,6 @@
 variables:
   REGISTRY: registry.sensetime.com/cloudnative4ai
-  VERSION: v0.0.1-alpha.0
+  VERSION: v0.0.1-alpha.0-207d097b
   PROJECT: nervex-operator
   
 

@@ -24,8 +24,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// NervexJobSpec defines the desired state of NervexJob
-type NervexJobSpec struct {
+// NerveXJobSpec defines the desired state of NerveXJob
+type NerveXJobSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -54,21 +54,21 @@ type CoordinatorSpec struct {
 	Template corev1.PodTemplateSpec `json:"template"`
 }
 
-// NervexJobStatus defines the observed state of NervexJob
-type NervexJobStatus struct {
+// NerveXJobStatus defines the observed state of NerveXJob
+type NerveXJobStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	Phase Phase `json:"phase,omitempty"`
 
-	Conditions []NervexJobCondition `json:"conditions,omitempty"`
+	Conditions []NerveXJobCondition `json:"conditions,omitempty"`
 
 	Actors int32 `json:"actors,omitempty"`
 
 	Learners int32 `json:"learners,omitempty"`
 }
 
-// Phase defines the phase of NervexJob
+// Phase defines the phase of NerveXJob
 type Phase string
 
 const (
@@ -90,8 +90,8 @@ const (
 	JobUnknown Phase = "Unknown"
 )
 
-// NervexJobCondition records the conditions of NervexJob
-type NervexJobCondition struct {
+// NerveXJobCondition records the conditions of NerveXJob
+type NerveXJobCondition struct {
 	// Type of job condition.
 	Type JobConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
@@ -106,7 +106,7 @@ type NervexJobCondition struct {
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
 }
 
-// JobConditionType defines the condition state of NervexJob
+// JobConditionType defines the condition state of NerveXJob
 type JobConditionType string
 
 const (
@@ -119,26 +119,27 @@ const (
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName=nvxjob
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 
-// NervexJob is the Schema for the nervexjobs API
-type NervexJob struct {
+// NerveXJob is the Schema for the nervexjobs API
+type NerveXJob struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   NervexJobSpec   `json:"spec,omitempty"`
-	Status NervexJobStatus `json:"status,omitempty"`
+	Spec   NerveXJobSpec   `json:"spec,omitempty"`
+	Status NerveXJobStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// NervexJobList contains a list of NervexJob
-type NervexJobList struct {
+// NerveXJobList contains a list of NerveXJob
+type NerveXJobList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NervexJob `json:"items"`
+	Items           []NerveXJob `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&NervexJob{}, &NervexJobList{})
+	SchemeBuilder.Register(&NerveXJob{}, &NerveXJobList{})
 }

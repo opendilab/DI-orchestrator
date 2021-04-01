@@ -80,7 +80,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.NervexJobReconciler{
+	if err = (&controllers.NerveXJobReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("NervexJob"),
 		Scheme: mgr.GetScheme(),

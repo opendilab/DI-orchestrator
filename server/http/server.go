@@ -90,7 +90,7 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Info("request from", njreq.Namespace, njreq.Coordinator)
+	log.Info("request body: ", "request", njreq)
 
 	// get ALConfig
 	obj, exists, err := s.alconfigDyInformer.GetIndexer().GetByKey(s.alconfig)
@@ -128,7 +128,7 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 	}
 	var ownRefer metav1.OwnerReference
 	for _, ref := range ownRefers {
-		if ref.Kind == "NervexJob" {
+		if ref.Kind == "NerveXJob" {
 			ownRefer = ref
 		}
 	}
@@ -143,11 +143,11 @@ func (s *NervexServer) Add(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !exists {
-		http.Error(w, fmt.Sprintf("NervexJob: %s not exists", njKey), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("NerveXJob: %s not exists in cache", njKey), http.StatusInternalServerError)
 		return
 	}
 
-	nj := &nervexv1alpha1.NervexJob{}
+	nj := &nervexv1alpha1.NerveXJob{}
 	err = nervexutil.GetObjectFromUnstructured(obj, nj)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to convert NervexJob: %s", err)

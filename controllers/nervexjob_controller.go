@@ -27,14 +27,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
-// NervexJobReconciler reconciles a NervexJob object
-type NervexJobReconciler struct {
+// NerveXJobReconciler reconciles a NerveXJob object
+type NerveXJobReconciler struct {
 	client.Client
 	Log    logr.Logger
 	Scheme *runtime.Scheme
@@ -48,18 +51,18 @@ type NervexJobReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the NervexJob object against the actual cluster state, and then
+// the NerveXJob object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
-func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("nervexjob", req.NamespacedName)
 	log.Info("reconcile nervexjob", "nervexjob", req.NamespacedName)
 
-	// get NervexJob object
-	nvxJob := &nervexv1alpha1.NervexJob{}
+	// get NerveXJob object
+	nvxJob := &nervexv1alpha1.NerveXJob{}
 	err := r.Get(ctx, req.NamespacedName, nvxJob)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -67,10 +70,10 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	jobStatus := nvxJob.Status.DeepCopy()
 
-	// list pods of NervexJob
+	// list pods of NerveXJob
 	pods, err := r.listPods(ctx, nvxJob)
 	if err != nil {
-		log.Error(err, "unable to list pods of NervexJob")
+		log.Error(err, "unable to list pods of NerveXJob")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -80,7 +83,7 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Error(err, "unable to classify pods")
 	}
 
-	// check the phase of NervexJob
+	// check the phase of NerveXJob
 	// if isSucceeded(nvxJob) || isFailed(nvxJob) {
 	// 	// delete actors and learners owned by nvcJob
 	// 	// if err := r.deletePods(ctx, actors); err != nil {
@@ -97,12 +100,14 @@ func (r *NervexJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// update status
 	if !apiequality.Semantic.DeepEqual(*jobStatus, nvxJob.Status) {
-		r.Status().Update(ctx, nvxJob, &client.UpdateOptions{})
+		if err := r.updateNerveXJobStatus(ctx, nvxJob); err != nil {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
+		}
 	}
 	return ctrl.Result{}, nil
 }
 
-func (r *NervexJobReconciler) listPods(ctx context.Context, job *nervexv1alpha1.NervexJob) ([]*corev1.Pod, error) {
+func (r *NerveXJobReconciler) listPods(ctx context.Context, job *nervexv1alpha1.NerveXJob) ([]*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 
 	// generate label selector
@@ -126,7 +131,7 @@ func (r *NervexJobReconciler) listPods(ctx context.Context, job *nervexv1alpha1.
 	return pods, nil
 }
 
-func (r *NervexJobReconciler) classifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, err error) {
+func (r *NerveXJobReconciler) classifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, err error) {
 	// filter out actors
 	actors, err = filterOutReplicaPods(pods, nervexutil.ActorName)
 	if err != nil {
@@ -174,18 +179,26 @@ func filterOutReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod
 	return result, nil
 }
 
-func (r *NervexJobReconciler) deletePods(ctx context.Context, pods []*corev1.Pod) error {
-	for _, pod := range pods {
-		if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil {
-			return client.IgnoreNotFound(err)
-		}
-	}
-	return nil
-}
+// func (r *NerveXJobReconciler) deletePods(ctx context.Context, pods []*corev1.Pod) error {
+// 	for _, pod := range pods {
+// 		if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil {
+// 			return client.IgnoreNotFound(err)
+// 		}
+// 	}
+// 	return nil
+// }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *NervexJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *NerveXJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&nervexv1alpha1.NervexJob{}).
+		For(&nervexv1alpha1.NerveXJob{}).
+		Watches(
+			&source.Kind{Type: &corev1.Pod{}},
+			&handler.EnqueueRequestForOwner{
+				IsController: true,
+				OwnerType:    &nervexv1alpha1.NerveXJob{},
+			},
+			builder.Predicates{},
+		).
 		Complete(r)
 }

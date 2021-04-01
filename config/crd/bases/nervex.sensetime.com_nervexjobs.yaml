@@ -10,9 +10,11 @@ metadata:
 spec:
   group: nervex.sensetime.com
   names:
-    kind: NervexJob
-    listKind: NervexJobList
+    kind: NerveXJob
+    listKind: NerveXJobList
     plural: nervexjobs
+    shortNames:
+    - nvxjob
     singular: nervexjob
   scope: Namespaced
   versions:
@@ -23,7 +25,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NervexJob is the Schema for the nervexjobs API
+        description: NerveXJob is the Schema for the nervexjobs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -38,7 +40,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: NervexJobSpec defines the desired state of NervexJob
+            description: NerveXJobSpec defines the desired state of NerveXJob
             properties:
               coordinator:
                 description: CoordinatorSpec defines the desired state of coordinators
@@ -6614,14 +6616,14 @@ spec:
             - coordinator
             type: object
           status:
-            description: NervexJobStatus defines the observed state of NervexJob
+            description: NerveXJobStatus defines the observed state of NerveXJob
             properties:
               actors:
                 format: int32
                 type: integer
               conditions:
                 items:
-                  description: NervexJobCondition records the conditions of NervexJob
+                  description: NerveXJobCondition records the conditions of NerveXJob
                   properties:
                     lastTransitionTime:
                       description: Last time the condition transitioned from one status
@@ -6654,7 +6656,7 @@ spec:
                 format: int32
                 type: integer
               phase:
-                description: Phase defines the phase of NervexJob
+                description: Phase defines the phase of NerveXJob
                 type: string
             type: object
         type: object

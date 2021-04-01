@@ -115,3 +115,7 @@ func BuildService(labels map[string]string, port int32, portName string) *corev1
 		},
 	}
 }
+
+func NamespacedName(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
+}

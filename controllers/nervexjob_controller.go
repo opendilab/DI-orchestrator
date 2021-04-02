@@ -126,26 +126,26 @@ func (r *NerveXJobReconciler) listPods(ctx context.Context, job *nervexv1alpha1.
 
 	pods := []*corev1.Pod{}
 	for _, pod := range podList.Items {
-		pods = append(pods, &pod)
+		pods = append(pods, pod.DeepCopy())
 	}
 	return pods, nil
 }
 
 func (r *NerveXJobReconciler) classifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, err error) {
 	// filter out actors
-	actors, err = filterOutReplicaPods(pods, nervexutil.ActorName)
+	actors, err = filterReplicaPods(pods, nervexutil.ActorName)
 	if err != nil {
 		return
 	}
 
 	// filter out leader pods
-	learners, err = filterOutReplicaPods(pods, nervexutil.LearnerName)
+	learners, err = filterReplicaPods(pods, nervexutil.LearnerName)
 	if err != nil {
 		return
 	}
 
 	// filter out coordinator pod
-	coordinators, err := filterOutReplicaPods(pods, nervexutil.CoordinatorName)
+	coordinators, err := filterReplicaPods(pods, nervexutil.CoordinatorName)
 	if err != nil {
 		return
 	}
@@ -161,7 +161,7 @@ func (r *NerveXJobReconciler) classifyPods(pods []*corev1.Pod) (actors []*corev1
 	return
 }
 
-func filterOutReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod, error) {
+func filterReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{nervexutil.ReplicaTypeLabel: replicaType},
 	})

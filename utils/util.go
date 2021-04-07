@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
@@ -118,4 +119,52 @@ func BuildService(labels map[string]string, port int32, portName string) *corev1
 
 func NamespacedName(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
+}
+
+func ClassifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, err error) {
+	// filter out actors
+	actors, err = filterReplicaPods(pods, ActorName)
+	if err != nil {
+		return
+	}
+
+	// filter out leader pods
+	learners, err = filterReplicaPods(pods, LearnerName)
+	if err != nil {
+		return
+	}
+
+	// filter out coordinator pod
+	coordinators, err := filterReplicaPods(pods, CoordinatorName)
+	if err != nil {
+		return
+	}
+
+	if len(coordinators) > 1 {
+		err = fmt.Errorf("there must be only one coordinator")
+		return
+	}
+	if len(coordinators) < 1 {
+		return
+	}
+	coordinator = coordinators[0]
+	return
+}
+
+func filterReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod, error) {
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{ReplicaTypeLabel: replicaType},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := []*corev1.Pod{}
+	for _, pod := range pods {
+		if !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		result = append(result, pod)
+	}
+	return result, nil
 }

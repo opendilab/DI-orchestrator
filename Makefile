@@ -92,7 +92,7 @@ dev-images: build
 	docker build -t ${IMG} --target dev-manager .
 	docker build -t ${SERVER_IMG} -f Dockerfile.server --target dev-nervex-server .
 
-docker-build: ## Build docker image with the manager.
+docker-build: build ## Build docker image with the manager.
 	docker build -t ${IMG} --target manager .
 	docker build -t ${SERVER_IMG} -f Dockerfile.server --target nervex-server .
 

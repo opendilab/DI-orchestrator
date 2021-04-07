@@ -10,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -376,7 +375,7 @@ func (s *NervexServer) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// classify pods
-	actors, learners, _, err := s.classifyPods(pods)
+	actors, learners, _, err := nervexutil.ClassifyPods(pods)
 	if err != nil {
 		errMsg := fmt.Sprintf("unable to classify pods: %s", err)
 		http.Error(w, errMsg, http.StatusInternalServerError)
@@ -441,54 +440,6 @@ func (s *NervexServer) listPods(ns string, ownRefer metav1.OwnerReference) ([]*c
 	return pods, nil
 }
 
-func (s *NervexServer) classifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, err error) {
-	// filter out actors
-	actors, err = filterReplicaPods(pods, nervexutil.ActorName)
-	if err != nil {
-		return
-	}
-
-	// filter out leader pods
-	learners, err = filterReplicaPods(pods, nervexutil.LearnerName)
-	if err != nil {
-		return
-	}
-
-	// filter out coordinator pod
-	coordinators, err := filterReplicaPods(pods, nervexutil.CoordinatorName)
-	if err != nil {
-		return
-	}
-
-	if len(coordinators) > 1 {
-		err = fmt.Errorf("there must be only one coordinator")
-		return
-	}
-	if len(coordinators) < 1 {
-		return
-	}
-	coordinator = coordinators[0]
-	return
-}
-
-func filterReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: map[string]string{nervexutil.ReplicaTypeLabel: replicaType},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	result := []*corev1.Pod{}
-	for _, pod := range pods {
-		if !selector.Matches(labels.Set(pod.Labels)) {
-			continue
-		}
-		result = append(result, pod)
-	}
-	return result, nil
-}
-
 func (s *NervexServer) DeletePodsAndServices(pods []*corev1.Pod, njreq *NervexJobRequest, replicaType string) ([]string, error) {
 	results := []string{}
 	resources := ResourceQuantity{}
@@ -501,10 +452,6 @@ func (s *NervexServer) DeletePodsAndServices(pods []*corev1.Pod, njreq *NervexJo
 	}
 
 	for _, pod := range pods {
-		// do not delete if pod is not running
-		if pod.Status.Phase != "Running" {
-			continue
-		}
 
 		err := s.KubeClient.CoreV1().Pods(njreq.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
 		if err != nil {

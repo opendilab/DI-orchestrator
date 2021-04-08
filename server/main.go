@@ -68,7 +68,7 @@ func main() {
 
 	logger := zap.New(zap.UseFlagOptions(&opts))
 
-	nervexServer := serverhttp.NewNervexServer(kubeClient, dynamicClient, logger, alconfigDyInformer, njDyInformer, alconfigName)
+	nervexServer := serverhttp.NewNerveXServer(kubeClient, dynamicClient, logger, alconfigDyInformer, njDyInformer, alconfigName)
 
 	if err := nervexServer.Start(); err != nil {
 		log.Fatalf("Failed to start NervexServer: %v", err)

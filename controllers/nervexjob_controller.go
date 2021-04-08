@@ -76,7 +76,7 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// classify pods
-	_, _, coordinator, err := nervexutil.ClassifyPods(pods)
+	_, _, coordinator, _, err := nervexutil.ClassifyPods(pods)
 	if err != nil {
 		log.Error(err, "unable to classify pods")
 	}

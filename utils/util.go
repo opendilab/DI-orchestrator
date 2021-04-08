@@ -121,7 +121,7 @@ func NamespacedName(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
 }
 
-func ClassifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, err error) {
+func ClassifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {
 	// filter out actors
 	actors, err = filterReplicaPods(pods, ActorName)
 	if err != nil {
@@ -140,14 +140,21 @@ func ClassifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.
 		return
 	}
 
-	if len(coordinators) > 1 {
+	// filter aggregator pod
+	aggregators, err := filterReplicaPods(pods, AggregatorName)
+	if err != nil {
+		return
+	}
+
+	if len(coordinators) > 1 || len(aggregators) > 1 {
 		err = fmt.Errorf("there must be only one coordinator")
 		return
 	}
-	if len(coordinators) < 1 {
+	if len(coordinators) < 1 || len(aggregators) < 1 {
 		return
 	}
 	coordinator = coordinators[0]
+	aggregator = aggregators[0]
 	return
 }
 

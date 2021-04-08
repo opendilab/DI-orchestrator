@@ -312,5 +312,163 @@ func SetPodTemplateResources(template *corev1.PodTemplateSpec, resources Resourc
 }
 
 func (s *NervexServer) Delete(w http.ResponseWriter, r *http.Request) {
+	log := s.Log.WithName("NervexServer")
 
+	// parse request body
+	var njreq NervexJobRequest
+	err := json.NewDecoder(r.Body).Decode(&njreq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log.Info("delete request body: ", "request", njreq)
+
+	// get coordinator
+	coordinator, err := s.KubeClient.CoreV1().Pods(njreq.Namespace).Get(context.Background(), njreq.Coordinator, metav1.GetOptions{})
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to get coordinator: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+
+	ownRefers := coordinator.GetOwnerReferences()
+	if len(ownRefers) == 0 {
+		errMsg := fmt.Sprintf("orphaned coordinator found: %s/%s, please ensure which NervexJob it belongs to", coordinator.Namespace, coordinator.Name)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+	var ownRefer metav1.OwnerReference
+	for _, ref := range ownRefers {
+		if ref.Kind == "NerveXJob" {
+			ownRefer = ref
+		}
+	}
+
+	// get NervexJob
+	njKey := fmt.Sprintf("%s/%s", njreq.Namespace, ownRefer.Name)
+	obj, exists, err := s.njDyInformer.GetIndexer().GetByKey(njKey)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to get NervexJob: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+
+	if !exists {
+		http.Error(w, fmt.Sprintf("NerveXJob: %s not exists in cache", njKey), http.StatusInternalServerError)
+		return
+	}
+
+	nj := &nervexv1alpha1.NerveXJob{}
+	err = nervexutil.GetObjectFromUnstructured(obj, nj)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to convert NervexJob: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+
+	// list pods
+	pods, err := s.listPods(njreq.Namespace, ownRefer)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to list pod through ownrefernece: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+
+	// classify pods
+	actors, learners, _, err := nervexutil.ClassifyPods(pods)
+	if err != nil {
+		errMsg := fmt.Sprintf("unable to classify pods: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+
+	// delete actor pods
+	delActors, err := s.DeletePodsAndServices(actors, &njreq, nervexutil.ActorName)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to delete actor: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+
+	// delete learner pods
+	delLearners, err := s.DeletePodsAndServices(learners, &njreq, nervexutil.LearnerName)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to delete learner: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+
+	rep := NervexJobResponse{
+		Namespace:   njreq.Namespace,
+		Coordinator: njreq.Coordinator,
+		Actors:      delActors,
+		Learners:    delLearners,
+	}
+	w.Header().Set("Conten-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	repJson, err := json.Marshal(rep)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to marshal json: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		return
+	}
+	_, err = w.Write(repJson)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to write json: %s", err)
+		http.Error(w, errMsg, http.StatusInternalServerError)
+	}
+}
+
+func (s *NervexServer) listPods(ns string, ownRefer metav1.OwnerReference) ([]*corev1.Pod, error) {
+	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: nervexutil.GenLabels(ownRefer.Name),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	podList, err := s.KubeClient.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector.String()})
+	if err != nil {
+		return nil, err
+	}
+
+	pods := []*corev1.Pod{}
+	for _, pod := range podList.Items {
+		pods = append(pods, pod.DeepCopy())
+	}
+
+	return pods, nil
+}
+
+func (s *NervexServer) DeletePodsAndServices(pods []*corev1.Pod, njreq *NervexJobRequest, replicaType string) ([]string, error) {
+	results := []string{}
+	resources := ResourceQuantity{}
+	ns := njreq.Namespace
+
+	if replicaType == nervexutil.ActorName {
+		resources = njreq.Actors
+	} else if replicaType == nervexutil.LearnerName {
+		resources = njreq.Learners
+	}
+
+	for _, pod := range pods {
+
+		err := s.KubeClient.CoreV1().Pods(njreq.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return results, err
+		}
+		err = s.KubeClient.CoreV1().Services(njreq.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return results, err
+		}
+
+		result := fmt.Sprintf("%s.%s", pod.Name, ns)
+		results = append(results, result)
+		// break if enough
+		if len(results) == resources.Replicas {
+			break
+		}
+	}
+
+	return results, nil
 }

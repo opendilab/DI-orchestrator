@@ -26,7 +26,7 @@ spec:
             python3 -u -c 'import nervex.entry.parallel_entry as pe; pe.launch_coordinator(filename="atari_impala_default_config.py.pkl")';
             while true; do sleep 30; done;
           ports:
-          - name: cood-port
+          - name: coordinator
             containerPort: 22273
           resources:
             requests:

@@ -19,7 +19,11 @@ var (
 
 func main() {
 	var nervexServer string
-	flag.StringVar(&nervexServer, "nervex-server", DefaultNervexServer, " URL to nervex-server.")
+	var numAct int
+	var numLearn int
+	flag.StringVar(&nervexServer, "nervex-server", DefaultNervexServer, "URL to nervex-server.")
+	flag.IntVar(&numAct, "actors", 1, "number of actors.")
+	flag.IntVar(&numLearn, "learners", 1, "number of learners.")
 	flag.Parse()
 
 	namespace := os.Getenv(NamespaceEnv)
@@ -37,13 +41,13 @@ func main() {
 		"actors": map[string]interface{}{
 			"cpu":      "0.1",
 			"memory":   "50Mi",
-			"replicas": 1,
+			"replicas": numAct,
 		},
 		"learners": map[string]interface{}{
 			"cpu":      "0.1",
 			"memory":   "50Mi",
 			"gpu":      "0",
-			"replicas": 1,
+			"replicas": numLearn,
 		},
 	}
 	actors, learners, err := add(nervexServer, req)

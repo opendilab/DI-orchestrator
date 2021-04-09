@@ -150,7 +150,7 @@ func (s *NerveXServer) getOwnerReference(njreq NerveXJobRequest) (*metav1.OwnerR
 		}
 	}
 	if !ownByNerveX {
-		errMsg := fmt.Sprintf("coordinator is not owned by NerveXJob")
+		errMsg := "coordinator is not owned by NerveXJob"
 		return nil, fmt.Errorf(errMsg)
 	}
 

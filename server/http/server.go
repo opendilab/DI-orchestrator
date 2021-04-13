@@ -292,15 +292,14 @@ func (s *NerveXServer) createPodsAndServices(
 		portEnv = "AGGREGATOR_PORT"
 	}
 
+	// setup pod template
+	template.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
+
 	// add labels to pod template
 	labels := nervexutil.GenLabels(ownRefer.Name)
 	labels[nervexutil.ReplicaTypeLabel] = replicaType
 	nervexutil.AddLabelsToPodTemplate(template, labels)
 
-	// setup pod template
-	template.GenerateName = fmt.Sprintf("%s-%s-", coordinator, replicaType)
-	template.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
-	template.Namespace = ns
 	// set pod resource
 	SetPodTemplateResources(template, resources, containerName)
 	// get pod port
@@ -319,60 +318,41 @@ func (s *NerveXServer) createPodsAndServices(
 	// build pod
 	pod := nervexutil.BuildPodFromTemplate(template.DeepCopy())
 
-	// build service
-	svc := nervexutil.BuildService(labels, port, portName)
-	svc.Labels = labels
-	svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
-
 	results := []string{}
 	// create pods and services
 	for i := 0; i < resources.Replicas; i++ {
 		tempPod := pod.DeepCopy()
-		newPod, err := s.KubeClient.CoreV1().Pods(ns).Create(context.Background(), tempPod, metav1.CreateOptions{})
+
+		// set pod name
+		generateName := fmt.Sprintf("%s-%s", coordinator, replicaType)
+		tempPod.Name = nervexutil.GenerateName(generateName)
+
+		// add pod name label
+		labels := tempPod.GetLabels()
+		labels[nervexutil.PodNameLabel] = tempPod.Name
+		tempPod.SetLabels(labels)
+
+		_, err := s.KubeClient.CoreV1().Pods(ns).Create(context.Background(), tempPod, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
 		}
 
-		tempSvc := svc.DeepCopy()
-		tempSvc.Name = newPod.Name
-		_, err = s.KubeClient.CoreV1().Services(ns).Create(context.Background(), tempSvc, metav1.CreateOptions{})
+		// build service
+		svc := nervexutil.BuildService(labels, port, portName)
+		svc.SetLabels(labels)
+		svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
+		svc.Name = tempPod.Name
+
+		_, err = s.KubeClient.CoreV1().Services(ns).Create(context.Background(), svc, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
 		}
 
-		result := fmt.Sprintf("%s.%s:%d", tempSvc.Name, ns, port)
+		result := fmt.Sprintf("%s.%s:%d", svc.Name, ns, port)
 		results = append(results, result)
 	}
 
 	return results, nil
-}
-
-func SetPodTemplateResources(template *corev1.PodTemplateSpec, resources ResourceQuantity, containerName string) {
-	for i := range template.Spec.Containers {
-		if template.Spec.Containers[i].Name != containerName {
-			continue
-		}
-		if template.Spec.Containers[i].Resources.Limits == nil {
-			template.Spec.Containers[i].Resources.Limits = make(corev1.ResourceList)
-		}
-		if template.Spec.Containers[i].Resources.Requests == nil {
-			template.Spec.Containers[i].Resources.Requests = make(corev1.ResourceList)
-		}
-
-		// cpu and memory must not be zero
-		if !resources.Cpu.IsZero() {
-			template.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = resources.Cpu
-			template.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = resources.Cpu
-		}
-		if !resources.Memory.IsZero() {
-			template.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = resources.Memory
-			template.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = resources.Memory
-		}
-		if !resources.Gpu.IsZero() {
-			template.Spec.Containers[i].Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = resources.Gpu
-			template.Spec.Containers[i].Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = resources.Gpu
-		}
-	}
 }
 
 func (s *NerveXServer) Delete(w http.ResponseWriter, r *http.Request) {

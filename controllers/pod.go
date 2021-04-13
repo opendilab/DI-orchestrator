@@ -66,6 +66,7 @@ func (r *NerveXJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 	// add labels
 	labels := nervexutil.GenLabels(job.Name)
 	labels[nervexutil.ReplicaTypeLabel] = replicaType
+	labels[nervexutil.PodNameLabel] = podTemplate.Name
 	nervexutil.AddLabelsToPodTemplate(podTemplate, labels)
 
 	// get port
@@ -78,8 +79,8 @@ func (r *NerveXJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 
 	// add env
 	envs := make(map[string]string)
-	envs["KUBERNETES_POD_NAMESPACE"] = podTemplate.Namespace
-	envs["KUBERNETES_POD_NAME"] = podTemplate.Name
+	envs[nervexutil.PodNamespaceEnv] = podTemplate.Namespace
+	envs[nervexutil.PodNameEnv] = podTemplate.Name
 	envs["COORDINATOR_PORT"] = fmt.Sprintf("%d", port)
 	nervexutil.SetPodTemplateEnv(podTemplate, envs)
 
@@ -96,6 +97,7 @@ func (r *NerveXJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 	pod := nervexutil.BuildPodFromTemplate(podTemplate)
 	log.Info("create pod ", "pod name:", pod)
 	if err := r.Create(ctx, pod, &client.CreateOptions{}); err != nil {
+		log.Error(err, "failed to create pod", "pod name:", pod)
 		return err
 	}
 	return nil

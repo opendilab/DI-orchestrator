@@ -15,4 +15,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: registry.sensetime.com/cloudnative4ai/nervex-operator
-  newTag: v0.0.1-alpha.0-87957297
+  newTag: v0.0.1-alpha.0-21123d9e

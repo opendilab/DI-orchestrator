@@ -2,16 +2,32 @@ package util
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 )
+
+const (
+	randomLength = 5
+)
+
+func init() {
+
+}
+
+func GenerateName(name string) string {
+	rand.Seed(time.Now().UnixNano())
+	return fmt.Sprintf("%s-%s", name, utilrand.String(randomLength))
+}
 
 func GetObjectFromUnstructured(obj interface{}, dest interface{}) error {
 	us, ok := obj.(*unstructured.Unstructured)
@@ -146,14 +162,22 @@ func ClassifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.
 		return
 	}
 
-	if len(coordinators) > 1 || len(aggregators) > 1 {
+	if len(coordinators) > 1 {
 		err = fmt.Errorf("there must be only one coordinator")
 		return
 	}
-	if len(coordinators) < 1 || len(aggregators) < 1 {
+	if len(coordinators) < 1 {
 		return
 	}
 	coordinator = coordinators[0]
+
+	if len(aggregators) > 1 {
+		err = fmt.Errorf("there must be only one coordinator")
+		return
+	}
+	if len(aggregators) < 1 {
+		return
+	}
 	aggregator = aggregators[0]
 	return
 }

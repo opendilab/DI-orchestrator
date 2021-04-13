@@ -5,6 +5,7 @@ const (
 	JobNameLabel        = "nervexjob-name"
 	ControllerNameLabel = "controller-name"
 	ReplicaTypeLabel    = "replica-type"
+	PodNameLabel        = "pod-name"
 
 	ControllerName  = "nervex-operator"
 	ActorName       = "actor"
@@ -26,4 +27,7 @@ const (
 	DefaultLearnerPort     = 22271
 	DefaultAggregatorPort  = 22272
 	DefaultCoordinatorPort = 22273
+
+	PodNamespaceEnv = "KUBERNETES_POD_NAMESPACE"
+	PodNameEnv      = "KUBERNETES_POD_NAME"
 )

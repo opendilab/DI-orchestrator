@@ -1,7 +1,7 @@
 apiVersion: nervex.sensetime.com/v1alpha1
 kind: NerveXJob
 metadata:
-  name: nervexjob-example
+  name: nervexjob-example-1
 spec:
   group: xxx
   priorityClassName: default
@@ -10,10 +10,8 @@ spec:
       spec:
         containers:
         - name: coordinator
-          image: registry.sensetime.com/cloudnative4ai/liqingping/mock_nervex:v0.0.1
+          image: registry.sensetime.com/cloudnative4ai/mock_nervex:v0.0.1
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "-c",]
           args: ["python3 -u main.py coordinator -l $HOSTNAME -p $COORDINATOR_PORT"]
           # args: ["sleep 3600"]
-
-# spc run nervexjob --image --cpus-per-pod 6 --gpus-per-pod 8

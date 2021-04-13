@@ -23,10 +23,11 @@ const (
 	DefaultAggregatorPortName  = "aggregator"
 	DefaultCoordinatorPortName = "coordinator"
 
-	DefaultActorPort       = 22270
-	DefaultLearnerPort     = 22271
-	DefaultAggregatorPort  = 22272
-	DefaultCoordinatorPort = 22273
+	DefaultActorPort           = 22270
+	DefaultLearnerPort         = 22271
+	DefaultAggregatorPort      = 22272
+	DefaultCoordinatorPort     = 22273
+	DefaultCoordinatorNodePort = 32273
 
 	PodNamespaceEnv = "KUBERNETES_POD_NAMESPACE"
 	PodNameEnv      = "KUBERNETES_POD_NAME"

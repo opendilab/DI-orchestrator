@@ -118,11 +118,11 @@ func SetPodTemplateEnv(template *corev1.PodTemplateSpec, envs map[string]string)
 	}
 }
 
-func BuildService(labels map[string]string, port int32, portName string) *corev1.Service {
-	return &corev1.Service{
+func BuildService(labels map[string]string, port int32, portName string, serviceType corev1.ServiceType) *corev1.Service {
+	svc := &corev1.Service{
 		Spec: corev1.ServiceSpec{
-			ClusterIP: "None",
-			Selector:  labels,
+			Type:     serviceType,
+			Selector: labels,
 			Ports: []corev1.ServicePort{
 				{
 					Port: port,
@@ -131,6 +131,14 @@ func BuildService(labels map[string]string, port int32, portName string) *corev1
 			},
 		},
 	}
+	switch serviceType {
+	case corev1.ServiceTypeClusterIP:
+		svc.Spec.ClusterIP = "None"
+	case corev1.ServiceTypeNodePort:
+		svc.Spec.Ports[0].NodePort = port
+	}
+
+	return svc
 }
 
 func NamespacedName(namespace, name string) string {

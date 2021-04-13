@@ -17,7 +17,7 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 			return err
 		}
 	} else {
-		if err := r.createPod(ctx, job, nervexutil.CoordinatorName); err != nil {
+		if err := r.createPodAndService(ctx, job, nervexutil.CoordinatorName); err != nil {
 			return err
 		}
 
@@ -48,7 +48,7 @@ func (r *NerveXJobReconciler) checkPodStatus(ctx context.Context, job *nervexv1a
 	return nil
 }
 
-func (r *NerveXJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1.NerveXJob, replicaType string) error {
+func (r *NerveXJobReconciler) createPodAndService(ctx context.Context, job *nervexv1alpha1.NerveXJob, replicaType string) error {
 	log := r.Log.WithValues("nervexjob", job.Namespace)
 	podTemplate := job.Spec.Coordinator.Template.DeepCopy()
 
@@ -98,6 +98,17 @@ func (r *NerveXJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 	log.Info("create pod ", "pod name:", pod)
 	if err := r.Create(ctx, pod, &client.CreateOptions{}); err != nil {
 		log.Error(err, "failed to create pod", "pod name:", pod)
+		return err
+	}
+
+	// build service
+	svc := nervexutil.BuildService(labels, port, nervexutil.DefaultCoordinatorPortName, corev1.ServiceTypeNodePort)
+	svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
+	svc.Name = pod.Name
+	svc.Namespace = pod.Namespace
+	log.Info("create service ", "service name:", svc)
+	if err := r.Create(ctx, svc, &client.CreateOptions{}); err != nil {
+		log.Error(err, "failed to create service", "service name:", svc)
 		return err
 	}
 	return nil

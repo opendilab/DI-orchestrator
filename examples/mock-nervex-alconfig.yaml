@@ -8,24 +8,24 @@ spec:
       spec:
         containers:
         - name: actor
-          image: registry.sensetime.com/cloudnative4ai/liqingping/mock_nervex:v0.0.1
+          image: registry.sensetime.com/cloudnative4ai/mock_nervex:v0.0.1
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "-c",]
           args: ["until ping -c 1 $HOSTNAME.default ; do sleep 1 ; done ; sleep 5; python3 -u main.py actor -l $HOSTNAME.default -p $ACTOR_PORT"]
           ports:
-          - name: actor-port
+          - name: actor
             containerPort: 80
   learner:
     template:
       spec:
         containers:
         - name: learner
-          image: registry.sensetime.com/cloudnative4ai/liqingping/mock_nervex:v0.0.1
+          image: registry.sensetime.com/cloudnative4ai/mock_nervex:v0.0.1
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "-c",]
           args: ["until ping -c 1 $HOSTNAME.default ; do sleep 1 ; done ; sleep 5; python3 -u main.py learner -l $HOSTNAME.default -p $LEARNER_PORT"]
           ports:
-          - name: learner-port
+          - name: learner
             containerPort: 80
   aggregator:
     template:
@@ -34,7 +34,7 @@ spec:
         - name: learner
           image: registry.sensetime.com/cloudnative4ai/nginx:latest
           ports:
-          - name: aggr-port
+          - name: aggregator
             containerPort: 80
 status:
   actors:

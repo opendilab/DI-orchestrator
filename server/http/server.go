@@ -108,19 +108,19 @@ func (s *NerveXServer) Add(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, _, _, ag, err := s.listActorsAndLearners(njreq.Namespace, ownRefer.Name)
+	_, _, _, ag, err := s.listReplicaPods(njreq.Namespace, ownRefer.Name)
 	if err != nil {
 		log.Error(err, "failed to list actors and learners")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	needAgg := false
+	needAg := false
 	if ag == nil {
-		needAgg = true
+		needAg = true
 	}
 
 	// create actors and learners
-	actors, learners, aggregator, err := s.createActorsAndLearnersFromALConfig(alconfig, &njreq, *ownRefer, needAgg)
+	actors, learners, aggregator, err := s.createActorsAndLearnersFromALConfig(alconfig, &njreq, *ownRefer, needAg)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed create actors and learners: %s", err)
 		log.Error(err, "failed create actors and learners")
@@ -213,7 +213,7 @@ func (s *NerveXServer) getALConfig() (*nervexv1alpha1.ActorLearnerConfig, error)
 	return alconfig, nil
 }
 
-func (s *NerveXServer) listActorsAndLearners(ns, jobName string) (
+func (s *NerveXServer) listReplicaPods(ns, jobName string) (
 	actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {
 	// list pods that belong to the NerveXJob
 	pods, err := s.listPods(ns, jobName)
@@ -338,8 +338,7 @@ func (s *NerveXServer) createPodsAndServices(
 		}
 
 		// build service
-		svc := nervexutil.BuildService(labels, port, portName)
-		svc.SetLabels(labels)
+		svc := nervexutil.BuildService(labels, port, portName, corev1.ServiceTypeClusterIP)
 		svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
 		svc.Name = tempPod.Name
 
@@ -375,7 +374,7 @@ func (s *NerveXServer) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// list pods that belong to the NerveXJob
-	actors, learners, _, _, err := s.listActorsAndLearners(njreq.Namespace, ownRefer.Name)
+	actors, learners, _, _, err := s.listReplicaPods(njreq.Namespace, ownRefer.Name)
 	if err != nil {
 		log.Error(err, "failed to list actors and learners")
 		http.Error(w, err.Error(), http.StatusInternalServerError)

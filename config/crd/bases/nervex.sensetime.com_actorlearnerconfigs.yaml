@@ -19752,27 +19752,10 @@ spec:
             description: ActorLearnerConfigStatus defines the observed state of ActorLearnerConfig
             properties:
               actors:
-                description: ReplicaStatus defines the observed state of actors' and
-                  learners' replicas
+                description: ActorLearnerReplicaStatus defines the observed state
+                  of actors' and learners' replicas
                 properties:
                   active:
-                    format: int32
-                    type: integer
-                  idle:
-                    format: int32
-                    type: integer
-                  total:
-                    format: int32
-                    type: integer
-                type: object
-              aggregator:
-                description: ReplicaStatus defines the observed state of actors' and
-                  learners' replicas
-                properties:
-                  active:
-                    format: int32
-                    type: integer
-                  idle:
                     format: int32
                     type: integer
                   total:
@@ -19780,13 +19763,10 @@ spec:
                     type: integer
                 type: object
               learners:
-                description: ReplicaStatus defines the observed state of actors' and
-                  learners' replicas
+                description: ActorLearnerReplicaStatus defines the observed state
+                  of actors' and learners' replicas
                 properties:
                   active:
-                    format: int32
-                    type: integer
-                  idle:
                     format: int32
                     type: integer
                   total:

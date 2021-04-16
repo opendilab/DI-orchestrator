@@ -56,20 +56,16 @@ type ActorLearnerConfigStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Actors *ReplicaStatus `json:"actors,omitempty"`
+	Actors *ActorLearnerReplicaStatus `json:"actors,omitempty"`
 
-	Learners *ReplicaStatus `json:"learners,omitempty"`
-
-	Aggregator *ReplicaStatus `json:"aggregator,omitempty"`
+	Learners *ActorLearnerReplicaStatus `json:"learners,omitempty"`
 }
 
-// ReplicaStatus defines the observed state of actors' and learners' replicas
-type ReplicaStatus struct {
+// ActorLearnerReplicaStatus defines the observed state of actors' and learners' replicas
+type ActorLearnerReplicaStatus struct {
 	Total int32 `json:"total,omitempty"`
 
 	Active int32 `json:"active,omitempty"`
-
-	Idle int32 `json:"idle,omitempty"`
 }
 
 // +kubebuilder:object:root=true

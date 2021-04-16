@@ -6,11 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
@@ -21,11 +23,10 @@ const (
 )
 
 func init() {
-
+	rand.Seed(time.Now().UnixNano())
 }
 
 func GenerateName(name string) string {
-	rand.Seed(time.Now().UnixNano())
 	return fmt.Sprintf("%s-%s", name, utilrand.String(randomLength))
 }
 
@@ -90,39 +91,88 @@ func AddLabelsToPodTemplate(podTemplate *corev1.PodTemplateSpec, labels map[stri
 	}
 }
 
-func BuildPodFromTemplate(template *corev1.PodTemplateSpec) *corev1.Pod {
+func BuildPodFromTemplate(
+	template *corev1.PodTemplateSpec,
+	ownRefer metav1.OwnerReference,
+	ns, replicaType, containerName, portName string,
+	defaultPort int32) (*corev1.Pod, int32, error) {
+	// generate name is the NerveXJob name
+	jobName := ownRefer.Name
+	portEnv := ""
+	podName := fmt.Sprintf("%s-%s", jobName, replicaType)
+	switch replicaType {
+	case ActorName:
+		portEnv = "ACTOR_PORT"
+		podName = GenerateName(podName)
+	case LearnerName:
+		portEnv = "LEARNER_PORT"
+		podName = GenerateName(podName)
+	case AggregatorName:
+		portEnv = "AGGREGATOR_PORT"
+
+	case CoordinatorName:
+		portEnv = "COORDINATOR_PORT"
+	default:
+		return nil, -1, fmt.Errorf("wrong replica type: %s", replicaType)
+	}
+
+	// setup pod template
+	template.SetName(podName)
+	template.SetNamespace(ns)
+	template.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
+
+	// add labels to pod template
+	labels := GenLabels(jobName)
+	labels[ReplicaTypeLabel] = replicaType
+	labels[PodNameLabel] = template.Name
+	AddLabelsToPodTemplate(template, labels)
+
+	// get pod port
+	port, ok := GetPortFromPodTemplate(template, containerName, portName)
+	if !ok {
+		port = defaultPort
+		logrus.Infof("no port found, use default port container %s port %d", containerName, port)
+		SetPodTemplatePort(template, containerName, portName, port)
+	}
+
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
+		Spec:       *template.Spec.DeepCopy(),
+		ObjectMeta: *template.ObjectMeta.DeepCopy(),
 	}
-	pod.Spec = *template.Spec.DeepCopy()
-	pod.ObjectMeta = *template.ObjectMeta.DeepCopy()
-	return pod
+
+	// add env
+	envs := make(map[string]string)
+	envs[portEnv] = fmt.Sprintf("%d", port)
+	SetPodEnv(pod, envs)
+	return pod, port, nil
 }
 
-func SetPodTemplateEnv(template *corev1.PodTemplateSpec, envs map[string]string) {
+func SetPodEnv(pod *corev1.Pod, envs map[string]string) {
 	// add env
-	for i := range template.Spec.Containers {
-		if len(template.Spec.Containers[i].Env) == 0 {
-			template.Spec.Containers[i].Env = make([]corev1.EnvVar, 0)
+	for i := range pod.Spec.Containers {
+		if len(pod.Spec.Containers[i].Env) == 0 {
+			pod.Spec.Containers[i].Env = make([]corev1.EnvVar, 0)
 		}
 		for k, v := range envs {
 			env := corev1.EnvVar{
 				Name:  k,
 				Value: v,
 			}
-			template.Spec.Containers[i].Env = append(template.Spec.Containers[i].Env, env)
+			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, env)
 		}
 	}
 }
 
-func BuildService(labels map[string]string, port int32, portName string, serviceType corev1.ServiceType) *corev1.Service {
+func BuildService(labels map[string]string, port int32, portName string) *corev1.Service {
 	svc := &corev1.Service{
 		Spec: corev1.ServiceSpec{
-			Type:     serviceType,
-			Selector: labels,
+			Type:      corev1.ServiceTypeClusterIP,
+			ClusterIP: "None",
+			Selector:  labels,
 			Ports: []corev1.ServicePort{
 				{
 					Port: port,
@@ -131,18 +181,20 @@ func BuildService(labels map[string]string, port int32, portName string, service
 			},
 		},
 	}
-	switch serviceType {
-	case corev1.ServiceTypeClusterIP:
-		svc.Spec.ClusterIP = "None"
-	case corev1.ServiceTypeNodePort:
-		svc.Spec.Ports[0].NodePort = port
-	}
 
 	return svc
 }
 
 func NamespacedName(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
+}
+
+func SplitNamespaceName(namespaceName string) (types.NamespacedName, error) {
+	strs := strings.Split(namespaceName, "/")
+	if len(strs) != 2 {
+		return types.NamespacedName{}, fmt.Errorf("Invalid namespace, name %s", namespaceName)
+	}
+	return types.NamespacedName{Namespace: strs[0], Name: strs[1]}, nil
 }
 
 func ClassifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {

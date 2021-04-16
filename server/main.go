@@ -25,8 +25,10 @@ var (
 func main() {
 	var kubeconfig string
 	var alconfigName string
+	var serverBindAddress string
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "The kubeconfig file to access kubernetes cluster. Default to ")
 	flag.StringVar(&alconfigName, "alconfig-namespace-name", DefaultALConfigNamespaceName, "The ActorLearnerConfig to manage actors and learners.")
+	flag.StringVar(&serverBindAddress, "server-bind-address", ":8080", "The address for server to bind to.")
 	flag.Parse()
 
 	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -70,7 +72,7 @@ func main() {
 
 	nervexServer := serverhttp.NewNerveXServer(kubeClient, dynamicClient, logger, alconfigDyInformer, njDyInformer, alconfigName)
 
-	if err := nervexServer.Start(); err != nil {
+	if err := nervexServer.Start(serverBindAddress); err != nil {
 		log.Fatalf("Failed to start NervexServer: %v", err)
 	}
 }

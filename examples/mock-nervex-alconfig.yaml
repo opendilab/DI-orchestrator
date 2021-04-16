@@ -36,12 +36,3 @@ spec:
           ports:
           - name: aggregator
             containerPort: 80
-status:
-  actors:
-    total: 4
-    active: 3
-    idle: 1
-  learners:
-    total: 5
-    active: 5
-    idle: 0

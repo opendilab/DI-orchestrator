@@ -16,8 +16,10 @@ var (
 )
 
 const (
-	NerveXJobPodsReadyReason    = "PodsReady"
-	NerveXJobPodsNotReadyReason = "PodsNotReady"
+	NerveXJobCreatedReason   = "NerveXJobCreated"
+	NerveXJobRunningReason   = "NerveXJobRunning"
+	NerveXJobFailedReason    = "NerveXJobFailed"
+	NerveXJobSucceededReason = "NerveXJobSucceeded"
 )
 
 func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
@@ -36,24 +38,64 @@ func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *ne
 	return err
 }
 
-func updateNerveXJobConditions(job *nervexv1alpha1.NerveXJob, conditionType nervexv1alpha1.JobConditionType, reason, msg string) error {
+func initializeNerveXJobReplicaStatus(job *nervexv1alpha1.NerveXJob) {
+	if job.Status.ReplicaStatus == nil {
+		job.Status.ReplicaStatus = make(map[nervexv1alpha1.ReplicaType]*nervexv1alpha1.ReplicaStatus)
+	}
+
+	for _, replicaType := range []nervexv1alpha1.ReplicaType{nervexv1alpha1.ReplicaTypeActor,
+		nervexv1alpha1.ReplicaTypeLearner, nervexv1alpha1.ReplicaTypeAggregator, nervexv1alpha1.ReplicaTypeCoordinator} {
+		job.Status.ReplicaStatus[replicaType] = &nervexv1alpha1.ReplicaStatus{}
+	}
+}
+
+func updateReplicasStatues(job *nervexv1alpha1.NerveXJob,
+	actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) {
+	// update actor status
+	for _, actor := range actors {
+		updateReplicaStatus(actor, job, nervexv1alpha1.ReplicaTypeActor)
+	}
+
+	// update learner status
+	for _, learner := range learners {
+		updateReplicaStatus(learner, job, nervexv1alpha1.ReplicaTypeLearner)
+	}
+
+	// update aggregator
+	updateReplicaStatus(aggregator, job, nervexv1alpha1.ReplicaTypeAggregator)
+
+	// update coordinator
+	updateReplicaStatus(coordinator, job, nervexv1alpha1.ReplicaTypeCoordinator)
+
+}
+
+func updateReplicaStatus(pod *corev1.Pod, job *nervexv1alpha1.NerveXJob, replicaType nervexv1alpha1.ReplicaType) {
+	switch pod.Status.Phase {
+	case corev1.PodRunning:
+		job.Status.ReplicaStatus[replicaType].Active++
+	case corev1.PodFailed:
+		job.Status.ReplicaStatus[replicaType].Failed++
+	case corev1.PodSucceeded:
+		job.Status.ReplicaStatus[replicaType].Succeeded++
+	}
+}
+
+func updateNerveXJobConditions(job *nervexv1alpha1.NerveXJob, conditionType nervexv1alpha1.Phase, reason, msg string) {
 	newCondition := newCondition(conditionType, reason, msg)
 
 	if isSucceeded(job) || isFailed(job) {
 		for i := range job.Status.Conditions {
-			if job.Status.Conditions[i].Type == nervexv1alpha1.JobReady {
+			if job.Status.Conditions[i].Type == nervexv1alpha1.JobRunning {
 				job.Status.Conditions[i].Status = corev1.ConditionFalse
 				job.Status.Conditions[i].LastTransitionTime = metav1.Now()
 				job.Status.Conditions[i].LastUpdateTime = metav1.Now()
 			}
 		}
-		return nil
 	}
 	setCondition(&job.Status, newCondition)
-	return nil
 }
 
-func newCondition(conditionType nervexv1alpha1.JobConditionType, reason, msg string) *nervexv1alpha1.NerveXJobCondition {
+func newCondition(conditionType nervexv1alpha1.Phase, reason, msg string) *nervexv1alpha1.NerveXJobCondition {
 	return &nervexv1alpha1.NerveXJobCondition{
 		Type:               conditionType,
 		Status:             corev1.ConditionTrue,
@@ -81,7 +123,7 @@ func setCondition(status *nervexv1alpha1.NerveXJobStatus, condition *nervexv1alp
 	status.Conditions = append(conditions, *condition)
 }
 
-func getCondition(status *nervexv1alpha1.NerveXJobStatus, conditionType nervexv1alpha1.JobConditionType) *nervexv1alpha1.NerveXJobCondition {
+func getCondition(status *nervexv1alpha1.NerveXJobStatus, conditionType nervexv1alpha1.Phase) *nervexv1alpha1.NerveXJobCondition {
 	for _, condition := range status.Conditions {
 		if condition.Type == conditionType {
 			return &condition
@@ -90,7 +132,7 @@ func getCondition(status *nervexv1alpha1.NerveXJobStatus, conditionType nervexv1
 	return nil
 }
 
-func filterOutConditions(conditions []nervexv1alpha1.NerveXJobCondition, conditionType nervexv1alpha1.JobConditionType) []nervexv1alpha1.NerveXJobCondition {
+func filterOutConditions(conditions []nervexv1alpha1.NerveXJobCondition, conditionType nervexv1alpha1.Phase) []nervexv1alpha1.NerveXJobCondition {
 	newConditions := []nervexv1alpha1.NerveXJobCondition{}
 
 	for _, condition := range conditions {

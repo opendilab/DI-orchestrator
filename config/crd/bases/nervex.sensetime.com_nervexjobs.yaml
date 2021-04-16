@@ -6621,9 +6621,6 @@ spec:
           status:
             description: NerveXJobStatus defines the observed state of NerveXJob
             properties:
-              actors:
-                format: int32
-                type: integer
               conditions:
                 items:
                   description: NerveXJobCondition records the conditions of NerveXJob
@@ -6655,12 +6652,28 @@ spec:
                   - type
                   type: object
                 type: array
-              learners:
-                format: int32
-                type: integer
               phase:
                 description: Phase defines the phase of NerveXJob
                 type: string
+              replicaStatus:
+                additionalProperties:
+                  description: ReplicaStatus represents the current observed state
+                    of the replica.
+                  properties:
+                    active:
+                      description: The number of actively running pods.
+                      format: int32
+                      type: integer
+                    failed:
+                      description: The number of pods which reached phase Failed.
+                      format: int32
+                      type: integer
+                    succeeded:
+                      description: The number of pods which reached phase Succeeded.
+                      format: int32
+                      type: integer
+                  type: object
+                type: object
             type: object
         type: object
     served: true

@@ -2,7 +2,7 @@ package http
 
 import corev1 "k8s.io/api/core/v1"
 
-func SetPodTemplateResources(template *corev1.PodTemplateSpec, resources ResourceQuantity, containerName string) {
+func SetPodResources(template *corev1.Pod, resources ResourceQuantity, containerName string) {
 	for i := range template.Spec.Containers {
 		if template.Spec.Containers[i].Name != containerName {
 			continue

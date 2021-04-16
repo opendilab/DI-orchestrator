@@ -37,8 +37,9 @@ import (
 // NerveXJobReconciler reconciles a NerveXJob object
 type NerveXJobReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	ALConfig string
 }
 
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs;actorlearnerconfigs,verbs=get;list;watch;create;update;patch;delete
@@ -75,12 +76,6 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// classify pods
-	_, _, coordinator, _, err := nervexutil.ClassifyPods(pods)
-	if err != nil {
-		log.Error(err, "unable to classify pods")
-	}
-
 	// check the phase of NerveXJob
 	// if isSucceeded(nvxJob) || isFailed(nvxJob) {
 	// 	// delete actors and learners owned by nvcJob
@@ -92,7 +87,10 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// 	// }
 	// }
 
-	if err := r.reconcilePods(ctx, nvxJob, coordinator); err != nil {
+	// initialize NerveXJob status
+	initializeNerveXJobReplicaStatus(nvxJob)
+
+	if err := r.reconcilePods(ctx, nvxJob, pods); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 

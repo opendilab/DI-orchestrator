@@ -6,75 +6,21 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
-type NerveXServer struct {
-	KubeClient         *kubernetes.Clientset
-	DynamicClient      dynamic.Interface
-	Log                logr.Logger
-	alconfigDyInformer cache.SharedIndexInformer
-	njDyInformer       cache.SharedIndexInformer
-	alconfig           string
-}
-
-type NerveXJobRequest struct {
-	Namespace   string           `json:"namespace"`
-	Coordinator string           `json:"coordinator"`
-	Actors      ResourceQuantity `json:"actors"`
-	Learners    ResourceQuantity `json:"learners"`
-}
-
-type ResourceQuantity struct {
-	Replicas int               `json:"replicas"`
-	Cpu      resource.Quantity `json:"cpus"`
-	Gpu      resource.Quantity `json:"gpus"`
-	Memory   resource.Quantity `json:"memory"`
-}
-
-type NerveXJobResponse struct {
-	Namespace   string   `json:"namespace"`
-	Coordinator string   `json:"coordinator"`
-	Aggregator  string   `json:"aggregator"`
-	Actors      []string `json:"actors"`
-	Learners    []string `json:"learners"`
-}
-
-func NewNerveXServer(
-	kubeClient *kubernetes.Clientset,
-	dynamicClient dynamic.Interface,
-	log logr.Logger,
-	alconfigDyInformer cache.SharedIndexInformer,
-	njDyInformer cache.SharedIndexInformer,
-	alconfig string) *NerveXServer {
-
-	return &NerveXServer{
-		KubeClient:         kubeClient,
-		DynamicClient:      dynamicClient,
-		Log:                log,
-		alconfigDyInformer: alconfigDyInformer,
-		njDyInformer:       njDyInformer,
-		alconfig:           alconfig,
-	}
-}
-
-func (s *NerveXServer) Start() error {
+func (s *NerveXServer) Start(serverBindAddress string) error {
 	log := s.Log.WithName("NerveXServer")
 	http.HandleFunc("/api/v1alpha1/add", s.Add)
 	http.HandleFunc("/api/v1alpha1/delete", s.Delete)
 	http.HandleFunc("/healthz", healthz)
 
-	log.Info("Start listening on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Info("Start listening on", "port", serverBindAddress)
+	if err := http.ListenAndServe(serverBindAddress, nil); err != nil {
 		return err
 	}
 	return nil
@@ -103,24 +49,13 @@ func (s *NerveXServer) Add(w http.ResponseWriter, r *http.Request) {
 	// get ownReference of request coordinator
 	ownRefer, err := s.getOwnerReference(njreq)
 	if err != nil {
-		log.Error(err, "failed to get OwnerReference of coordinator %s", nervexutil.NamespacedName(njreq.Namespace, njreq.Coordinator))
+		log.Error(err, "failed to get OwnerReference of coordinator", "coordinator", nervexutil.NamespacedName(njreq.Namespace, njreq.Coordinator))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-
-	_, _, _, ag, err := s.listReplicaPods(njreq.Namespace, ownRefer.Name)
-	if err != nil {
-		log.Error(err, "failed to list actors and learners")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	needAg := false
-	if ag == nil {
-		needAg = true
 	}
 
 	// create actors and learners
-	actors, learners, aggregator, err := s.createActorsAndLearnersFromALConfig(alconfig, &njreq, *ownRefer, needAg)
+	actors, learners, err := s.createActorsAndLearnersFromALConfig(alconfig, &njreq, *ownRefer)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed create actors and learners: %s", err)
 		log.Error(err, "failed create actors and learners")
@@ -129,7 +64,7 @@ func (s *NerveXServer) Add(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write response
-	writeResponse(w, njreq.Namespace, njreq.Coordinator, actors, learners, aggregator)
+	writeResponse(w, njreq.Namespace, njreq.Coordinator, actors, learners)
 }
 
 func (s *NerveXServer) getOwnerReference(njreq NerveXJobRequest) (*metav1.OwnerReference, error) {
@@ -156,7 +91,7 @@ func (s *NerveXServer) getOwnerReference(njreq NerveXJobRequest) (*metav1.OwnerR
 
 	// get NerveXJob
 	njKey := fmt.Sprintf("%s/%s", njreq.Namespace, ownRefer.Name)
-	_, exists, err := s.njDyInformer.GetIndexer().GetByKey(njKey)
+	_, exists, err := s.njDyi.GetIndexer().GetByKey(njKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get NerveXJob: %s", err)
 		return nil, fmt.Errorf(errMsg)
@@ -170,13 +105,12 @@ func (s *NerveXServer) getOwnerReference(njreq NerveXJobRequest) (*metav1.OwnerR
 	return &ownRefer, nil
 }
 
-func writeResponse(w http.ResponseWriter, ns, coordinator string, actors, learners []string, aggregator string) {
+func writeResponse(w http.ResponseWriter, ns, coordinator string, actors, learners []string) {
 	rep := NerveXJobResponse{
 		Namespace:   ns,
 		Coordinator: coordinator,
 		Actors:      actors,
 		Learners:    learners,
-		Aggregator:  aggregator,
 	}
 	w.Header().Set("Conten-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -194,7 +128,7 @@ func writeResponse(w http.ResponseWriter, ns, coordinator string, actors, learne
 }
 
 func (s *NerveXServer) getALConfig() (*nervexv1alpha1.ActorLearnerConfig, error) {
-	obj, exists, err := s.alconfigDyInformer.GetIndexer().GetByKey(s.alconfig)
+	obj, exists, err := s.alDyi.GetIndexer().GetByKey(s.alconfig)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get ALConfig: %s", err)
 		return nil, fmt.Errorf(errMsg)
@@ -232,8 +166,7 @@ func (s *NerveXServer) listReplicaPods(ns, jobName string) (
 func (s *NerveXServer) createActorsAndLearnersFromALConfig(
 	alconfig *nervexv1alpha1.ActorLearnerConfig,
 	njreq *NerveXJobRequest,
-	ownRefer metav1.OwnerReference,
-	needAgg bool) ([]string, []string, string, error) {
+	ownRefer metav1.OwnerReference) ([]string, []string, error) {
 
 	// create actors
 	actorTemplate := alconfig.Spec.Actor.Template
@@ -241,7 +174,7 @@ func (s *NerveXServer) createActorsAndLearnersFromALConfig(
 		nervexutil.ActorName, nervexutil.DefaultActorContainerName, nervexutil.DefaultActorPortName, nervexutil.DefaultActorPort)
 
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, err
 	}
 
 	// create learners
@@ -250,22 +183,10 @@ func (s *NerveXServer) createActorsAndLearnersFromALConfig(
 		nervexutil.LearnerName, nervexutil.DefaultLearnerContainerName, nervexutil.DefaultLearnerPortName, nervexutil.DefaultLearnerPort)
 
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, err
 	}
 
-	if !needAgg {
-		return actors, learners, "", nil
-	}
-	// create aggregator
-	aggregatorTemplate := alconfig.Spec.Learner.Template
-	aggregators, err := s.createPodsAndServices(&aggregatorTemplate, ownRefer, njreq,
-		nervexutil.AggregatorName, nervexutil.DefaultAggregatorContainerName, nervexutil.DefaultAggregatorPortName, nervexutil.DefaultAggregatorPort)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	aggregator := aggregators[0]
-
-	return actors, learners, aggregator, nil
+	return actors, learners, nil
 }
 
 func (s *NerveXServer) createPodsAndServices(
@@ -274,74 +195,40 @@ func (s *NerveXServer) createPodsAndServices(
 	njreq *NerveXJobRequest,
 	replicaType, containerName, portName string, defaultPort int32) ([]string, error) {
 
-	log := s.Log.WithName("NerveXServer")
-	coordinator := njreq.Coordinator
 	ns := njreq.Namespace
-
-	portEnv := ""
 	resources := ResourceQuantity{}
 	switch replicaType {
 	case nervexutil.ActorName:
 		resources = njreq.Actors
-		portEnv = "ACTOR_PORT"
 	case nervexutil.LearnerName:
 		resources = njreq.Learners
-		portEnv = "LEARNER_PORT"
 	case nervexutil.AggregatorName:
 		resources = ResourceQuantity{Replicas: 1}
-		portEnv = "AGGREGATOR_PORT"
 	}
-
-	// setup pod template
-	template.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
-
-	// add labels to pod template
-	labels := nervexutil.GenLabels(ownRefer.Name)
-	labels[nervexutil.ReplicaTypeLabel] = replicaType
-	nervexutil.AddLabelsToPodTemplate(template, labels)
-
-	// set pod resource
-	SetPodTemplateResources(template, resources, containerName)
-	// get pod port
-	port, ok := nervexutil.GetPortFromPodTemplate(template, containerName, portName)
-	if !ok {
-		port = defaultPort
-		log.Info("no port found, use default port", "container", containerName, "port", port)
-		nervexutil.SetPodTemplatePort(template, containerName, portName, port)
-	}
-
-	// add env
-	envs := make(map[string]string)
-	envs[portEnv] = fmt.Sprintf("%d", port)
-	nervexutil.SetPodTemplateEnv(template, envs)
-
-	// build pod
-	pod := nervexutil.BuildPodFromTemplate(template.DeepCopy())
 
 	results := []string{}
 	// create pods and services
 	for i := 0; i < resources.Replicas; i++ {
-		tempPod := pod.DeepCopy()
+		// build pod
+		pod, port, err := nervexutil.BuildPodFromTemplate(template.DeepCopy(), ownRefer, ns, replicaType, containerName, portName, defaultPort)
+		if err != nil {
+			return nil, err
+		}
+		// set pod resources
+		SetPodResources(pod, resources, containerName)
 
-		// set pod name
-		generateName := fmt.Sprintf("%s-%s", coordinator, replicaType)
-		tempPod.Name = nervexutil.GenerateName(generateName)
-
-		// add pod name label
-		labels := tempPod.GetLabels()
-		labels[nervexutil.PodNameLabel] = tempPod.Name
-		tempPod.SetLabels(labels)
-
-		_, err := s.KubeClient.CoreV1().Pods(ns).Create(context.Background(), tempPod, metav1.CreateOptions{})
+		// create pod
+		_, err = s.KubeClient.CoreV1().Pods(ns).Create(context.Background(), pod, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
 		}
 
 		// build service
-		svc := nervexutil.BuildService(labels, port, portName, corev1.ServiceTypeClusterIP)
+		svc := nervexutil.BuildService(pod.GetLabels(), port, portName)
 		svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
-		svc.Name = tempPod.Name
+		svc.Name = pod.Name
 
+		// create service
 		_, err = s.KubeClient.CoreV1().Services(ns).Create(context.Background(), svc, metav1.CreateOptions{})
 		if err != nil {
 			return nil, err
@@ -398,7 +285,7 @@ func (s *NerveXServer) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write response
-	writeResponse(w, njreq.Namespace, njreq.Coordinator, delActors, delLearners, "")
+	writeResponse(w, njreq.Namespace, njreq.Coordinator, delActors, delLearners)
 }
 
 func (s *NerveXServer) listPods(ns string, jobName string) ([]*corev1.Pod, error) {

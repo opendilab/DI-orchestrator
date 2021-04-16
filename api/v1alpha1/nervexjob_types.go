@@ -63,19 +63,17 @@ type NerveXJobStatus struct {
 
 	Conditions []NerveXJobCondition `json:"conditions,omitempty"`
 
-	Actors int32 `json:"actors,omitempty"`
-
-	Learners int32 `json:"learners,omitempty"`
+	ReplicaStatus map[ReplicaType]*ReplicaStatus `json:"replicaStatus,omitempty"`
 }
 
 // Phase defines the phase of NerveXJob
 type Phase string
 
 const (
-	// JobPending means the job has been submitted to the cluster,
+	// JobCreated means the job has been submitted to the cluster,
 	// but not all the pods and services have been created,
 	// or not pods are running
-	JobPending Phase = "Pending"
+	JobCreated Phase = "Created"
 
 	// JobRunning means all the pods are in running state
 	JobRunning Phase = "Running"
@@ -90,10 +88,33 @@ const (
 	JobUnknown Phase = "Unknown"
 )
 
+// ReplicaType represents the type of the replica. Each operator needs to define its
+// own set of ReplicaTypes.
+type ReplicaType string
+
+const (
+	ReplicaTypeActor       ReplicaType = "Actor"
+	ReplicaTypeLearner     ReplicaType = "Learner"
+	ReplicaTypeAggregator  ReplicaType = "Aggregator"
+	ReplicaTypeCoordinator ReplicaType = "Coordinator"
+)
+
+// ReplicaStatus represents the current observed state of the replica.
+type ReplicaStatus struct {
+	// The number of actively running pods.
+	Active int32 `json:"active,omitempty"`
+
+	// The number of pods which reached phase Succeeded.
+	Succeeded int32 `json:"succeeded,omitempty"`
+
+	// The number of pods which reached phase Failed.
+	Failed int32 `json:"failed,omitempty"`
+}
+
 // NerveXJobCondition records the conditions of NerveXJob
 type NerveXJobCondition struct {
 	// Type of job condition.
-	Type JobConditionType `json:"type"`
+	Type Phase `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status"`
 	// The reason for the condition's last transition.
@@ -105,17 +126,6 @@ type NerveXJobCondition struct {
 	// Last time the condition transitioned from one status to another.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
 }
-
-// JobConditionType defines the condition state of NerveXJob
-type JobConditionType string
-
-const (
-	// PodCreated means all the pods of the job are created
-	PodCreated JobConditionType = "PodCreated"
-
-	// JobReady means the job is ready for training
-	JobReady JobConditionType = "JobReady"
-)
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status

@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -43,6 +44,12 @@ var (
 	syncPeriod = 1 * time.Minute
 )
 
+var (
+	DefaultALConfigNamespace     = "nervex-system"
+	DefaultALConfigName          = "nervexjob-actor-learner-config"
+	DefaultALConfigNamespaceName = fmt.Sprintf("%s/%s", DefaultALConfigNamespace, DefaultALConfigName)
+)
+
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -60,7 +67,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&alconfigName, "alconfig-name", "nervexjob-actor-learner-config", "The configuration for actors and learners.")
+	flag.StringVar(&alconfigName, "alconfig-namespace-name", DefaultALConfigNamespaceName, "The ActorLearnerConfig to manage actors and learners.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -84,9 +91,10 @@ func main() {
 	}
 
 	reconciler := &controllers.NerveXJobReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("NerveXJob"),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("NerveXJob"),
+		Scheme:   mgr.GetScheme(),
+		ALConfig: alconfigName,
 	}
 	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NerveXJob")

@@ -13,10 +13,17 @@ import (
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
+var (
+	addReplicas        = "/api/v1alpha1/addReplicas"
+	deleteReplicas     = "/api/v1alpha1/deleteReplicas"
+	userAddReplicas    = "/api/v1alpha1/userAddReplicas"
+	userDeleteReplicas = "/api/v1alpha1/userDeleteReplicas"
+)
+
 func (s *NerveXServer) Start(serverBindAddress string) error {
 	log := s.Log.WithName("NerveXServer")
-	http.HandleFunc("/api/v1alpha1/add", s.Add)
-	http.HandleFunc("/api/v1alpha1/delete", s.Delete)
+	http.HandleFunc(addReplicas, s.AddReplicas)
+	http.HandleFunc(deleteReplicas, s.DeleteReplicas)
 	http.HandleFunc("/healthz", healthz)
 
 	log.Info("Start listening on", "port", serverBindAddress)
@@ -26,7 +33,7 @@ func (s *NerveXServer) Start(serverBindAddress string) error {
 	return nil
 }
 
-func (s *NerveXServer) Add(w http.ResponseWriter, r *http.Request) {
+func (s *NerveXServer) AddReplicas(w http.ResponseWriter, r *http.Request) {
 	log := s.Log.WithName("NerveXServer")
 
 	// parse request body
@@ -241,7 +248,7 @@ func (s *NerveXServer) createPodsAndServices(
 	return results, nil
 }
 
-func (s *NerveXServer) Delete(w http.ResponseWriter, r *http.Request) {
+func (s *NerveXServer) DeleteReplicas(w http.ResponseWriter, r *http.Request) {
 	log := s.Log.WithName("NerveXServer")
 
 	// parse request body

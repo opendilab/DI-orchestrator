@@ -196,7 +196,7 @@ class CoordinatorInteraction(object):
 
 
     def start(self) -> None:
-        self._cfg.actor, self._cfg.learner = self.get_interaction_information_from_server('add', data)
+        self._cfg.actor, self._cfg.learner = self.get_interaction_information_from_server('addReplicas', data)
         print(self._cfg.actor, self._cfg.learner)
         self._end_flag = False
         self._resource_update_process_thread.start()

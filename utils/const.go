@@ -28,6 +28,8 @@ const (
 	DefaultAggregatorPort  = 22272
 	DefaultCoordinatorPort = 22273
 
-	PodNamespaceEnv = "KUBERNETES_POD_NAMESPACE"
-	PodNameEnv      = "KUBERNETES_POD_NAME"
+	PodNamespaceEnv   = "KUBERNETES_POD_NAMESPACE"
+	PodNameEnv        = "KUBERNETES_POD_NAME"
+	CoordinatorURLEnv = "KUBERNETES_COORDINATOR_URL"
+	AggregatorURLEnv  = "KUBERNETES_AGGREGATOR_URL"
 )

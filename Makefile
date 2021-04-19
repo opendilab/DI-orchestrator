@@ -49,14 +49,14 @@ help: ## Display this help.
 ##@ Development
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=nervex-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
 	./hack/update-version.sh ${MASTER_VERSION}
 
 # dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
 # used `make manifests` when commited git
 dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=nervex-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	./hack/update-image-tags.sh config/manager ${VERSION}
 	./hack/update-version.sh ${VERSION}
 

@@ -18,11 +18,11 @@ from interaction.base import get_http_engine_class, split_http_address
 DEFAULT_NAMESPACE = 'default'
 DEFAULT_POD_NAME = 'nervexjob-example-coordinator'
 
-data = {
+init_replicas_request = {
     "actors": {
         "cpu":      "0.1",
         "memory":   "50Mi",
-        "replicas": 1,
+        "replicas": 2,
     },
     "learners": {
         "cpu":      "0.1",
@@ -42,6 +42,7 @@ class CoordinatorInteraction(object):
         self._connection_lock = LockContext(LockContextType.THREAD_LOCK)
         self._connection_actor = {}
         self._connection_learner = {}
+        self._connection_agg = None
         server_host, server_port, _, _ = split_http_address(system_addr)
         self.__server_http_engine = get_http_engine_class(headers={})()(server_host, server_port, False)
 
@@ -57,8 +58,11 @@ class CoordinatorInteraction(object):
 
         self._task_lock = LockContext(LockContextType.THREAD_LOCK)
 
-        self.resource_update_queue = Queue(65536)
-        self._resource_update_process_thread = Thread(target=self._resource_update_process)
+        self.replicas_update_queue = Queue(65536)
+        self._replicas_update_process_thread = Thread(target=self._replicas_update_process)
+
+        self._actor_failed_time = {}
+
 
     def _execute_actor_connection(self, _id, host, port):
         print("try to connect to {}:{}".format(host, port))
@@ -81,9 +85,11 @@ class CoordinatorInteraction(object):
                         self._callback_fn['deal_with_increase_actor']()
                     break
             except:
-                continue
+                time.sleep(1)
+
         with self._remain_lock:
-            self._remain_actor_conn.remove(_id)
+            if _id in self._remain_actor_conn:
+                self._remain_actor_conn.remove(_id)
         
         if conn.is_connected:
             print("Successed to connect to {}:{}".format(host, port))
@@ -113,37 +119,97 @@ class CoordinatorInteraction(object):
             except:
                 continue
         with self._remain_lock:
-            self._remain_learner_conn.remove(_id)
+            if _id in self._remain_learner_conn:
+                self._remain_learner_conn.remove(_id)
         
         if conn.is_connected:
             print("Successed to connect to {}:{}".format(host, port))
         else:
             print("Failed to connect to {}:{}".format(host, port))
 
-    def _resource_update_process(self):
-        # clear the queue
-        while not self.resource_update_queue.empty():
-            self.resource_update_queue.get()
-            
-        while not self.resource_update_queue.empty() or not self._end_flag:
+    def _execute_aggregator_connection(self, _id, host, port):
+        print("try to connect to {}:{}".format(host, port))
+        max_retry_time = 120
+        start_time = time.time()
+        while time.time() - start_time <= max_retry_time and not self._end_flag:
             try:
-                _result = self.resource_update_queue.get(timeout=3.0)
+                conn = self._master.new_connection(_id, host, port)
+                conn.connect()
+                assert conn.is_connected
+                resource_task = self._get_resource(conn)
+                if resource_task.status != TaskStatus.COMPLETED:
+                    # self._logger.error("can't acquire resource for learner({})".format(_id))
+                    continue
+                else:
+                    with self._resource_lock:
+                        self._resource_manager.update('learner', _id, resource_task.result)
+                    with self._connection_lock:
+                        self._connection_learner[_id] = conn
+                        self._connection_agg = conn
+                        self._callback_fn['deal_with_increase_learner']()
+                    break
+            except:
+                continue
+        with self._remain_lock:
+            if _id in self._remain_learner_conn:
+                self._remain_learner_conn.remove(_id)
+        
+        if conn.is_connected:
+            print("Successed to connect to {}:{}".format(host, port))
+        else:
+            print("Failed to connect to {}:{}".format(host, port))
+
+    def _replicas_update_process(self):
+        # clear the queue
+        while not self.replicas_update_queue.empty():
+            self.replicas_update_queue.get()
+            
+        while not self.replicas_update_queue.empty() or not self._end_flag:
+            try:
+                _result = self.replicas_update_queue.get(timeout=3.0)
             except Empty:
                 continue
             else:
-                method, _data = _result
-                # actors, learners = {'1': ['actor1', 'localhost', 13340],}, { }
-                self.get_interaction_information_from_server(method, _data)
+                """
+                e.g. _result looks like
+                    _result = {
+                        'method': 'add',
+                        'data': {
+                            "namespace": "default",
+                            "coordinator": "nervexjob-example-coordinator",
+                            "actors": ["localhost:13340"],
+                            "learners": ["localhost:12333"],
+                        },
+                    }
+                """
+                print("recevied ")
+                # Get actors, learners informations from data
+                method = _result['method']
+                data = _result['data']
+                actors, learners = data['actors'], data['learners']
+
                 if method == 'add':
-                    for _, (actor_id, actor_host, actor_port) in actors.items():
-                        thread = Thread(target=self._execute_actor_connection, args=(actor_id, actor_host, actor_port,))
+                    if self._connection_agg is None:
+                        print('Cannot find aggregator!')
+                    else:
+                        conn = self._connection_agg
+                        conn.added_replicas(learners)
+
+                    # connect to each actor
+                    for actor in actors:
+                        # actor_id = actor.split(':')[0]
+                        actor_id = actor
+                        actor_host = actor.split(':')[0]
+                        actor_port = actor.split(':')[1]
+                        thread = Thread(target=self._execute_actor_connection, args=(actor_id, actor_host, int(actor_port),))
                         thread.start()
                         with self._remain_lock:
                             self._remain_actor_conn.add(actor_id)
 
-                    # TODO: Add Learner
-                else:
-                    for _, (actor_id, actor_host, actor_port) in actors.items():
+                elif method == 'delete':
+                    # For simple, here is sequence
+                    for actor in actors:
+                        actor_id = actor
                         if actor_id not in self._connection_actor:
                             continue
                         
@@ -162,10 +228,16 @@ class CoordinatorInteraction(object):
                         assert not conn.is_connected
                         time.sleep(2)
 
-                    # TODO: Delete Learner
+                    if self._connection_agg is None:
+                        print('Cannot find aggregator!')
+                    else:
+                        conn = self._connection_agg
+                        conn.deleted_replicas(learners)
+                else:
+                    raise NotImplementedError
 
 
-    def get_interaction_information_from_server(self, method, data):
+    def send_replicas_request_to_server(self, method, data):
         namespace = os.environ.get('KUBERNETES_POD_NAMESPACE', DEFAULT_NAMESPACE)
         name = os.environ.get('KUBERNETES_POD_NAME', DEFAULT_POD_NAME)
 
@@ -175,48 +247,77 @@ class CoordinatorInteraction(object):
         response = self.__server_http_engine.request('POST', '/api/v1alpha1/'+method, data=data)
         
         if response.status_code != requests.codes.ok:
-            print("Failed to get actors, learners, aggregator from server!")
+            print("Failed to send replicas request to server!")
             sys.exit(1)
 
-        ret = json.loads(response.text)
-        actors, learners, aggregator = {}, {}, {}
-        for i, actor in enumerate(ret['actors']):
-            host, port, _, _ = split_http_address("http://"+actor)
-            actors[str(i)] = ['actor{}'.format(i), host, int(port)]
-            
-        for i, learner in enumerate(ret['learners']):
-            host, port, _, _ = split_http_address("http://"+learner)
-            learners[str(i)] = ['learner{}'.format(i), host, int(port)]
-            
-        # for i, aggregator in enumerate(ret['aggregator']):
-        #     host, port, _, _ = split_http_address(aggregator)
-        #     aggregator[str(i)] = ['aggregator{}'.format(i), host, int(port)]
+    def test_thread(self):
+        mock_data = {
+            'method': 'delete',
+            'data': {
+                "namespace": "default",
+                "coordinator": "nervexjob-example-coordinator",
+                "actors": [], #["localhost:13340"],
+                "learners": ["localhost:12333"],
+            },
+        }
+        time.sleep(5)
+        self.replicas_update_queue.put(mock_data)
+        time.sleep(5)
+        mock_data = {
+            'method': 'add',
+            'data': {
+                "namespace": "default",
+                "coordinator": "nervexjob-example-coordinator",
+                "actors": [], #["localhost:13340"],
+                "learners": ["localhost:12333"],
+            },
+        }
+        self.replicas_update_queue.put(mock_data)
 
-        return actors, learners
 
 
     def start(self) -> None:
-        self._cfg.actor, self._cfg.learner = self.get_interaction_information_from_server('addReplicas', data)
-        print(self._cfg.actor, self._cfg.learner)
         self._end_flag = False
-        self._resource_update_process_thread.start()
+        self._replicas_update_process_thread.start()
         self._master = Master(self._cfg.host, self._cfg.port)
-        setattr(self._master, 'resource_update_queue', self.resource_update_queue)
+        setattr(self._master, 'replicas_update_queue', self.replicas_update_queue)
 
         self._master.start()
         self._master.ping()
 
-        for _, (learner_id, learner_host, learner_port) in self._cfg.learner.items():
-                thread = Thread(target=self._execute_learner_connection, args=(learner_id, learner_host, learner_port,))
-                thread.start()
-                with self._remain_lock:
-                    self._remain_learner_conn.add(learner_id)
+        # Make sure connect to aggregator
+        agg_url = os.environ.get('KUBERNETES_AGGREGATOR_URL', "localhost:12334")
+        agg_id = agg_url
+        agg_host = agg_url.split(":")[0]
+        agg_port = agg_url.split(":")[1]
+        thread = Thread(target=self._execute_aggregator_connection, args=(agg_id, agg_host, int(agg_port),))
+        thread.start()
+        max_retry_time = 120
+        start_time = time.time()
+        while time.time() - start_time <= max_retry_time:
+            if self._connection_agg is None:
+                time.sleep(2)
+            else:
+                print("have connected to aggregator")
+                break
+        if self._connection_agg is None:
+            print("can't connect to aggregator, exit!")
+            exit(-1)
 
-        for _, (actor_id, actor_host, actor_port) in self._cfg.actor.items():
-                thread = Thread(target=self._execute_actor_connection, args=(actor_id, actor_host, actor_port,))
-                thread.start()
-                with self._remain_lock:
-                    self._remain_actor_conn.add(actor_id)
+        # self.send_replicas_request_to_server('addReplicas', init_replicas_request)
+        mock_response = {
+                        'method': 'add',
+                        'data': {
+                            "namespace": "default",
+                            "coordinator": "nervexjob-example-coordinator",
+                            "actors": ["localhost:13339"],
+                            "learners": ["localhost:12333"],
+                        },
+                    }
+        self.replicas_update_queue.put(mock_response)
+
+        # For test Thread
+        # Thread(target=self.test_thread, args=()).start()
 
         max_retry_time = 120
         start_time = time.time()
@@ -225,16 +326,14 @@ class CoordinatorInteraction(object):
                 print("Only can connect {} actors, {} learners.".format(len(self._connection_actor), len(self._connection_learner)))
                 time.sleep(2)
             else:
+                print("Have connected {} actors, {} learners, match limit requests.".format(len(self._connection_actor), len(self._connection_learner)))
+                print("Start...")
                 break
 
         if len(self._connection_actor) < self._cfg.actor_limits or len(self._connection_learner) < self._cfg.learner_limits:
             print("Exit since only can connect {} actors, {} learners.".format(len(self._connection_actor), len(self._connection_learner)))
             self.close()
             sys.exit(1)
-
-        # except Exception as e:
-        #     self.close()
-            # self._logger.error("connection start error:\n" + ''.join(traceback.format_tb(e.__traceback__)) + repr(e))
 
     def close(self) -> None:
         if self._end_flag:
@@ -256,7 +355,7 @@ class CoordinatorInteraction(object):
             assert not conn.is_connected
         self._connection_actor = {}
         self._connection_learner = {}
-        self._resource_update_process_thread.join()
+        self._replicas_update_process_thread.join()
         # wait from all slave receive DELETE
         time.sleep(5)
         self._master.close()
@@ -281,11 +380,26 @@ class CoordinatorInteraction(object):
         actor_task.update(assigned_actor)
 
         actor_id = actor_task['actor_id']
-        start_task = self._connection_actor[actor_id].new_task({'name': 'actor_start_task', 'task_info': actor_task})
+        start_task = self._connection_actor[actor_id].new_task(
+            {
+                'name': 'actor_start_task', 
+                'task_info': actor_task
+            }
+        )
         start_task.start().join()
         if start_task.status != TaskStatus.COMPLETED:
+            self._resource_manager.update(
+                'actor', assigned_actor['actor_id'], assigned_actor['resource_info']
+            )
+            print('actor_task({}) start failed: {}'.format(task_id, start_task.result))
+            self._actor_failed_time[actor_id] = self._actor_failed_time.get(actor_id, 0) + 1
+            if self._actor_failed_time[actor_id] >= 5:
+                print("ACTOR {} has failed 5 times".format(actor_id))
+                self._resource_manager.delete('actor', actor_id)
+                self._connection_actor.pop(actor_id)
             return False
         else:
+            self._actor_failed_time[actor_id] = self._actor_failed_time.get(actor_id, 0)
             # self._logger.info('actor task({}) is assigned to actor({})'.format(task_id, actor_id))
             print(('actor task({}) is assigned to actor({})'.format(task_id, actor_id)))
             with self._remain_lock:
@@ -298,15 +412,20 @@ class CoordinatorInteraction(object):
         actor_id = actor_task['actor_id']
         while not self._end_flag:
             try:
+                print("==0=")
                 data_task = self._connection_actor[actor_id].new_task({'name': 'actor_data_task'})
+                print("==0.1=")
                 data_task.start().join()
+                print("==1=")
                 if data_task.status != TaskStatus.COMPLETED:
                     # ignore and retry
                     continue
                 else:
                     result = data_task.result
                     finished_task = result.pop('finished_task', None)
+                    print("==2=")
                     if finished_task:
+                        print("==3=")
                         # result['finished_task'] is a flag
                         task_id = result.get('task_id', None)
                         self._callback_fn['deal_with_actor_finish_task'](task_id, result)

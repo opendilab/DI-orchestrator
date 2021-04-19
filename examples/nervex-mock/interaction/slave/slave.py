@@ -94,12 +94,26 @@ class Slave(ControllableService):
         app.route('/connect', methods=['POST'])(self.__check_master_request(self.__connect, False))
         app.route('/disconnect', methods=['DELETE'])(self.__check_master_request(self.__disconnect, True))
         app.route('/task/new', methods=['POST'])(self.__check_master_request(self.__new_task, True))
+        # app.route('/addedReplicas', methods=['POST'])(self.__check_master_request(self.__added_replicas))
+        app.route('/addedReplicas', methods=['POST'])(self.__added_replicas)
+        # app.route('/deletedReplicas', methods=['POST'])(self.__check_master_request(self.__deleted_replicas))
+        app.route('/deletedReplicas', methods=['POST'])(self.__deleted_replicas)
 
         # self apis
         app.route('/ping', methods=['GET'])(self.__check_self_request(self.__self_ping))
         app.route('/shutdown', methods=['DELETE'])(self.__check_self_request(self.__self_shutdown))
 
         return app
+
+    def __added_replicas(self):
+        _data = json.loads(request.data.decode())
+        result = self._process_replicas_update('add', _data['learners'])
+        return 'OK'
+
+    def __deleted_replicas(self):
+        _data = json.loads(request.data.decode())
+        result = self._process_replicas_update('delete', _data['learners'])
+        return 'OK'
 
     def __flask_app(self) -> Flask:
         return self.__flask_app_value or self.__generate_app()

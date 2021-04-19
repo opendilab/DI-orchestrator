@@ -110,21 +110,28 @@ class Master(ControllableService):
             '/slave/task/fail', methods=['PUT']
         )(self.__check_slave_request(self.__check_task_info(self.__task_fail)))
         
-        app.route('/add', methods=['POST'])(self.__add_api)
-        app.route('/delete', methods=['POST'])(self.__delete_api)
+        # nervex-server api
+        app.route('/addedReplicas', methods=['POST'])(self.__added_replicas)
+        app.route('/deletedReplicas', methods=['POST'])(self.__deleted_replicas)
+
         return app
 
-    def __add_api(self):
+    def __added_replicas(self):
         _data = json.loads(request.data.decode())
-        self.resource_update_queue.put(('add', _data))
-        print("====")
-        import time
-        time.sleep(10)
+        _result = {
+            'method': 'add',
+            'data': _data,
+        }
+        self.replicas_update_queue.put(_result)
         return 'OK'
 
-    def __delete_api(self):
+    def __deleted_replicas(self):
         _data = json.loads(request.data.decode())
-        self.resource_update_queue.put(('delete', _data))
+        _result = {
+            'method': 'delete',
+            'data': _data,
+        }
+        self.replicas_update_queue.put(_result)
         return 'OK'
 
     def __flask_app(self) -> Flask:
@@ -456,4 +463,5 @@ class Master(ControllableService):
         pass
 
     def _error_new_task(self, error: RequestException):
-        raise error
+        # raise error
+        pass

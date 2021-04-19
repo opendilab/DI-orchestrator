@@ -135,6 +135,34 @@ class SlaveConnection(_ISlaveConnection, metaclass=ABCMeta):
         with self.__lock:
             return self.__disconnect()
 
+    def __added_replicas(self, learners):
+        try:
+            response = self.__request('POST', '/addedReplicas', {
+                'learners': learners,
+            })
+        except RequestException as err:
+            pass
+        else:
+            return
+
+    def added_replicas(self, learners):
+        with self.__lock:
+            return self.__added_replicas(learners)
+
+    def __deleted_replicas(self, learners):
+        try:
+            response = self.__request('POST', '/deletedReplicas', {
+                'learners': learners,
+            })
+        except RequestException as err:
+            pass
+        else:
+            return 
+
+    def deleted_replicas(self, learners):
+        with self.__lock:
+            return self.__deleted_replicas(learners)
+
     def _before_new_task(self, data: Optional[Mapping[str, Any]] = None) -> Mapping[str, Any]:
         return data  # pragma: no cover
 
@@ -235,6 +263,14 @@ class SlaveConnectionProxy(_ISlaveConnection):
     def new_task(self, data: Optional[Mapping[str, Any]] = None):
         with self.__lock:
             return self.__connection.new_task(data)
+    
+    def added_replicas(self, learners):
+        with self.__lock:
+            return self.__connection.added_replicas(learners)
+
+    def deleted_replicas(self, learners):
+        with self.__lock:
+            return self.__connection.deleted_replicas(learners)
 
     def __task_complete_trigger(self, task_id: UUID, task_result: Mapping[str, Any]):
         with self.__lock:

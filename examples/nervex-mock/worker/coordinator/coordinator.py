@@ -40,7 +40,7 @@ cfg = {
         'learner_task_space': 0,
         'actor_cfg': {
             'env_kwargs': {
-                'eval_stop_ptg': 0.01,   
+                'eval_stop_ptg': 0.2,   
             }
         },
         'learner_cfg': {

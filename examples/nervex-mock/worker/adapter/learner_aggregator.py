@@ -7,6 +7,9 @@ from functools import reduce
 from interaction import Master, Slave, TaskFail
 from interaction.master.task import TaskStatus
 from easydict import EasyDict
+from threading import Thread
+
+from utils import LockContext, LockContextType
 
 cfg = {
     'learner': {
@@ -22,6 +25,13 @@ class LearnerAggregatorSlave(Slave):
         print(*args)
         super().__init__(*args, **kwargs)
         self._callback_fn = callback_fn
+
+    def _process_replicas_update(self, method, learners: list):
+        if method == 'add':
+            self._callback_fn['deal_with_learner_add'](learners)
+        elif method == 'delete':
+            self._callback_fn['deal_with_learner_delete'](learners)
+        return 'OK'
 
     def _process_task(self, task: dict) -> Union[dict, TaskFail]:
         task_name = task['name']
@@ -46,6 +56,9 @@ class MockLearnerAggregator(object):
             'deal_with_learner_start': self.deal_with_learner_start,
             'deal_with_get_data': self.deal_with_get_data,
             'deal_with_learn': self.deal_with_learn,
+            'deal_with_learner_add': self.deal_with_learner_add,
+            'deal_with_learner_delete': self.deal_with_learner_delete,
+
         }
 
         host, port = slave_host, slave_port
@@ -53,10 +66,70 @@ class MockLearnerAggregator(object):
         host, port = master_host, master_port
         self._master = Master(host, port)
 
+        self._connection_lock = LockContext(LockContextType.THREAD_LOCK)
         self._world_size = 0
         self._learner_connection = {}
+        self._remain_learner_conn = set()
+
+        self._end_flag = True
+
+    def _execute_learner_connection(self, _id, host, port):
+        print("try to connect to {}:{}".format(host, port))
+        max_retry_time = 120
+        start_time = time.time()
+        while time.time() - start_time <= max_retry_time and not self._end_flag:
+            try:
+                conn = self._master.new_connection(_id, host, port)
+                conn.connect()
+                assert conn.is_connected
+                with self._connection_lock:
+                    self._learner_connection[_id] = conn
+                    self._world_size += 1
+                break
+            except:
+                continue
+
+        with self._connection_lock:
+            if _id in self._remain_learner_conn:
+                self._remain_learner_conn.remove(_id)
+
+        if conn.is_connected:
+            print("Successed to connect to {}:{}".format(host, port))
+        else:
+            print("Failed to connect to {}:{}".format(host, port))
+
+    def deal_with_learner_delete(self, learners):
+        for learner in learners:
+            learner_id = learner.split(':')[0]
+            learner_host = learner.split(':')[0]
+            learner_port = learner.split(':')[1]
+
+            with self._connection_lock:
+                if learner_id in self._learner_connection:
+                    conn = self._learner_connection.pop(learner_id)
+                    conn.disconnect()
+                    assert not conn.is_connected
+                    self._world_size -= 1
+                else:
+                    print("cannot find learner {}".format(learner))
+
+    def deal_with_learner_add(self, learners):
+        for learner in learners:
+            learner_id = learner.split(':')[0]
+            if learner_id in self._learner_connection:
+                continue
+
+            learner_host = learner.split(':')[0]
+            learner_port = learner.split(':')[1]
+
+            thread = Thread(target=self._execute_learner_connection, args=(learner_id, learner_host, int(learner_port),))
+            thread.start()
+
+            with self._connection_lock:
+                self._remain_learner_conn.add(learner_id)
 
     def start(self) -> None:
+        self._end_flag = False
         try:
             self._slave.start()
         except Exception as e:
@@ -65,45 +138,34 @@ class MockLearnerAggregator(object):
             )
             return
 
-        max_retry_time = 60
+        self._master.start()
+        self._master.ping()
+        self._world_size = 0
+
+        max_retry_time = 120
         start_time = time.time()
         while time.time() - start_time <= max_retry_time:
-            try:
-                # self._master = Master(self._cfg.master.host, self._cfg.master.port)
-                self._master.start()
-                self._master.ping()
-                self._world_size = 0
-                for _, (learner_id, learner_host, learner_port) in self._cfg.learner.items():
-                    conn = self._master.new_connection(learner_id, learner_host, learner_port)
-                    conn.connect()
-                    assert conn.is_connected
-                    # self._logger.info("learner {} is connected".format(learner_id))
-                    self._learner_connection[learner_id] = conn
-                    self._world_size += 1
-                # self._logger.info("learner aggregator is started")
+            if len(self._learner_connection) <= 0:
+                time.sleep(2)
+            else:
                 break
-            except Exception as e:
-                # retry not close slave
-                try:
-                    for _, conn in self._learner_connection.items():
-                        conn.disconnect()
-                        assert not conn.is_connected
-                    self._learner_connection.clear()
-                    self._master.close()
-                except Exception:
-                    pass
-                # self._logger.error(
-                #     "learner_aggregator master start error:\n" + ''.join(traceback.format_tb(e.__traceback__)) +
-                #     repr(e)
-                # )
-                time.sleep(5)
+
         # Exceeds max retry time and no learner connection found.
         if len(self._learner_connection) == 0:
-            self._logger.error("learner_aggregator master max retries failed")
-
+            # self._logger.error("learner_aggregator master max retries failed")
+            print("learner_aggregator master max retries failed")
 
     def close(self) -> None:
+        if self._end_flag:
+            return
+        self._end_flag = True
         try:
+            start_time = time.time()
+            while time.time() - start_time <= 60:
+                if len(self._remain_learner_conn) == 0:
+                    break
+                else:
+                    time.sleep(1)
             self._slave.close()
             for _, conn in self._learner_connection.items():
                 conn.disconnect()

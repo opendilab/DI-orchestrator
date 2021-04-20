@@ -182,7 +182,7 @@ class CoordinatorInteraction(object):
                         },
                     }
                 """
-                print("recevied ")
+                print("recevied {}".format(_result))
                 # Get actors, learners informations from data
                 method = _result['method']
                 data = _result['data']
@@ -236,7 +236,6 @@ class CoordinatorInteraction(object):
                 else:
                     raise NotImplementedError
 
-
     def send_replicas_request_to_server(self, method, data):
         namespace = os.environ.get('KUBERNETES_POD_NAMESPACE', DEFAULT_NAMESPACE)
         name = os.environ.get('KUBERNETES_POD_NAME', DEFAULT_POD_NAME)
@@ -249,32 +248,6 @@ class CoordinatorInteraction(object):
         if response.status_code != requests.codes.ok:
             print("Failed to send replicas request to server!")
             sys.exit(1)
-
-    def test_thread(self):
-        mock_data = {
-            'method': 'delete',
-            'data': {
-                "namespace": "default",
-                "coordinator": "nervexjob-example-coordinator",
-                "actors": [], #["localhost:13340"],
-                "learners": ["localhost:12333"],
-            },
-        }
-        time.sleep(5)
-        self.replicas_update_queue.put(mock_data)
-        time.sleep(5)
-        mock_data = {
-            'method': 'add',
-            'data': {
-                "namespace": "default",
-                "coordinator": "nervexjob-example-coordinator",
-                "actors": [], #["localhost:13340"],
-                "learners": ["localhost:12333"],
-            },
-        }
-        self.replicas_update_queue.put(mock_data)
-
-
 
     def start(self) -> None:
         self._end_flag = False
@@ -304,20 +277,8 @@ class CoordinatorInteraction(object):
             print("can't connect to aggregator, exit!")
             exit(-1)
 
-        # self.send_replicas_request_to_server('addReplicas', init_replicas_request)
-        mock_response = {
-                        'method': 'add',
-                        'data': {
-                            "namespace": "default",
-                            "coordinator": "nervexjob-example-coordinator",
-                            "actors": ["localhost:13339"],
-                            "learners": ["localhost:12333"],
-                        },
-                    }
-        self.replicas_update_queue.put(mock_response)
-
-        # For test Thread
-        # Thread(target=self.test_thread, args=()).start()
+        # send replicas request ot server, then receive the response from /addReplicas http call
+        self.send_replicas_request_to_server('addReplicas', init_replicas_request)
 
         max_retry_time = 120
         start_time = time.time()
@@ -412,20 +373,15 @@ class CoordinatorInteraction(object):
         actor_id = actor_task['actor_id']
         while not self._end_flag:
             try:
-                print("==0=")
                 data_task = self._connection_actor[actor_id].new_task({'name': 'actor_data_task'})
-                print("==0.1=")
                 data_task.start().join()
-                print("==1=")
                 if data_task.status != TaskStatus.COMPLETED:
                     # ignore and retry
                     continue
                 else:
                     result = data_task.result
                     finished_task = result.pop('finished_task', None)
-                    print("==2=")
                     if finished_task:
-                        print("==3=")
                         # result['finished_task'] is a flag
                         task_id = result.get('task_id', None)
                         self._callback_fn['deal_with_actor_finish_task'](task_id, result)

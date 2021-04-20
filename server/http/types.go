@@ -5,15 +5,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
+
+	serverdynamic "go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
 )
 
 type NerveXServer struct {
 	KubeClient    *kubernetes.Clientset
 	DynamicClient dynamic.Interface
 	Log           logr.Logger
-	alDyi         cache.SharedIndexInformer
-	njDyi         cache.SharedIndexInformer
+	dyi           serverdynamic.DynamicInformers
 	alconfig      string
 }
 
@@ -43,16 +43,14 @@ func NewNerveXServer(
 	kubeClient *kubernetes.Clientset,
 	dynamicClient dynamic.Interface,
 	log logr.Logger,
-	alDyi cache.SharedIndexInformer,
-	njDyi cache.SharedIndexInformer,
+	dyi serverdynamic.DynamicInformers,
 	alconfig string) *NerveXServer {
 
 	return &NerveXServer{
 		KubeClient:    kubeClient,
 		DynamicClient: dynamicClient,
 		Log:           log,
-		alDyi:         alDyi,
-		njDyi:         njDyi,
+		dyi:           dyi,
 		alconfig:      alconfig,
 	}
 }

@@ -8,6 +8,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
@@ -76,12 +78,29 @@ func (s *NerveXServer) AddReplicas(w http.ResponseWriter, r *http.Request) {
 
 func (s *NerveXServer) getOwnerReference(njreq NerveXJobRequest) (*metav1.OwnerReference, error) {
 	// get coordinator
-	coordinator, err := s.KubeClient.CoreV1().Pods(njreq.Namespace).Get(context.Background(), njreq.Coordinator, metav1.GetOptions{})
+	coorKey := nervexutil.NamespacedName(njreq.Namespace, njreq.Coordinator)
+	coor, exists, err := s.dyi.PodInformer.Informer().GetIndexer().GetByKey(coorKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get coordinator: %s", err)
 		return nil, fmt.Errorf(errMsg)
 	}
+	if !exists {
+		errMsg := fmt.Sprintf("coordinator : %s not exists in cache", coorKey)
+		return nil, fmt.Errorf(errMsg)
+	}
+	// coordinator, err := s.KubeClient.CoreV1().Pods(njreq.Namespace).Get(context.Background(), njreq.Coordinator, metav1.GetOptions{})
+	// if err != nil {
+	// 	errMsg := fmt.Sprintf("failed to get coordinator: %s", err)
+	// 	return nil, fmt.Errorf(errMsg)
+	// }
 
+	coorUn := coor.(*unstructured.Unstructured)
+	var coordinator corev1.Pod
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(coorUn.UnstructuredContent(), &coordinator)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to convert unstructured: %s", coorUn.UnstructuredContent())
+		return nil, fmt.Errorf(errMsg)
+	}
 	var ownRefer metav1.OwnerReference
 	ownRefers := coordinator.GetOwnerReferences()
 	ownByNerveX := false
@@ -97,8 +116,8 @@ func (s *NerveXServer) getOwnerReference(njreq NerveXJobRequest) (*metav1.OwnerR
 	}
 
 	// get NerveXJob
-	njKey := fmt.Sprintf("%s/%s", njreq.Namespace, ownRefer.Name)
-	_, exists, err := s.njDyi.GetIndexer().GetByKey(njKey)
+	njKey := nervexutil.NamespacedName(njreq.Namespace, ownRefer.Name)
+	_, exists, err = s.dyi.NJInformer.Informer().GetIndexer().GetByKey(njKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get NerveXJob: %s", err)
 		return nil, fmt.Errorf(errMsg)
@@ -135,7 +154,7 @@ func writeResponse(w http.ResponseWriter, ns, coordinator string, actors, learne
 }
 
 func (s *NerveXServer) getALConfig() (*nervexv1alpha1.ActorLearnerConfig, error) {
-	obj, exists, err := s.alDyi.GetIndexer().GetByKey(s.alconfig)
+	obj, exists, err := s.dyi.ALInformer.Informer().GetIndexer().GetByKey(s.alconfig)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get ALConfig: %s", err)
 		return nil, fmt.Errorf(errMsg)
@@ -303,14 +322,18 @@ func (s *NerveXServer) listPods(ns string, jobName string) ([]*corev1.Pod, error
 		return nil, err
 	}
 
-	podList, err := s.KubeClient.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector.String()})
+	ret, err := s.dyi.PodInformer.Lister().ByNamespace(ns).List(labelSelector)
 	if err != nil {
 		return nil, err
 	}
+	// podList, err := s.KubeClient.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector.String()})
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	pods := []*corev1.Pod{}
-	for _, pod := range podList.Items {
-		pods = append(pods, pod.DeepCopy())
+	for _, pod := range ret {
+		pods = append(pods, pod.(*corev1.Pod))
 	}
 
 	return pods, nil

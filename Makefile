@@ -81,7 +81,7 @@ test: manifests generate fmt vet ## Run tests.
 
 ##@ Build
 
-build: generate fmt vet ## Build manager binary.
+build: generate  ## Build manager binary.
 	go build -o bin/manager main.go
 	go build -o bin/nervex-server server/main.go
 

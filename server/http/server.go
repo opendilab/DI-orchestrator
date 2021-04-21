@@ -60,7 +60,7 @@ func (s *NerveXServer) AddReplicas(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// return created replicas to coordinator
-	if err = s.writeResponseToPod(rep, njreq); err != nil {
+	if err = s.writeResponseToPod(rep, njreq, addedReplicas); err != nil {
 		log.Error(err, "failed to write response to coordinator")
 	}
 }
@@ -88,8 +88,8 @@ func (s *NerveXServer) DeleteReplicas(w http.ResponseWriter, r *http.Request) {
 		log.Error(err, "failed to write response")
 	}
 
-	// return created replicas to coordinator
-	if err = s.writeResponseToPod(rep, njreq); err != nil {
+	// return deleted replicas to coordinator
+	if err = s.writeResponseToPod(rep, njreq, deletedReplicas); err != nil {
 		log.Error(err, "failed to write response to coordinator")
 	}
 }
@@ -249,7 +249,7 @@ func writeResponse(w http.ResponseWriter, rep NerveXJobResponse) error {
 	return nil
 }
 
-func (s NerveXServer) writeResponseToPod(rep NerveXJobResponse, njreq NerveXJobRequest) error {
+func (s NerveXServer) writeResponseToPod(rep NerveXJobResponse, njreq NerveXJobRequest, path string) error {
 	log := s.Log.WithName("NerveXServer")
 
 	// get coordinator
@@ -269,7 +269,7 @@ func (s NerveXServer) writeResponseToPod(rep NerveXJobResponse, njreq NerveXJobR
 		return err
 	}
 
-	url := fmt.Sprintf("http://%s%s", coorURL, addedReplicas)
+	url := fmt.Sprintf("http://%s%s", coorURL, path)
 	log.Info("request", "url", url)
 	_, err = http.Post(url, "application/json", bytes.NewReader(reqJson))
 	if err != nil {
@@ -410,7 +410,9 @@ func (s *NerveXServer) listPods(ns string, jobName string) ([]*corev1.Pod, error
 	for _, obj := range ret {
 		podUn := obj.(*unstructured.Unstructured)
 		var pod corev1.Pod
-		runtime.DefaultUnstructuredConverter.FromUnstructured(podUn.UnstructuredContent(), &pod)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(podUn.UnstructuredContent(), &pod); err != nil {
+			return nil, err
+		}
 		pods = append(pods, &pod)
 	}
 

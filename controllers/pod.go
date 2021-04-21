@@ -164,7 +164,7 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *nervexv
 	svc.Namespace = pod.Namespace
 
 	// access url
-	url := fmt.Sprintf("%s.%s:%d", pod.Name, pod.Namespace, port)
+	url := nervexutil.ConcatURL(pod.Name, pod.Namespace, port)
 
 	return pod, svc, url, nil
 }

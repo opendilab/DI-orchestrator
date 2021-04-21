@@ -1,6 +1,7 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,10 +17,10 @@ import (
 )
 
 var (
-	addReplicas        = "/api/v1alpha1/addReplicas"
-	deleteReplicas     = "/api/v1alpha1/deleteReplicas"
-	userAddReplicas    = "/api/v1alpha1/userAddReplicas"
-	userDeleteReplicas = "/api/v1alpha1/userDeleteReplicas"
+	addReplicas     = "/addReplicas"
+	deleteReplicas  = "/deleteReplicas"
+	addedReplicas   = "/addedReplicas"
+	deletedReplicas = "/deletedReplicas"
 )
 
 func (s *NerveXServer) Start(serverBindAddress string) error {
@@ -47,60 +48,137 @@ func (s *NerveXServer) AddReplicas(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Info("request body: ", "request", njreq)
 
+	rep, err := s.addReplicas(njreq)
+	if err != nil {
+		log.Error(err, "failed to add replicas")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	// write response
+	if err = writeResponse(w, rep); err != nil {
+		log.Error(err, "failed to write response")
+	}
+
+	// return created replicas to coordinator
+	if err = s.writeResponseToPod(rep, njreq); err != nil {
+		log.Error(err, "failed to write response to coordinator")
+	}
+}
+
+func (s *NerveXServer) DeleteReplicas(w http.ResponseWriter, r *http.Request) {
+	log := s.Log.WithName("NerveXServer")
+
+	// parse request body
+	var njreq NerveXJobRequest
+	err := json.NewDecoder(r.Body).Decode(&njreq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log.Info("delete request body: ", "request", njreq)
+
+	rep, err := s.deleteReplicas(njreq)
+	if err != nil {
+		log.Error(err, "failed to delete replicas")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	// write response
+	if err = writeResponse(w, rep); err != nil {
+		log.Error(err, "failed to write response")
+	}
+
+	// return created replicas to coordinator
+	if err = s.writeResponseToPod(rep, njreq); err != nil {
+		log.Error(err, "failed to write response to coordinator")
+	}
+}
+
+func (s *NerveXServer) addReplicas(njreq NerveXJobRequest) (NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
 	// get ALConfig
 	alconfig, err := s.getALConfig()
 	if err != nil {
 		log.Error(err, "failed to get ALConfig", "alconfig", s.alconfig)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return NerveXJobResponse{}, err
 	}
 
 	// get ownReference of request coordinator
 	ownRefer, err := s.getOwnerReference(njreq)
 	if err != nil {
 		log.Error(err, "failed to get OwnerReference of coordinator", "coordinator", nervexutil.NamespacedName(njreq.Namespace, njreq.Coordinator))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return NerveXJobResponse{}, err
 	}
 
 	// create actors and learners
 	actors, learners, err := s.createActorsAndLearnersFromALConfig(alconfig, &njreq, *ownRefer)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed create actors and learners: %s", err)
-		log.Error(err, "failed create actors and learners")
-		http.Error(w, errMsg, http.StatusInternalServerError)
-		return
+		log.Error(err, errMsg)
+		return NerveXJobResponse{}, err
 	}
 
-	// write response
-	writeResponse(w, njreq.Namespace, njreq.Coordinator, actors, learners)
+	rep := NerveXJobResponse{
+		Namespace:   njreq.Namespace,
+		Coordinator: njreq.Coordinator,
+		Actors:      actors,
+		Learners:    learners,
+	}
+
+	return rep, nil
+}
+
+func (s *NerveXServer) deleteReplicas(njreq NerveXJobRequest) (NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
+
+	// get ownReference of the request coordinator
+	ownRefer, err := s.getOwnerReference(njreq)
+	if err != nil {
+		log.Error(err, "failed to get owner reference")
+		return NerveXJobResponse{}, err
+	}
+
+	// list pods that belong to the NerveXJob
+	actors, learners, _, _, err := s.listReplicaPods(njreq.Namespace, ownRefer.Name)
+	if err != nil {
+		log.Error(err, "failed to list actors and learners")
+		return NerveXJobResponse{}, err
+	}
+
+	// delete actor pods
+	delActors, err := s.DeletePodsAndServices(actors, &njreq, nervexutil.ActorName)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to delete actor: %s", err)
+		log.Error(err, errMsg)
+		return NerveXJobResponse{}, err
+	}
+
+	// delete learner pods
+	delLearners, err := s.DeletePodsAndServices(learners, &njreq, nervexutil.LearnerName)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to delete learner: %s", err)
+		log.Error(err, errMsg)
+		return NerveXJobResponse{}, err
+	}
+
+	rep := NerveXJobResponse{
+		Namespace:   njreq.Namespace,
+		Coordinator: njreq.Coordinator,
+		Actors:      delActors,
+		Learners:    delLearners,
+	}
+
+	return rep, nil
 }
 
 func (s *NerveXServer) getOwnerReference(njreq NerveXJobRequest) (*metav1.OwnerReference, error) {
 	// get coordinator
 	coorKey := nervexutil.NamespacedName(njreq.Namespace, njreq.Coordinator)
-	coor, exists, err := s.dyi.PodInformer.Informer().GetIndexer().GetByKey(coorKey)
+	coordinator, err := s.getPodByKey(coorKey)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to get coordinator: %s", err)
-		return nil, fmt.Errorf(errMsg)
+		return nil, err
 	}
-	if !exists {
-		errMsg := fmt.Sprintf("coordinator : %s not exists in cache", coorKey)
-		return nil, fmt.Errorf(errMsg)
-	}
-	// coordinator, err := s.KubeClient.CoreV1().Pods(njreq.Namespace).Get(context.Background(), njreq.Coordinator, metav1.GetOptions{})
-	// if err != nil {
-	// 	errMsg := fmt.Sprintf("failed to get coordinator: %s", err)
-	// 	return nil, fmt.Errorf(errMsg)
-	// }
 
-	coorUn := coor.(*unstructured.Unstructured)
-	var coordinator corev1.Pod
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(coorUn.UnstructuredContent(), &coordinator)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to convert unstructured: %s", coorUn.UnstructuredContent())
-		return nil, fmt.Errorf(errMsg)
-	}
 	var ownRefer metav1.OwnerReference
 	ownRefers := coordinator.GetOwnerReferences()
 	ownByNerveX := false
@@ -117,7 +195,7 @@ func (s *NerveXServer) getOwnerReference(njreq NerveXJobRequest) (*metav1.OwnerR
 
 	// get NerveXJob
 	njKey := nervexutil.NamespacedName(njreq.Namespace, ownRefer.Name)
-	_, exists, err = s.dyi.NJInformer.Informer().GetIndexer().GetByKey(njKey)
+	_, exists, err := s.dyi.NJInformer.Informer().GetIndexer().GetByKey(njKey)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get NerveXJob: %s", err)
 		return nil, fmt.Errorf(errMsg)
@@ -131,26 +209,74 @@ func (s *NerveXServer) getOwnerReference(njreq NerveXJobRequest) (*metav1.OwnerR
 	return &ownRefer, nil
 }
 
-func writeResponse(w http.ResponseWriter, ns, coordinator string, actors, learners []string) {
-	rep := NerveXJobResponse{
-		Namespace:   ns,
-		Coordinator: coordinator,
-		Actors:      actors,
-		Learners:    learners,
+func (s *NerveXServer) getPodByKey(key string) (*corev1.Pod, error) {
+	obj, exists, err := s.dyi.PodInformer.Informer().GetIndexer().GetByKey(key)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to get pod: %s", err)
+		return nil, fmt.Errorf(errMsg)
 	}
+	if !exists {
+		errMsg := fmt.Sprintf("pod: %s not exists in cache", key)
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	podUn := obj.(*unstructured.Unstructured)
+	var pod corev1.Pod
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(podUn.UnstructuredContent(), &pod)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to convert unstructured: %s", podUn.UnstructuredContent())
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	return &pod, nil
+}
+
+func writeResponse(w http.ResponseWriter, rep NerveXJobResponse) error {
 	w.Header().Set("Conten-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	repJson, err := json.Marshal(rep)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to marshal json: %s", err)
 		http.Error(w, errMsg, http.StatusInternalServerError)
-		return
+		return err
 	}
 	_, err = w.Write(repJson)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to write json: %s", err)
 		http.Error(w, errMsg, http.StatusInternalServerError)
+		return err
 	}
+	return nil
+}
+
+func (s NerveXServer) writeResponseToPod(rep NerveXJobResponse, njreq NerveXJobRequest) error {
+	log := s.Log.WithName("NerveXServer")
+
+	// get coordinator
+	coorKey := nervexutil.NamespacedName(njreq.Namespace, njreq.Coordinator)
+	coor, err := s.getPodByKey(coorKey)
+	if err != nil {
+		return err
+	}
+
+	port, found := nervexutil.GetPortFromPod(coor, nervexutil.DefaultCoordinatorContainerName, nervexutil.DefaultCoordinatorPortName)
+	if !found {
+		port = nervexutil.DefaultCoordinatorPort
+	}
+	coorURL := nervexutil.ConcatURL(coor.Name, coor.Namespace, port)
+	reqJson, err := json.Marshal(rep)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("http://%s%s", coorURL, addedReplicas)
+	log.Info("request", "url", url)
+	_, err = http.Post(url, "application/json", bytes.NewReader(reqJson))
+	if err != nil {
+		return fmt.Errorf("failed to send request to coordinator %s: %v", url, err)
+	}
+
+	return nil
 }
 
 func (s *NerveXServer) getALConfig() (*nervexv1alpha1.ActorLearnerConfig, error) {
@@ -260,58 +386,11 @@ func (s *NerveXServer) createPodsAndServices(
 			return nil, err
 		}
 
-		result := fmt.Sprintf("%s.%s:%d", svc.Name, ns, port)
+		result := nervexutil.ConcatURL(svc.Name, ns, port)
 		results = append(results, result)
 	}
 
 	return results, nil
-}
-
-func (s *NerveXServer) DeleteReplicas(w http.ResponseWriter, r *http.Request) {
-	log := s.Log.WithName("NerveXServer")
-
-	// parse request body
-	var njreq NerveXJobRequest
-	err := json.NewDecoder(r.Body).Decode(&njreq)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	log.Info("delete request body: ", "request", njreq)
-
-	// get ownReference of the request coordinator
-	ownRefer, err := s.getOwnerReference(njreq)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// list pods that belong to the NerveXJob
-	actors, learners, _, _, err := s.listReplicaPods(njreq.Namespace, ownRefer.Name)
-	if err != nil {
-		log.Error(err, "failed to list actors and learners")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// delete actor pods
-	delActors, err := s.DeletePodsAndServices(actors, &njreq, nervexutil.ActorName)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to delete actor: %s", err)
-		http.Error(w, errMsg, http.StatusInternalServerError)
-		return
-	}
-
-	// delete learner pods
-	delLearners, err := s.DeletePodsAndServices(learners, &njreq, nervexutil.LearnerName)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to delete learner: %s", err)
-		http.Error(w, errMsg, http.StatusInternalServerError)
-		return
-	}
-
-	// write response
-	writeResponse(w, njreq.Namespace, njreq.Coordinator, delActors, delLearners)
 }
 
 func (s *NerveXServer) listPods(ns string, jobName string) ([]*corev1.Pod, error) {
@@ -326,14 +405,13 @@ func (s *NerveXServer) listPods(ns string, jobName string) ([]*corev1.Pod, error
 	if err != nil {
 		return nil, err
 	}
-	// podList, err := s.KubeClient.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector.String()})
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	pods := []*corev1.Pod{}
-	for _, pod := range ret {
-		pods = append(pods, pod.(*corev1.Pod))
+	for _, obj := range ret {
+		podUn := obj.(*unstructured.Unstructured)
+		var pod corev1.Pod
+		runtime.DefaultUnstructuredConverter.FromUnstructured(podUn.UnstructuredContent(), &pod)
+		pods = append(pods, &pod)
 	}
 
 	return pods, nil
@@ -342,13 +420,21 @@ func (s *NerveXServer) listPods(ns string, jobName string) ([]*corev1.Pod, error
 func (s *NerveXServer) DeletePodsAndServices(pods []*corev1.Pod, njreq *NerveXJobRequest, replicaType string) ([]string, error) {
 	results := []string{}
 	resources := ResourceQuantity{}
+	var containerName, portName string
+	var defaultPort int32
 	ns := njreq.Namespace
 
 	switch replicaType {
 	case nervexutil.ActorName:
 		resources = njreq.Actors
+		containerName = nervexutil.DefaultActorContainerName
+		portName = nervexutil.DefaultActorPortName
+		defaultPort = nervexutil.DefaultActorPort
 	case nervexutil.LearnerName:
 		resources = njreq.Learners
+		containerName = nervexutil.DefaultLearnerContainerName
+		portName = nervexutil.DefaultLearnerPortName
+		defaultPort = nervexutil.DefaultLearnerPort
 	}
 
 	for _, pod := range pods {
@@ -366,7 +452,11 @@ func (s *NerveXServer) DeletePodsAndServices(pods []*corev1.Pod, njreq *NerveXJo
 			return results, err
 		}
 
-		result := fmt.Sprintf("%s.%s", pod.Name, ns)
+		port, found := nervexutil.GetPortFromPod(pod, containerName, portName)
+		if !found {
+			port = defaultPort
+		}
+		result := nervexutil.ConcatURL(pod.Name, ns, port)
 		results = append(results, result)
 
 	}

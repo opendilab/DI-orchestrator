@@ -1,11 +1,11 @@
-# Build manager with local manager binary
-FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as dev-manager
+# Build nervex-operator with local nervex-operator binary
+FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as dev-nervex-operator
 WORKDIR /
-COPY /bin/manager  .
+COPY /bin/nervex-operator  .
 
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/nervex-operator"]
 
-# Build the manager binary
+# Build the nervex-operator binary
 FROM registry.sensetime.com/cloudnative4ai/golang:1.14 as builder
 LABEL maintainer="liqingping@sensetime.com"
 
@@ -24,13 +24,13 @@ COPY controllers/ controllers/
 COPY utils/ utils/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o nervex-operator main.go
 
-# Use distroless as minimal base image to package the manager binary
+# Use distroless as minimal base image to package the nervex-operator binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as manager
+FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as nervex-operator
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/nervex-operator .
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/nervex-operator"]

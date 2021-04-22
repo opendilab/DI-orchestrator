@@ -2,6 +2,12 @@ variables:
   REGISTRY: registry.sensetime.com/cloudnative4ai
   VERSION: v0.0.1-alpha.0
   PROJECT: nervex-operator
+  # dind config
+  DOCKER_HOST: tcp://localhost:2376
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+
   
 
 # each job's `before_script` will overwrite this global settings.
@@ -51,6 +57,8 @@ build-manual:
     - cloudnative4ai-group-runner-phoenix
   allow_failure: false
   when: manual
+  services:
+    - registry.sensetime.com/cloudnative4ai/docker:19.03.8-dind
   dependencies:
     - unit-test
   except:
@@ -58,7 +66,7 @@ build-manual:
     - develop
     - /^release.*$/
   script:
-    - make docker-build
+    - make dev-images
     - make docker-push
   after_script:
     - docker image prune -f

@@ -81,22 +81,22 @@ test: manifests generate fmt vet ## Run tests.
 
 ##@ Build
 
-build: generate  ## Build manager binary.
-	go build -o bin/manager main.go
+build: generate  ## Build nervex-operator binary.
+	go build -o bin/nervex-operator main.go
 	go build -o bin/nervex-server server/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 dev-images: build
-	docker build -t ${IMG} --target dev-manager .
+	docker build -t ${IMG} --target dev-nervex-operator .
 	docker build -t ${SERVER_IMG} -f Dockerfile.server --target dev-nervex-server .
 
-docker-build: build ## Build docker image with the manager.
-	docker build -t ${IMG} --target manager .
+docker-build: build ## Build docker image with the nervex-operator.
+	docker build -t ${IMG} --target nervex-operator .
 	docker build -t ${SERVER_IMG} -f Dockerfile.server --target nervex-server .
 
-docker-push: ## Push docker image with the manager.
+docker-push: ## Push docker image with the nervex-operator.
 	docker push ${IMG}
 	docker push ${SERVER_IMG}
 

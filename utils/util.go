@@ -43,8 +43,8 @@ func GetObjectFromUnstructured(obj interface{}, dest interface{}) error {
 	return nil
 }
 
-func GetPortFromPodTemplate(template *corev1.PodTemplateSpec, containerName, portName string) (int32, bool) {
-	for _, c := range template.Spec.Containers {
+func GetPortFromPod(pod *corev1.Pod, containerName, portName string) (int32, bool) {
+	for _, c := range pod.Spec.Containers {
 		if c.Name != containerName {
 			continue
 		}
@@ -57,19 +57,19 @@ func GetPortFromPodTemplate(template *corev1.PodTemplateSpec, containerName, por
 	return -1, false
 }
 
-func SetPodTemplatePort(template *corev1.PodTemplateSpec, containerName, portName string, port int32) {
-	for i := range template.Spec.Containers {
-		if template.Spec.Containers[i].Name != containerName {
+func SetPortForPod(pod *corev1.Pod, containerName, portName string, port int32) {
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name != containerName {
 			continue
 		}
-		if template.Spec.Containers[i].Ports == nil {
-			template.Spec.Containers[i].Ports = []corev1.ContainerPort{}
+		if pod.Spec.Containers[i].Ports == nil {
+			pod.Spec.Containers[i].Ports = []corev1.ContainerPort{}
 		}
 		portObj := corev1.ContainerPort{
 			Name:          portName,
 			ContainerPort: port,
 		}
-		template.Spec.Containers[i].Ports = append(template.Spec.Containers[i].Ports, portObj)
+		pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, portObj)
 	}
 }
 
@@ -82,12 +82,12 @@ func GenLabels(jobName string) map[string]string {
 	}
 }
 
-func AddLabelsToPodTemplate(podTemplate *corev1.PodTemplateSpec, labels map[string]string) {
-	if podTemplate.ObjectMeta.Labels == nil {
-		podTemplate.ObjectMeta.Labels = make(map[string]string)
+func AddLabelsToPod(pod *corev1.Pod, labels map[string]string) {
+	if pod.ObjectMeta.Labels == nil {
+		pod.ObjectMeta.Labels = make(map[string]string)
 	}
 	for k, v := range labels {
-		podTemplate.ObjectMeta.Labels[k] = v
+		pod.ObjectMeta.Labels[k] = v
 	}
 }
 
@@ -121,20 +121,6 @@ func BuildPodFromTemplate(
 	template.SetNamespace(ns)
 	template.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
 
-	// add labels to pod template
-	labels := GenLabels(jobName)
-	labels[ReplicaTypeLabel] = replicaType
-	labels[PodNameLabel] = template.Name
-	AddLabelsToPodTemplate(template, labels)
-
-	// get pod port
-	port, ok := GetPortFromPodTemplate(template, containerName, portName)
-	if !ok {
-		port = defaultPort
-		logrus.Infof("no port found, use default port container %s port %d", containerName, port)
-		SetPodTemplatePort(template, containerName, portName, port)
-	}
-
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -142,6 +128,20 @@ func BuildPodFromTemplate(
 		},
 		Spec:       *template.Spec.DeepCopy(),
 		ObjectMeta: *template.ObjectMeta.DeepCopy(),
+	}
+
+	// add labels to pod
+	labels := GenLabels(jobName)
+	labels[ReplicaTypeLabel] = replicaType
+	labels[PodNameLabel] = pod.Name
+	AddLabelsToPod(pod, labels)
+
+	// get pod port
+	port, ok := GetPortFromPod(pod, containerName, portName)
+	if !ok {
+		port = defaultPort
+		logrus.Infof("no port found, use default port for container %s port %d", containerName, port)
+		SetPortForPod(pod, containerName, portName, port)
 	}
 
 	// add env
@@ -195,6 +195,10 @@ func SplitNamespaceName(namespaceName string) (types.NamespacedName, error) {
 		return types.NamespacedName{}, fmt.Errorf("Invalid namespace, name %s", namespaceName)
 	}
 	return types.NamespacedName{Namespace: strs[0], Name: strs[1]}, nil
+}
+
+func ConcatURL(name, ns string, port int32) string {
+	return fmt.Sprintf("%s.%s:%d", name, ns, port)
 }
 
 func ClassifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {

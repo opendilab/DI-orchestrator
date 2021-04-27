@@ -10,8 +10,8 @@ spec:
       spec:
         containers:
         - name: coordinator
-          image: registry.sensetime.com/cloudnative4ai/nervex-mock:v0.0.2
-          imagePullPolicy: IfNotPresent
+          image: registry.sensetime.com/cloudnative4ai/nervex-mock:v0.0.3
+          imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
           args: ["python3 -u main.py coordinator -l $HOSTNAME -p $COORDINATOR_PORT"]
           # args: ["sleep 3600"]

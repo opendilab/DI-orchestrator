@@ -76,6 +76,7 @@ class CoordinatorInteraction(object):
                 resource_task = self._get_resource(conn)
                 if resource_task.status != TaskStatus.COMPLETED:
                     # self._logger.error("can't acquire resource for actor({})".format(_id))
+                    print("can't acquire resource for actor({})".format(_id))
                     continue
                 else:
                     with self._resource_lock:
@@ -91,41 +92,41 @@ class CoordinatorInteraction(object):
             if _id in self._remain_actor_conn:
                 self._remain_actor_conn.remove(_id)
         
-        if conn.is_connected:
+        if _id in self._connection_actor and self._connection_actor[_id].is_connected:
             print("Successed to connect to {}:{}".format(host, port))
         else:
             print("Failed to connect to {}:{}".format(host, port))
 
-    def _execute_learner_connection(self, _id, host, port):
-        print("try to connect to {}:{}".format(host, port))
-        max_retry_time = 120
-        start_time = time.time()
-        while time.time() - start_time <= max_retry_time and not self._end_flag:
-            try:
-                conn = self._master.new_connection(_id, host, port)
-                conn.connect()
-                assert conn.is_connected
-                resource_task = self._get_resource(conn)
-                if resource_task.status != TaskStatus.COMPLETED:
-                    # self._logger.error("can't acquire resource for learner({})".format(_id))
-                    continue
-                else:
-                    with self._resource_lock:
-                        self._resource_manager.update('learner', _id, resource_task.result)
-                    with self._connection_lock:
-                        self._connection_learner[_id] = conn
-                        self._callback_fn['deal_with_increase_learner']()
-                    break
-            except:
-                continue
-        with self._remain_lock:
-            if _id in self._remain_learner_conn:
-                self._remain_learner_conn.remove(_id)
+    # def _execute_learner_connection(self, _id, host, port):
+    #     print("try to connect to {}:{}".format(host, port))
+    #     max_retry_time = 120
+    #     start_time = time.time()
+    #     while time.time() - start_time <= max_retry_time and not self._end_flag:
+    #         try:
+    #             conn = self._master.new_connection(_id, host, port)
+    #             conn.connect()
+    #             assert conn.is_connected
+    #             resource_task = self._get_resource(conn)
+    #             if resource_task.status != TaskStatus.COMPLETED:
+    #                 # self._logger.error("can't acquire resource for learner({})".format(_id))
+    #                 continue
+    #             else:
+    #                 with self._resource_lock:
+    #                     self._resource_manager.update('learner', _id, resource_task.result)
+    #                 with self._connection_lock:
+    #                     self._connection_learner[_id] = conn
+    #                     self._callback_fn['deal_with_increase_learner']()
+    #                 break
+    #         except:
+    #             continue
+    #     with self._remain_lock:
+    #         if _id in self._remain_learner_conn:
+    #             self._remain_learner_conn.remove(_id)
         
-        if conn.is_connected:
-            print("Successed to connect to {}:{}".format(host, port))
-        else:
-            print("Failed to connect to {}:{}".format(host, port))
+    #     if conn.is_connected:
+    #         print("Successed to connect to {}:{}".format(host, port))
+    #     else:
+    #         print("Failed to connect to {}:{}".format(host, port))
 
     def _execute_aggregator_connection(self, _id, host, port):
         print("try to connect to {}:{}".format(host, port))
@@ -139,6 +140,7 @@ class CoordinatorInteraction(object):
                 resource_task = self._get_resource(conn)
                 if resource_task.status != TaskStatus.COMPLETED:
                     # self._logger.error("can't acquire resource for learner({})".format(_id))
+                    print("can't acquire resource for learner({})".format(_id))
                     continue
                 else:
                     with self._resource_lock:
@@ -154,7 +156,7 @@ class CoordinatorInteraction(object):
             if _id in self._remain_learner_conn:
                 self._remain_learner_conn.remove(_id)
         
-        if conn.is_connected:
+        if self._connection_agg is not None and self._connection_agg.is_connected:
             print("Successed to connect to {}:{}".format(host, port))
         else:
             print("Failed to connect to {}:{}".format(host, port))
@@ -243,7 +245,7 @@ class CoordinatorInteraction(object):
         data["namespace"] = namespace
         data["coordinator"] = name
 
-        response = self.__server_http_engine.request('POST', '/api/v1alpha1/'+method, data=data)
+        response = self.__server_http_engine.request('POST', '/'+method, data=data)
         
         if response.status_code != requests.codes.ok:
             print("Failed to send replicas request to server!")
@@ -275,7 +277,7 @@ class CoordinatorInteraction(object):
                 break
         if self._connection_agg is None:
             print("can't connect to aggregator, exit!")
-            exit(-1)
+            sys.exit(1)
 
         # send replicas request ot server, then receive the response from /addReplicas http call
         self.send_replicas_request_to_server('addReplicas', init_replicas_request)

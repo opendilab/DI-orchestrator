@@ -142,18 +142,20 @@ class MockLearnerAggregator(object):
         self._master.ping()
         self._world_size = 0
 
-        max_retry_time = 120
-        start_time = time.time()
-        while time.time() - start_time <= max_retry_time:
-            if len(self._learner_connection) <= 0:
-                time.sleep(2)
-            else:
-                break
+        print("Start...")
+        # Since the learner info is assigned by coordinator, aggregator don't need to try to connect learner.
+        # max_retry_time = 120
+        # start_time = time.time()
+        # while time.time() - start_time <= max_retry_time:
+        #     if len(self._learner_connection) <= 0:
+        #         time.sleep(2)
+        #     else:
+        #         break
 
-        # Exceeds max retry time and no learner connection found.
-        if len(self._learner_connection) == 0:
-            # self._logger.error("learner_aggregator master max retries failed")
-            print("learner_aggregator master max retries failed")
+        # # Exceeds max retry time and no learner connection found.
+        # if len(self._learner_connection) == 0:
+        #     # self._logger.error("learner_aggregator master max retries failed")
+        #     print("learner_aggregator master max retries failed")
 
     def close(self) -> None:
         if self._end_flag:

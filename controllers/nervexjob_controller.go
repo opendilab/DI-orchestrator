@@ -39,12 +39,12 @@ type NerveXJobReconciler struct {
 	client.Client
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
-	ALConfig string
+	AGConfig string
 }
 
-//+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs;actorlearnerconfigs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/status;actorlearnerconfigs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/finalizers;actorlearnerconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs;aggregatorconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/status;aggregatorconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/finalizers;aggregatorconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=pods;services,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -64,6 +64,7 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	nvxJob := &nervexv1alpha1.NerveXJob{}
 	err := r.Get(ctx, req.NamespacedName, nvxJob)
 	if err != nil {
+		log.Error(err, "failed to get NerveXJob", "job", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -72,14 +73,14 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// list pods of NerveXJob
 	pods, err := r.listPods(ctx, nvxJob)
 	if err != nil {
-		log.Error(err, "unable to list pods of NerveXJob")
+		log.Error(err, "failed to list pods of NerveXJob", "job", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// check the phase of NerveXJob
 	// if isSucceeded(nvxJob) || isFailed(nvxJob) {
-	// 	// delete actors and learners owned by nvcJob
-	// 	// if err := r.deletePods(ctx, actors); err != nil {
+	// 	// delete collectors and learners owned by nvcJob
+	// 	// if err := r.deletePods(ctx, collectors); err != nil {
 	// 	// 	return ctrl.Result{}, client.IgnoreNotFound(err)
 	// 	// }
 	// 	// if err := r.deletePods(ctx, learners); err != nil {
@@ -91,15 +92,18 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	initializeNerveXJobReplicaStatus(nvxJob)
 
 	if err := r.reconcilePods(ctx, nvxJob, pods); err != nil {
+		log.Error(err, "failed to reconcile pods", "job", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// update status
-	if !apiequality.Semantic.DeepEqual(*jobStatus, nvxJob.Status) {
-		if err := r.updateNerveXJobStatus(ctx, nvxJob); err != nil {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
+	defer func() {
+		if !apiequality.Semantic.DeepEqual(*jobStatus, nvxJob.Status) {
+			if err := r.updateNerveXJobStatus(ctx, nvxJob); err != nil {
+				log.Error(err, "failed to update NerveXJobStatus", "job", req.NamespacedName)
+			}
 		}
-	}
+	}()
 	return ctrl.Result{}, nil
 }
 

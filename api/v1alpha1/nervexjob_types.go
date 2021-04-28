@@ -36,6 +36,10 @@ type NerveXJobSpec struct {
 	PriorityClassName PriorityClassName `json:"priorityClassName,omitempty"`
 
 	Coordinator CoordinatorSpec `json:"coordinator"`
+
+	Collector CollectorSpec `json:"collector,"`
+
+	Learner LearnerSpec `json:"learner,"`
 }
 
 // Priority defines the priority of nervex job
@@ -52,6 +56,16 @@ const (
 // CoordinatorSpec defines the desired state of coordinators
 type CoordinatorSpec struct {
 	Template corev1.PodTemplateSpec `json:"template"`
+}
+
+// CollectorSpec defines the desired state of CollectorSpec
+type CollectorSpec struct {
+	Template corev1.PodTemplateSpec `json:"template,"`
+}
+
+// Learner defines the desired state of Learner
+type LearnerSpec struct {
+	Template corev1.PodTemplateSpec `json:"template,"`
 }
 
 // NerveXJobStatus defines the observed state of NerveXJob
@@ -93,7 +107,7 @@ const (
 type ReplicaType string
 
 const (
-	ReplicaTypeActor       ReplicaType = "Actor"
+	ReplicaTypeCollector   ReplicaType = "Collector"
 	ReplicaTypeLearner     ReplicaType = "Learner"
 	ReplicaTypeAggregator  ReplicaType = "Aggregator"
 	ReplicaTypeCoordinator ReplicaType = "Coordinator"

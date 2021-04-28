@@ -8,22 +8,22 @@ const (
 	PodNameLabel        = "pod-name"
 
 	ControllerName  = "nervex-operator"
-	ActorName       = "actor"
+	CollectorName   = "collector"
 	LearnerName     = "learner"
 	AggregatorName  = "aggregator"
 	CoordinatorName = "coordinator"
 
-	DefaultActorContainerName       = "actor"
+	DefaultCollectorContainerName   = "collector"
 	DefaultLearnerContainerName     = "learner"
 	DefaultAggregatorContainerName  = "aggregator"
 	DefaultCoordinatorContainerName = "coordinator"
 
-	DefaultActorPortName       = "actor"
+	DefaultCollectorPortName   = "collector"
 	DefaultLearnerPortName     = "learner"
 	DefaultAggregatorPortName  = "aggregator"
 	DefaultCoordinatorPortName = "coordinator"
 
-	DefaultActorPort       = 22270
+	DefaultCollectorPort   = 22270
 	DefaultLearnerPort     = 22271
 	DefaultAggregatorPort  = 22272
 	DefaultCoordinatorPort = 22273

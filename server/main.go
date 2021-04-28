@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 
 	corev1 "k8s.io/api/core/v1"
@@ -16,18 +15,10 @@ import (
 	serverhttp "go-sensephoenix.sensetime.com/nervex-operator/server/http"
 )
 
-var (
-	DefaultALConfigNamespace     = "nervex-system"
-	DefaultALConfigName          = "nervexjob-actor-learner-config"
-	DefaultALConfigNamespaceName = fmt.Sprintf("%s/%s", DefaultALConfigNamespace, DefaultALConfigName)
-)
-
 func main() {
 	var kubeconfig string
-	var alconfigName string
 	var serverBindAddress string
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "The kubeconfig file to access kubernetes cluster. Default to ")
-	flag.StringVar(&alconfigName, "alconfig-namespace-name", DefaultALConfigNamespaceName, "The ActorLearnerConfig to manage actors and learners.")
 	flag.StringVar(&serverBindAddress, "server-bind-address", ":8080", "The address for server to bind to.")
 	flag.Parse()
 
@@ -55,7 +46,7 @@ func main() {
 
 	logger := zap.New(zap.UseFlagOptions(&opts))
 
-	nervexServer := serverhttp.NewNerveXServer(kubeClient, dynamicClient, logger, dyi, alconfigName)
+	nervexServer := serverhttp.NewNerveXServer(kubeClient, dynamicClient, logger, dyi)
 
 	if err := nervexServer.Start(serverBindAddress); err != nil {
 		log.Fatalf("Failed to start NervexServer: %v", err)

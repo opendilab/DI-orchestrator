@@ -19,7 +19,7 @@ spec:
       - command:
         - /nervex-server
         image: registry.sensetime.com/cloudnative4ai/nervex-server:v0.0.1-alpha.0
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: server
         securityContext:
           allowPrivilegeEscalation: false

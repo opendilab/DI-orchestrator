@@ -14,13 +14,12 @@ type NerveXServer struct {
 	DynamicClient dynamic.Interface
 	Log           logr.Logger
 	dyi           serverdynamic.DynamicInformers
-	alconfig      string
 }
 
 type NerveXJobRequest struct {
 	Namespace   string           `json:"namespace"`
 	Coordinator string           `json:"coordinator"`
-	Actors      ResourceQuantity `json:"actors"`
+	Collectors  ResourceQuantity `json:"collectors"`
 	Learners    ResourceQuantity `json:"learners"`
 }
 
@@ -35,7 +34,7 @@ type NerveXJobResponse struct {
 	Namespace   string   `json:"namespace"`
 	Coordinator string   `json:"coordinator"`
 	Aggregator  string   `json:"aggregator"`
-	Actors      []string `json:"actors"`
+	Collectors  []string `json:"collectors"`
 	Learners    []string `json:"learners"`
 }
 
@@ -43,14 +42,12 @@ func NewNerveXServer(
 	kubeClient *kubernetes.Clientset,
 	dynamicClient dynamic.Interface,
 	log logr.Logger,
-	dyi serverdynamic.DynamicInformers,
-	alconfig string) *NerveXServer {
+	dyi serverdynamic.DynamicInformers) *NerveXServer {
 
 	return &NerveXServer{
 		KubeClient:    kubeClient,
 		DynamicClient: dynamicClient,
 		Log:           log,
 		dyi:           dyi,
-		alconfig:      alconfig,
 	}
 }

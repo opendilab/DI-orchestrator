@@ -3,7 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/nervex.sensetime.com_nervexjobs.yaml
-- bases/nervex.sensetime.com_actorlearnerconfigs.yaml
+- bases/nervex.sensetime.com_aggregatorconfigs.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

@@ -101,8 +101,8 @@ func BuildPodFromTemplate(
 	portEnv := ""
 	podName := fmt.Sprintf("%s-%s", jobName, replicaType)
 	switch replicaType {
-	case ActorName:
-		portEnv = "ACTOR_PORT"
+	case CollectorName:
+		portEnv = "COLLECTOR_PORT"
 		podName = GenerateName(podName)
 	case LearnerName:
 		portEnv = "LEARNER_PORT"
@@ -201,9 +201,9 @@ func ConcatURL(name, ns string, port int32) string {
 	return fmt.Sprintf("%s.%s:%d", name, ns, port)
 }
 
-func ClassifyPods(pods []*corev1.Pod) (actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {
-	// filter out actors
-	actors, err = filterReplicaPods(pods, ActorName)
+func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {
+	// filter out collectors
+	collectors, err = filterReplicaPods(pods, CollectorName)
 	if err != nil {
 		return
 	}

@@ -5,9 +5,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
@@ -22,16 +20,16 @@ var (
 
 type DynamicInformers struct {
 	NJInformer  informers.GenericInformer
-	ALInformer  informers.GenericInformer
+	AGInformer  informers.GenericInformer
 	PodInformer informers.GenericInformer
 }
 
 func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) DynamicInformers {
 	// add ALConfig informer
-	alconfigGVR := schema.GroupVersionResource{
+	aggregatorGVR := schema.GroupVersionResource{
 		Group:    nervexv1alpha1.GroupVersion.Group,
 		Version:  nervexv1alpha1.GroupVersion.Version,
-		Resource: "actorlearnerconfigs",
+		Resource: "aggregatorconfigs",
 	}
 
 	// add NervexJob informer
@@ -49,7 +47,7 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Dynami
 	}
 	dyi := DynamicInformers{
 		NJInformer:  dif.ForResource(njGVR),
-		ALInformer:  dif.ForResource(alconfigGVR),
+		AGInformer:  dif.ForResource(aggregatorGVR),
 		PodInformer: dif.ForResource(podGVR),
 	}
 
@@ -68,11 +66,11 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Dynami
 		},
 	)
 
-	dyi.ALInformer.Informer().AddEventHandler(
+	dyi.AGInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				// on add object
-				log.Printf("new ALConfig: %s/%s", obj.(*unstructured.Unstructured).GetNamespace(), obj.(*unstructured.Unstructured).GetName())
+				log.Printf("new AGConfig: %s/%s", obj.(*unstructured.Unstructured).GetNamespace(), obj.(*unstructured.Unstructured).GetName())
 			},
 			UpdateFunc: func(old, new interface{}) {
 				// on update object
@@ -85,23 +83,8 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Dynami
 
 	dyi.PodInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				// on add object
-				podUn := obj.(*unstructured.Unstructured)
-				var pod corev1.Pod
-				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(podUn.UnstructuredContent(), &pod); err != nil {
-					log.Printf("failed to convert pod %v", err)
-					return
-				}
-				owner := metav1.GetControllerOf(&pod)
-				if owner == nil || owner.Kind != nervexv1alpha1.KindNerveXJob {
-					return
-				}
-				log.Printf("new pod: %s/%s", pod.GetNamespace(), pod.GetName())
-			},
-			UpdateFunc: func(old, new interface{}) {
-				// on update object
-			},
+			AddFunc:    addPodHandler,
+			UpdateFunc: updatePodHandler,
 			DeleteFunc: func(obj interface{}) {
 				// on delete object
 			},

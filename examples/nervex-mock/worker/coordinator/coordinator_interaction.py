@@ -20,13 +20,13 @@ DEFAULT_POD_NAME = 'nervexjob-example-coordinator'
 
 init_replicas_request = {
     "actors": {
-        "cpu":      "0.1",
-        "memory":   "50Mi",
+        "cpu":      "0.5",
+        "memory":   "200Mi",
         "replicas": 2,
     },
     "learners": {
-        "cpu":      "0.1",
-        "memory":   "50Mi",
+        "cpu":      "0.5",
+        "memory":   "200Mi",
         "gpu":      "0",
         "replicas": 1,
     },
@@ -77,6 +77,8 @@ class CoordinatorInteraction(object):
                 if resource_task.status != TaskStatus.COMPLETED:
                     # self._logger.error("can't acquire resource for actor({})".format(_id))
                     print("can't acquire resource for actor({})".format(_id))
+                    conn.disconnect()
+                    time.sleep(1)
                     continue
                 else:
                     with self._resource_lock:
@@ -141,6 +143,8 @@ class CoordinatorInteraction(object):
                 if resource_task.status != TaskStatus.COMPLETED:
                     # self._logger.error("can't acquire resource for learner({})".format(_id))
                     print("can't acquire resource for learner({})".format(_id))
+                    conn.disconnect()
+                    time.sleep(1)
                     continue
                 else:
                     with self._resource_lock:
@@ -424,12 +428,16 @@ class CoordinatorInteraction(object):
         )
         start_task.start().join()
         if start_task.status != TaskStatus.COMPLETED:
+            self._resource_manager.update('learner', assigned_learner['learner_id'], assigned_learner['resource_info'])
+            # self._logger.info('learner_task({}) start failed: {}'.format(task_id, start_task.result))
             return False
         else:
             # self._logger.info('learner task({}) is assigned to learner({})'.format(task_id, learner_id))
             with self._remain_lock:
                 self._remain_learner_task.add(task_id)
-            learner_task_thread = Thread(target=self._execute_learner_task, args=(learner_task, ))
+            learner_task_thread = Thread(
+                target=self._execute_learner_task, args=(learner_task, ), name='coordinator_learner_task'
+            )
             learner_task_thread.start()
             return True
 

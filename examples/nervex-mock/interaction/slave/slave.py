@@ -119,10 +119,16 @@ class Slave(ControllableService):
         return self.__flask_app_value or self.__generate_app()
 
     def __run_app(self):
-        self.__flask_app().run(
-            host=self.__host,
-            port=self.__port,
-        )
+        while True:
+            try:
+                self.__flask_app().run(
+                    host=self.__host,
+                    port=self.__port,
+                )
+            except:
+                print("failed to run flask app on {}:{}..".format(self.__host, self.__port))
+            else:
+                break
 
     # both method checkers
     def __check_shutdown(self, func: Callable[[], Any]) -> Callable[[], Any]:

@@ -366,7 +366,7 @@ class MockCoordinator(object):
 
     def info(self, s: str) -> None:
         # self._logger.info('[Coordinator({})]: {}'.format(self._coordinator_uid, s))
-        # print('[Coordinator({})]: {}'.format(self._coordinator_uid, s))
+        print('[Coordinator({})]: {}'.format(self._coordinator_uid, s))
         pass
 
     def error(self, s: str) -> None:

@@ -1,6 +1,8 @@
 package http
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+)
 
 func SetPodResources(template *corev1.Pod, resources ResourceQuantity, containerName string) {
 	for i := range template.Spec.Containers {
@@ -15,9 +17,9 @@ func SetPodResources(template *corev1.Pod, resources ResourceQuantity, container
 		}
 
 		// cpu and memory must not be zero
-		if !resources.Cpu.IsZero() {
-			template.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = resources.Cpu
-			template.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = resources.Cpu
+		if !resources.CPU.IsZero() {
+			template.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = resources.CPU
+			template.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = resources.CPU
 		}
 		if !resources.Memory.IsZero() {
 			template.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = resources.Memory

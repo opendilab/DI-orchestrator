@@ -13,8 +13,20 @@ type NerveXServer struct {
 	KubeClient    *kubernetes.Clientset
 	DynamicClient dynamic.Interface
 	Log           logr.Logger
-	dyi           serverdynamic.DynamicInformers
+	dyi           serverdynamic.Informers
 }
+
+type NerveXJobRequestParams struct {
+	Namespace   []string `json:"namespace"`
+	Coordinator []string `json:"coordinator"`
+	Name        []string `json:"name"`
+}
+
+const (
+	RequestParamTypeNamespace   string = "namespace"
+	RequestParamTypeCoordinator string = "coordinator"
+	RequestParamTypeName        string = "name"
+)
 
 type NerveXJobRequest struct {
 	Namespace   string           `json:"namespace"`
@@ -25,24 +37,35 @@ type NerveXJobRequest struct {
 
 type ResourceQuantity struct {
 	Replicas int               `json:"replicas"`
-	Cpu      resource.Quantity `json:"cpus"`
+	CPU      resource.Quantity `json:"cpus"`
 	Gpu      resource.Quantity `json:"gpus"`
 	Memory   resource.Quantity `json:"memory"`
 }
 
+type Response struct {
+	Status  string      `json:"status"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data"`
+}
 type NerveXJobResponse struct {
 	Namespace   string   `json:"namespace"`
 	Coordinator string   `json:"coordinator"`
-	Aggregator  string   `json:"aggregator"`
 	Collectors  []string `json:"collectors"`
 	Learners    []string `json:"learners"`
+}
+
+type ReplicaResponse struct {
+	Namespace   string `json:"namespace"`
+	Coordinator string `json:"coordinator"`
+	ReplicaType string `json:"replicaType"`
+	Name        string `json:"name"`
 }
 
 func NewNerveXServer(
 	kubeClient *kubernetes.Clientset,
 	dynamicClient dynamic.Interface,
 	log logr.Logger,
-	dyi serverdynamic.DynamicInformers) *NerveXServer {
+	dyi serverdynamic.Informers) *NerveXServer {
 
 	return &NerveXServer{
 		KubeClient:    kubeClient,

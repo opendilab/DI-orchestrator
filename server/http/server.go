@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
@@ -17,16 +19,14 @@ import (
 )
 
 var (
-	addReplicasApi     = "/addReplicas"
-	deleteReplicasApi  = "/deleteReplicas"
-	addedReplicasApi   = "/addedReplicas"
-	deletedReplicasApi = "/deletedReplicas"
+	replicasAPI       = "/v1alpha1/replicas"
+	replicasFailedAPI = "/v1alpha1/replicas/failed"
 )
 
 func (s *NerveXServer) Start(serverBindAddress string) error {
 	log := s.Log.WithName("NerveXServer")
-	http.HandleFunc(addReplicasApi, s.AddReplicas)
-	http.HandleFunc(deleteReplicasApi, s.DeleteReplicas)
+	http.HandleFunc(replicasAPI, s.Replicas)
+	http.HandleFunc(replicasFailedAPI, s.ReplicasFailed)
 	http.HandleFunc("/healthz", healthz)
 
 	log.Info("Start listening on", "port", serverBindAddress)
@@ -36,8 +36,13 @@ func (s *NerveXServer) Start(serverBindAddress string) error {
 	return nil
 }
 
-func (s *NerveXServer) AddReplicas(w http.ResponseWriter, r *http.Request) {
+func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 	log := s.Log.WithName("NerveXServer")
+
+	switch r.Method {
+	case "GET":
+		s.getReplicas(w, r)
+	}
 
 	// parse request body
 	var njreq NerveXJobRequest
@@ -58,14 +63,136 @@ func (s *NerveXServer) AddReplicas(w http.ResponseWriter, r *http.Request) {
 	if err = writeResponse(w, rep); err != nil {
 		log.Error(err, "failed to write response")
 	}
+}
 
-	// return created replicas to coordinator
-	if err = s.writeResponseToPod(rep, njreq, addedReplicasApi); err != nil {
-		log.Error(err, "failed to write response to coordinator")
+func (s *NerveXServer) getReplicas(w http.ResponseWriter, r *http.Request) {
+	log := s.Log.WithName("NerveXServer")
+
+	// get request params from request
+	rp := NerveXJobRequestParams{}
+	params := r.URL.Query()
+	for k, v := range params {
+		switch strings.ToLower(k) {
+		case RequestParamTypeNamespace:
+			rp.Namespace = v
+		case RequestParamTypeCoordinator:
+			rp.Coordinator = v
+		case RequestParamTypeName:
+			rp.Name = v
+		default:
+			errInfo := fmt.Errorf("request param %s is not supported, ignored", k)
+			log.Error(errInfo, "")
+		}
+	}
+
+	if rp.Namespace == nil { // if namespace not set, get all replicas
+		s.getAllReplicas(w, r)
+	} else if rp.Coordinator == nil && rp.Name == nil { //
+		s.getNamespacedReplicas(rp.Namespace[0])
+	} else if rp.Name == nil {
+		s.getNamespacedReplicasByCoordinator(rp.Namespace[0], rp.Coordinator[0])
+	} else if rp.Coordinator == nil {
+		s.getNamespacedReplicaByName(w, r, rp.Namespace[0], rp.Name[0])
+	} else {
+		s.getNamespacedReplicasByCoordinatorAndName(w, r, rp.Namespace[0], rp.Coordinator[0], rp.Name[0])
 	}
 }
 
-func (s *NerveXServer) DeleteReplicas(w http.ResponseWriter, r *http.Request) {
+func (s *NerveXServer) getAllReplicas(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (s *NerveXServer) getNamespacedReplicas(namespace string) ([]NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
+
+	// construct label selector to list coordinators in namespace
+	lbs := map[string]string{
+		nervexutil.GroupNameLabel:      nervexv1alpha1.GroupVersion.Group,
+		nervexutil.ControllerNameLabel: nervexutil.ControllerName,
+		nervexutil.ReplicaTypeLabel:    nervexutil.CollectorName,
+	}
+	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: lbs,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// list coordinators in namespace
+	pods, err := s.listPodsWithSelector(namespace, labelSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	results := []NerveXJobResponse{}
+	for _, pod := range pods {
+		result, err := s.getNamespacedReplicasByCoordinator(namespace, pod.Name)
+		if err != nil {
+			errMsg := fmt.Sprintf("failed to get replicas for coordinator %s, skipped", pod.Name)
+			log.Error(err, errMsg)
+		}
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
+func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName string) (NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
+
+	// get ownReference of the request coordinator
+	nvxJob, err := s.getNerveXJob(namespace, coordinatorName)
+	if err != nil {
+		log.Error(err, "failed to get owner reference")
+		return NerveXJobResponse{}, err
+	}
+
+	// list pods that belong to the NerveXJob
+	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: nervexutil.GenLabels(nvxJob.Name),
+	})
+	if err != nil {
+		return NerveXJobResponse{}, err
+	}
+	collectors, learners, _, _, err := s.listReplicaPodsWithSelector(namespace, labelSelector)
+	if err != nil {
+		log.Error(err, "failed to list collectors and learners")
+		return NerveXJobResponse{}, err
+	}
+
+	// get access urls
+	collectorURLs := []string{}
+	learnerURLs := []string{}
+	for _, pod := range collectors {
+		url := nervexutil.GetPodAccessURL(pod, namespace,
+			nervexutil.DefaultCollectorContainerName, nervexutil.DefaultCollectorPortName, nervexutil.DefaultCollectorPort)
+		collectorURLs = append(collectorURLs, url)
+	}
+	for _, pod := range learners {
+		url := nervexutil.GetPodAccessURL(pod, namespace,
+			nervexutil.DefaultLearnerContainerName, nervexutil.DefaultLearnerPortName, nervexutil.DefaultLearnerPort)
+		learnerURLs = append(learnerURLs, url)
+	}
+
+	rep := NerveXJobResponse{
+		Namespace:   namespace,
+		Coordinator: coordinatorName,
+		Collectors:  collectorURLs,
+		Learners:    learnerURLs,
+	}
+
+	return rep, nil
+}
+
+func (s *NerveXServer) getNamespacedReplicaByName(w http.ResponseWriter, r *http.Request, namespace, name string) {
+
+}
+
+func (s *NerveXServer) getNamespacedReplicasByCoordinatorAndName(w http.ResponseWriter, r *http.Request, namespace, coordinatorName, name string) {
+
+}
+
+func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
 	log := s.Log.WithName("NerveXServer")
 
 	// parse request body
@@ -87,18 +214,13 @@ func (s *NerveXServer) DeleteReplicas(w http.ResponseWriter, r *http.Request) {
 	if err = writeResponse(w, rep); err != nil {
 		log.Error(err, "failed to write response")
 	}
-
-	// return deleted replicas to coordinator
-	if err = s.writeResponseToPod(rep, njreq, deletedReplicasApi); err != nil {
-		log.Error(err, "failed to write response to coordinator")
-	}
 }
 
 func (s *NerveXServer) addReplicas(njreq NerveXJobRequest) (NerveXJobResponse, error) {
 	log := s.Log.WithName("NerveXServer")
 
 	// get ownReference of request coordinator
-	nvxJob, err := s.getNerveXJob(njreq)
+	nvxJob, err := s.getNerveXJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
 		log.Error(err, "failed to get NerveXJob from coordinator", "coordinator", nervexutil.NamespacedName(njreq.Namespace, njreq.Coordinator))
 		return NerveXJobResponse{}, err
@@ -126,14 +248,20 @@ func (s *NerveXServer) deleteReplicas(njreq NerveXJobRequest) (NerveXJobResponse
 	log := s.Log.WithName("NerveXServer")
 
 	// get ownReference of the request coordinator
-	nvxJob, err := s.getNerveXJob(njreq)
+	nvxJob, err := s.getNerveXJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
 		log.Error(err, "failed to get owner reference")
 		return NerveXJobResponse{}, err
 	}
 
 	// list pods that belong to the NerveXJob
-	collectors, learners, _, _, err := s.listReplicaPods(njreq.Namespace, nvxJob.Name)
+	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: nervexutil.GenLabels(nvxJob.Name),
+	})
+	if err != nil {
+		return NerveXJobResponse{}, err
+	}
+	collectors, learners, _, _, err := s.listReplicaPodsWithSelector(njreq.Namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
 		return NerveXJobResponse{}, err
@@ -165,9 +293,9 @@ func (s *NerveXServer) deleteReplicas(njreq NerveXJobRequest) (NerveXJobResponse
 	return rep, nil
 }
 
-func (s *NerveXServer) getNerveXJob(njreq NerveXJobRequest) (*nervexv1alpha1.NerveXJob, error) {
+func (s *NerveXServer) getNerveXJob(namespace, coordinatorName string) (*nervexv1alpha1.NerveXJob, error) {
 	// get coordinator
-	coorKey := nervexutil.NamespacedName(njreq.Namespace, njreq.Coordinator)
+	coorKey := nervexutil.NamespacedName(namespace, coordinatorName)
 	coordinator, err := s.getPodByKey(coorKey)
 	if err != nil {
 		return nil, err
@@ -188,7 +316,7 @@ func (s *NerveXServer) getNerveXJob(njreq NerveXJobRequest) (*nervexv1alpha1.Ner
 	}
 
 	// get NerveXJob
-	njKey := nervexutil.NamespacedName(njreq.Namespace, ownRefer.Name)
+	njKey := nervexutil.NamespacedName(namespace, ownRefer.Name)
 	nvxJob, err := s.getNerveXJobByKey(njKey)
 	if err != nil {
 		return nil, err
@@ -244,13 +372,13 @@ func (s *NerveXServer) getPodByKey(key string) (*corev1.Pod, error) {
 func writeResponse(w http.ResponseWriter, rep NerveXJobResponse) error {
 	w.Header().Set("Conten-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	repJson, err := json.Marshal(rep)
+	repJSON, err := json.Marshal(rep)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to marshal json: %s", err)
 		http.Error(w, errMsg, http.StatusInternalServerError)
 		return err
 	}
-	_, err = w.Write(repJson)
+	_, err = w.Write(repJSON)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to write json: %s", err)
 		http.Error(w, errMsg, http.StatusInternalServerError)
@@ -274,14 +402,14 @@ func (s NerveXServer) writeResponseToPod(rep NerveXJobResponse, njreq NerveXJobR
 		port = nervexutil.DefaultCoordinatorPort
 	}
 	coorURL := nervexutil.ConcatURL(coor.Name, coor.Namespace, port)
-	reqJson, err := json.Marshal(rep)
+	reqJSON, err := json.Marshal(rep)
 	if err != nil {
 		return err
 	}
 
 	url := fmt.Sprintf("http://%s%s", coorURL, path)
 	log.Info("send response to", "url", url)
-	_, err = http.Post(url, "application/json", bytes.NewReader(reqJson))
+	_, err = http.Post(url, "application/json", bytes.NewReader(reqJSON))
 	if err != nil {
 		return fmt.Errorf("failed to send request to coordinator %s: %v", url, err)
 	}
@@ -289,30 +417,10 @@ func (s NerveXServer) writeResponseToPod(rep NerveXJobResponse, njreq NerveXJobR
 	return nil
 }
 
-// func (s *NerveXServer) getALConfig() (*nervexv1alpha1.AggregatorConfig, error) {
-// 	obj, exists, err := s.dyi.AGInformer.Informer().GetIndexer().GetByKey(s.alconfig)
-// 	if err != nil {
-// 		errMsg := fmt.Sprintf("failed to get ALConfig: %s", err)
-// 		return nil, fmt.Errorf(errMsg)
-// 	}
-// 	if !exists {
-// 		errMsg := fmt.Sprintf("AggregatorConfig: %s not exists", s.alconfig)
-// 		return nil, fmt.Errorf(errMsg)
-// 	}
-
-// 	alconfig := &nervexv1alpha1.AggregatorConfig{}
-// 	err = nervexutil.GetObjectFromUnstructured(obj, alconfig)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return alconfig, nil
-// }
-
-func (s *NerveXServer) listReplicaPods(ns, jobName string) (
+func (s *NerveXServer) listReplicaPodsWithSelector(ns string, labelSelector labels.Selector) (
 	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {
 	// list pods that belong to the NerveXJob
-	pods, err := s.listPods(ns, jobName)
+	pods, err := s.listPodsWithSelector(ns, labelSelector)
 	if err != nil {
 		return
 	}
@@ -409,15 +517,8 @@ func (s *NerveXServer) createPodsAndServices(
 	return results, nil
 }
 
-func (s *NerveXServer) listPods(ns string, jobName string) ([]*corev1.Pod, error) {
-	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: nervexutil.GenLabels(jobName),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	ret, err := s.dyi.PodInformer.Lister().ByNamespace(ns).List(labelSelector)
+func (s *NerveXServer) listPodsWithSelector(namespace string, labelSelector labels.Selector) ([]*corev1.Pod, error) {
+	ret, err := s.dyi.PodInformer.Lister().ByNamespace(namespace).List(labelSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -470,13 +571,8 @@ func (s *NerveXServer) DeletePodsAndServices(pods []*corev1.Pod, njreq *NerveXJo
 			return results, err
 		}
 
-		port, found := nervexutil.GetPortFromPod(pod, containerName, portName)
-		if !found {
-			port = defaultPort
-		}
-		result := nervexutil.ConcatURL(pod.Name, ns, port)
+		result := nervexutil.GetPodAccessURL(pod, ns, containerName, portName, defaultPort)
 		results = append(results, result)
-
 	}
 
 	return results, nil

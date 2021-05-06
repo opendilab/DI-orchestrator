@@ -47,6 +47,12 @@ type Response struct {
 	Message string      `json:"message"`
 	Data    interface{} `json:"data"`
 }
+
+const (
+	StatusOK     = "OK"
+	StatusFailed = "Failed"
+)
+
 type NerveXJobResponse struct {
 	Namespace   string   `json:"namespace"`
 	Coordinator string   `json:"coordinator"`

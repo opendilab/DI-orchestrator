@@ -30,7 +30,7 @@ spec:
         - "--metrics-bind-address=:8080"
         - "--leader-elect"
         image: registry.sensetime.com/cloudnative4ai/nervex-operator:v0.0.1-alpha.0
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

@@ -39,24 +39,34 @@ func (s *NerveXServer) Start(serverBindAddress string) error {
 func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 	log := s.Log.WithName("NerveXServer")
 
+	var reps interface{}
+	var err error
+	var msg string
 	switch r.Method {
 	case "GET":
-		s.getReplicas(w, r)
+		msg = "successfully get replicas"
+		reps, err = s.getReplicas(r)
+		if err != nil {
+			msg = err.Error()
+		}
+	case "POST":
+		msg = "successfully create replicas"
+		reps, err = s.addReplicas(r)
+		if err != nil {
+			msg = err.Error()
+		}
+	case "DELETE":
+		msg = "successfully delete replicas"
+		reps, err = s.deleteReplicas(r)
+		if err != nil {
+			msg = err.Error()
+		}
 	}
 
-	// parse request body
-	var njreq NerveXJobRequest
-	err := json.NewDecoder(r.Body).Decode(&njreq)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	log.Info("request body: ", "request", njreq)
-
-	rep, err := s.addReplicas(njreq)
-	if err != nil {
-		log.Error(err, "failed to add replicas")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	rep := Response{
+		Status:  StatusOK,
+		Message: msg,
+		Data:    reps,
 	}
 
 	// write response
@@ -65,7 +75,7 @@ func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *NerveXServer) getReplicas(w http.ResponseWriter, r *http.Request) {
+func (s *NerveXServer) getReplicas(r *http.Request) (interface{}, error) {
 	log := s.Log.WithName("NerveXServer")
 
 	// get request params from request
@@ -85,21 +95,47 @@ func (s *NerveXServer) getReplicas(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var reps interface{}
+	var err error
 	if rp.Namespace == nil { // if namespace not set, get all replicas
-		s.getAllReplicas(w, r)
+		reps, err = s.getAllReplicas()
+		if err != nil {
+			return nil, err
+		}
 	} else if rp.Coordinator == nil && rp.Name == nil { //
-		s.getNamespacedReplicas(rp.Namespace[0])
+		reps, err = s.getNamespacedReplicas(rp.Namespace[0])
+		if err != nil {
+			return nil, err
+		}
 	} else if rp.Name == nil {
-		s.getNamespacedReplicasByCoordinator(rp.Namespace[0], rp.Coordinator[0])
+		reps, err = s.getNamespacedReplicasByCoordinator(rp.Namespace[0], rp.Coordinator[0])
+		if err != nil {
+			return nil, err
+		}
 	} else if rp.Coordinator == nil {
-		s.getNamespacedReplicaByName(w, r, rp.Namespace[0], rp.Name[0])
+		s.getNamespacedReplicaByName(rp.Namespace[0], rp.Name[0])
 	} else {
-		s.getNamespacedReplicasByCoordinatorAndName(w, r, rp.Namespace[0], rp.Coordinator[0], rp.Name[0])
+		s.getNamespacedReplicasByCoordinatorAndName(rp.Namespace[0], rp.Coordinator[0], rp.Name[0])
 	}
+
+	return reps, nil
 }
 
-func (s *NerveXServer) getAllReplicas(w http.ResponseWriter, r *http.Request) {
+func (s *NerveXServer) getAllReplicas() ([]NerveXJobResponse, error) {
+	nsl, err := s.KubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
 
+	results := []NerveXJobResponse{}
+	for _, ns := range nsl.Items {
+		reps, err := s.getNamespacedReplicas(ns.Name)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, reps...)
+	}
+	return results, nil
 }
 
 func (s *NerveXServer) getNamespacedReplicas(namespace string) ([]NerveXJobResponse, error) {
@@ -109,7 +145,7 @@ func (s *NerveXServer) getNamespacedReplicas(namespace string) ([]NerveXJobRespo
 	lbs := map[string]string{
 		nervexutil.GroupNameLabel:      nervexv1alpha1.GroupVersion.Group,
 		nervexutil.ControllerNameLabel: nervexutil.ControllerName,
-		nervexutil.ReplicaTypeLabel:    nervexutil.CollectorName,
+		nervexutil.ReplicaTypeLabel:    nervexutil.CoordinatorName,
 	}
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: lbs,
@@ -184,40 +220,47 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinator
 	return rep, nil
 }
 
-func (s *NerveXServer) getNamespacedReplicaByName(w http.ResponseWriter, r *http.Request, namespace, name string) {
+func (s *NerveXServer) getNamespacedReplicaByName(namespace, name string) {
 
 }
 
-func (s *NerveXServer) getNamespacedReplicasByCoordinatorAndName(w http.ResponseWriter, r *http.Request, namespace, coordinatorName, name string) {
+func (s *NerveXServer) getNamespacedReplicasByCoordinatorAndName(namespace, coordinatorName, name string) {
 
 }
 
 func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
+	// log := s.Log.WithName("NerveXServer")
+
+	// // parse request body
+	// var njreq NerveXJobRequest
+	// err := json.NewDecoder(r.Body).Decode(&njreq)
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusBadRequest)
+	// 	return
+	// }
+	// log.Info("delete request body: ", "request", njreq)
+
+	// rep, err := s.deleteReplicas(njreq)
+	// if err != nil {
+	// 	log.Error(err, "failed to delete replicas")
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// }
+
+	// // write response
+	// if err = writeResponse(w, rep); err != nil {
+	// 	log.Error(err, "failed to write response")
+	// }
+}
+
+func (s *NerveXServer) addReplicas(r *http.Request) (NerveXJobResponse, error) {
 	log := s.Log.WithName("NerveXServer")
 
-	// parse request body
+	// get request body
 	var njreq NerveXJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return NerveXJobResponse{}, err
 	}
-	log.Info("delete request body: ", "request", njreq)
-
-	rep, err := s.deleteReplicas(njreq)
-	if err != nil {
-		log.Error(err, "failed to delete replicas")
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	// write response
-	if err = writeResponse(w, rep); err != nil {
-		log.Error(err, "failed to write response")
-	}
-}
-
-func (s *NerveXServer) addReplicas(njreq NerveXJobRequest) (NerveXJobResponse, error) {
-	log := s.Log.WithName("NerveXServer")
 
 	// get ownReference of request coordinator
 	nvxJob, err := s.getNerveXJob(njreq.Namespace, njreq.Coordinator)
@@ -244,8 +287,15 @@ func (s *NerveXServer) addReplicas(njreq NerveXJobRequest) (NerveXJobResponse, e
 	return rep, nil
 }
 
-func (s *NerveXServer) deleteReplicas(njreq NerveXJobRequest) (NerveXJobResponse, error) {
+func (s *NerveXServer) deleteReplicas(r *http.Request) (NerveXJobResponse, error) {
 	log := s.Log.WithName("NerveXServer")
+
+	// get request body
+	var njreq NerveXJobRequest
+	err := json.NewDecoder(r.Body).Decode(&njreq)
+	if err != nil {
+		return NerveXJobResponse{}, err
+	}
 
 	// get ownReference of the request coordinator
 	nvxJob, err := s.getNerveXJob(njreq.Namespace, njreq.Coordinator)
@@ -369,7 +419,7 @@ func (s *NerveXServer) getPodByKey(key string) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
-func writeResponse(w http.ResponseWriter, rep NerveXJobResponse) error {
+func writeResponse(w http.ResponseWriter, rep Response) error {
 	w.Header().Set("Conten-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	repJSON, err := json.Marshal(rep)

@@ -25,9 +25,9 @@ func SetPodResources(template *corev1.Pod, resources ResourceQuantity, container
 			template.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = resources.Memory
 			template.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = resources.Memory
 		}
-		if !resources.Gpu.IsZero() {
-			template.Spec.Containers[i].Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = resources.Gpu
-			template.Spec.Containers[i].Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = resources.Gpu
+		if !resources.GPU.IsZero() {
+			template.Spec.Containers[i].Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
+			template.Spec.Containers[i].Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
 		}
 	}
 }

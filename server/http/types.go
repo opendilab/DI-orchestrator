@@ -38,7 +38,7 @@ type NerveXJobRequest struct {
 type ResourceQuantity struct {
 	Replicas int               `json:"replicas"`
 	CPU      resource.Quantity `json:"cpus"`
-	Gpu      resource.Quantity `json:"gpus"`
+	GPU      resource.Quantity `json:"gpus"`
 	Memory   resource.Quantity `json:"memory"`
 }
 

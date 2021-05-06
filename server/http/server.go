@@ -42,29 +42,32 @@ func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 	var reps interface{}
 	var err error
 	var msg string
+
+	// handle request by request method
 	switch r.Method {
 	case "GET":
 		msg = "successfully get replicas"
 		reps, err = s.getReplicas(r)
-		if err != nil {
-			msg = err.Error()
-		}
 	case "POST":
 		msg = "successfully create replicas"
 		reps, err = s.addReplicas(r)
-		if err != nil {
-			msg = err.Error()
-		}
 	case "DELETE":
 		msg = "successfully delete replicas"
 		reps, err = s.deleteReplicas(r)
-		if err != nil {
-			msg = err.Error()
-		}
 	}
 
+	var success bool = true
+	var code int = CODE_SUCCESS
+	if err != nil {
+		success = false
+		code = CODE_FAILED
+		msg = err.Error()
+	}
+
+	// build response
 	rep := Response{
-		Status:  StatusOK,
+		Success: success,
+		Code:    code,
 		Message: msg,
 		Data:    reps,
 	}

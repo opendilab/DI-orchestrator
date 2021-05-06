@@ -43,14 +43,15 @@ type ResourceQuantity struct {
 }
 
 type Response struct {
-	Status  string      `json:"status"`
+	Success bool        `json:"success"`
+	Code    int         `json:"code"`
 	Message string      `json:"message"`
 	Data    interface{} `json:"data"`
 }
 
 const (
-	StatusOK     = "OK"
-	StatusFailed = "Failed"
+	CODE_SUCCESS = iota
+	CODE_FAILED
 )
 
 type NerveXJobResponse struct {

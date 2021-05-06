@@ -19,7 +19,7 @@ DEFAULT_NAMESPACE = 'default'
 DEFAULT_POD_NAME = 'nervexjob-example-coordinator'
 
 init_replicas_request = {
-    "actors": {
+    "collectors": {
         "cpu":      "0.5",
         "memory":   "200Mi",
         "replicas": 2,
@@ -40,7 +40,7 @@ class CoordinatorInteraction(object):
         self._callback_fn = callback_fn
         # self._logger = logger
         self._connection_lock = LockContext(LockContextType.THREAD_LOCK)
-        self._connection_actor = {}
+        self._connection_collector = {}
         self._connection_learner = {}
         self._connection_agg = None
         server_host, server_port, _, _ = split_http_address(system_addr)
@@ -50,10 +50,10 @@ class CoordinatorInteraction(object):
         self._resource_manager = NaiveResourceManager()
         self._end_flag = True
         self._remain_lock = LockContext(LockContextType.THREAD_LOCK)
-        self._remain_actor_task = set()
+        self._remain_collector_task = set()
         self._remain_learner_task = set()
 
-        self._remain_actor_conn = set()
+        self._remain_collector_conn = set()
         self._remain_learner_conn = set()
 
         self._task_lock = LockContext(LockContextType.THREAD_LOCK)
@@ -61,10 +61,10 @@ class CoordinatorInteraction(object):
         self.replicas_update_queue = Queue(65536)
         self._replicas_update_process_thread = Thread(target=self._replicas_update_process)
 
-        self._actor_failed_time = {}
+        self._collector_failed_time = {}
 
 
-    def _execute_actor_connection(self, _id, host, port):
+    def _execute_collector_connection(self, _id, host, port):
         print("try to connect to {}:{}".format(host, port))
         max_retry_time = 120
         start_time = time.time()
@@ -75,26 +75,26 @@ class CoordinatorInteraction(object):
                 assert conn.is_connected
                 resource_task = self._get_resource(conn)
                 if resource_task.status != TaskStatus.COMPLETED:
-                    # self._logger.error("can't acquire resource for actor({})".format(_id))
-                    print("can't acquire resource for actor({})".format(_id))
+                    # self._logger.error("can't acquire resource for collector({})".format(_id))
+                    print("can't acquire resource for collector({})".format(_id))
                     conn.disconnect()
                     time.sleep(1)
                     continue
                 else:
                     with self._resource_lock:
-                        self._resource_manager.update('actor', _id, resource_task.result)
+                        self._resource_manager.update('collector', _id, resource_task.result)
                     with self._connection_lock:
-                        self._connection_actor[_id] = conn
-                        self._callback_fn['deal_with_increase_actor']()
+                        self._connection_collector[_id] = conn
+                        self._callback_fn['deal_with_increase_collector']()
                     break
             except:
                 time.sleep(1)
 
         with self._remain_lock:
-            if _id in self._remain_actor_conn:
-                self._remain_actor_conn.remove(_id)
+            if _id in self._remain_collector_conn:
+                self._remain_collector_conn.remove(_id)
         
-        if _id in self._connection_actor and self._connection_actor[_id].is_connected:
+        if _id in self._connection_collector and self._connection_collector[_id].is_connected:
             print("Successed to connect to {}:{}".format(host, port))
         else:
             print("Failed to connect to {}:{}".format(host, port))
@@ -183,16 +183,16 @@ class CoordinatorInteraction(object):
                         'data': {
                             "namespace": "default",
                             "coordinator": "nervexjob-example-coordinator",
-                            "actors": ["localhost:13340"],
+                            "collectors": ["localhost:13340"],
                             "learners": ["localhost:12333"],
                         },
                     }
                 """
                 print("recevied {}".format(_result))
-                # Get actors, learners informations from data
+                # Get collectors, learners informations from data
                 method = _result['method']
                 data = _result['data']
-                actors, learners = data['actors'], data['learners']
+                collectors, learners = data['collectors'], data['learners']
 
                 if method == 'add':
                     if self._connection_agg is None:
@@ -201,36 +201,36 @@ class CoordinatorInteraction(object):
                         conn = self._connection_agg
                         conn.added_replicas(learners)
 
-                    # connect to each actor
-                    for actor in actors:
-                        # actor_id = actor.split(':')[0]
-                        actor_id = actor
-                        actor_host = actor.split(':')[0]
-                        actor_port = actor.split(':')[1]
-                        thread = Thread(target=self._execute_actor_connection, args=(actor_id, actor_host, int(actor_port),))
+                    # connect to each collector
+                    for collector in collectors:
+                        # collector_id = collector.split(':')[0]
+                        collector_id = collector
+                        collector_host = collector.split(':')[0]
+                        collector_port = collector.split(':')[1]
+                        thread = Thread(target=self._execute_collector_connection, args=(collector_id, collector_host, int(collector_port),))
                         thread.start()
                         with self._remain_lock:
-                            self._remain_actor_conn.add(actor_id)
+                            self._remain_collector_conn.add(collector_id)
 
                 elif method == 'delete':
                     # For simple, here is sequence
-                    for actor in actors:
-                        actor_id = actor
-                        if actor_id not in self._connection_actor:
+                    for collector in collectors:
+                        collector_id = collector
+                        if collector_id not in self._connection_collector:
                             continue
                         
-                        # delete the actor from resource manager to ensure that not assign job to actor again
+                        # delete the collector from resource manager to ensure that not assign job to collector again
                         while True:
                             with self._resource_lock:
-                                if not self._resource_manager.have_assigned('actor', actor_id):
-                                    self._resource_manager.delete('actor', actor_id)
+                                if not self._resource_manager.have_assigned('collector', collector_id):
+                                    self._resource_manager.delete('collector', collector_id)
                                     break
                             time.sleep(1)
 
                         with self._connection_lock:
-                            conn = self._connection_actor.pop(actor_id)
+                            conn = self._connection_collector.pop(collector_id)
                         conn.disconnect()
-                        self._callback_fn['deal_with_decrease_actor']()
+                        self._callback_fn['deal_with_decrease_collector']()
                         assert not conn.is_connected
                         time.sleep(2)
 
@@ -289,16 +289,16 @@ class CoordinatorInteraction(object):
         max_retry_time = 120
         start_time = time.time()
         while time.time() - start_time <= max_retry_time:
-            if len(self._connection_actor) < self._cfg.actor_limits or len(self._connection_learner) < self._cfg.learner_limits:
-                print("Only can connect {} actors, {} learners.".format(len(self._connection_actor), len(self._connection_learner)))
+            if len(self._connection_collector) < self._cfg.collector_limits or len(self._connection_learner) < self._cfg.learner_limits:
+                print("Only can connect {} collectors, {} learners.".format(len(self._connection_collector), len(self._connection_learner)))
                 time.sleep(2)
             else:
-                print("Have connected {} actors, {} learners, match limit requests.".format(len(self._connection_actor), len(self._connection_learner)))
+                print("Have connected {} collectors, {} learners, match limit requests.".format(len(self._connection_collector), len(self._connection_learner)))
                 print("Start...")
                 break
 
-        if len(self._connection_actor) < self._cfg.actor_limits or len(self._connection_learner) < self._cfg.learner_limits:
-            print("Exit since only can connect {} actors, {} learners.".format(len(self._connection_actor), len(self._connection_learner)))
+        if len(self._connection_collector) < self._cfg.collector_limits or len(self._connection_learner) < self._cfg.learner_limits:
+            print("Exit since only can connect {} collectors, {} learners.".format(len(self._connection_collector), len(self._connection_learner)))
             self.close()
             sys.exit(1)
 
@@ -309,18 +309,18 @@ class CoordinatorInteraction(object):
         # wait for execute thread
         start_time = time.time()
         while time.time() - start_time <= 60:
-            if len(self._remain_learner_task) == 0 and len(self._remain_actor_task) == 0 \
-                and len(self._remain_learner_conn) == 0 and len(self._remain_actor_conn) == 0:
+            if len(self._remain_learner_task) == 0 and len(self._remain_collector_task) == 0 \
+                and len(self._remain_learner_conn) == 0 and len(self._remain_collector_conn) == 0:
                 break
             else:
                 time.sleep(1)
-        for actor_id, conn in self._connection_actor.items():
+        for collector_id, conn in self._connection_collector.items():
             conn.disconnect()
             assert not conn.is_connected
         for learner_id, conn in self._connection_learner.items():
             conn.disconnect()
             assert not conn.is_connected
-        self._connection_actor = {}
+        self._connection_collector = {}
         self._connection_learner = {}
         self._replicas_update_process_thread.join()
         # wait from all slave receive DELETE
@@ -335,51 +335,51 @@ class CoordinatorInteraction(object):
         resource_task.start().join()
         return resource_task
 
-    def send_actor_task(self, actor_task: dict) -> bool:
+    def send_collector_task(self, collector_task: dict) -> bool:
         # assert not self._end_flag, "please start interaction first"
-        task_id = actor_task['task_id']
-        # according to resource info, assign task to a specific actor and adapt task
+        task_id = collector_task['task_id']
+        # according to resource info, assign task to a specific collector and adapt task
         with self._resource_lock:
-            assigned_actor = self._resource_manager.assign_actor(actor_task)
-        if assigned_actor is None:
-            # self._logger.error("actor task({}) doesn't have enough actor to execute".format(task_id))
+            assigned_collector = self._resource_manager.assign_collector(collector_task)
+        if assigned_collector is None:
+            # self._logger.error("collector task({}) doesn't have enough collector to execute".format(task_id))
             return False
-        actor_task.update(assigned_actor)
+        collector_task.update(assigned_collector)
 
-        actor_id = actor_task['actor_id']
-        start_task = self._connection_actor[actor_id].new_task(
+        collector_id = collector_task['collector_id']
+        start_task = self._connection_collector[collector_id].new_task(
             {
-                'name': 'actor_start_task', 
-                'task_info': actor_task
+                'name': 'collector_start_task', 
+                'task_info': collector_task
             }
         )
         start_task.start().join()
         if start_task.status != TaskStatus.COMPLETED:
             self._resource_manager.update(
-                'actor', assigned_actor['actor_id'], assigned_actor['resource_info']
+                'collector', assigned_collector['collector_id'], assigned_collector['resource_info']
             )
-            print('actor_task({}) start failed: {}'.format(task_id, start_task.result))
-            self._actor_failed_time[actor_id] = self._actor_failed_time.get(actor_id, 0) + 1
-            if self._actor_failed_time[actor_id] >= 5:
-                print("ACTOR {} has failed 5 times".format(actor_id))
-                self._resource_manager.delete('actor', actor_id)
-                self._connection_actor.pop(actor_id)
+            print('collector_task({}) start failed: {}'.format(task_id, start_task.result))
+            self._collector_failed_time[collector_id] = self._collector_failed_time.get(collector_id, 0) + 1
+            if self._collector_failed_time[collector_id] >= 5:
+                print("Collector {} has failed 5 times".format(collector_id))
+                self._resource_manager.delete('collector', collector_id)
+                self._connection_collector.pop(collector_id)
             return False
         else:
-            self._actor_failed_time[actor_id] = self._actor_failed_time.get(actor_id, 0)
-            # self._logger.info('actor task({}) is assigned to actor({})'.format(task_id, actor_id))
-            print(('actor task({}) is assigned to actor({})'.format(task_id, actor_id)))
+            self._collector_failed_time[collector_id] = self._collector_failed_time.get(collector_id, 0)
+            # self._logger.info('collector task({}) is assigned to collector({})'.format(task_id, collector_id))
+            print(('collector task({}) is assigned to collector({})'.format(task_id, collector_id)))
             with self._remain_lock:
-                self._remain_actor_task.add(task_id)
-            actor_task_thread = Thread(target=self._execute_actor_task, args=(actor_task, ))
-            actor_task_thread.start()
+                self._remain_collector_task.add(task_id)
+            collector_task_thread = Thread(target=self._execute_collector_task, args=(collector_task, ))
+            collector_task_thread.start()
             return True
 
-    def _execute_actor_task(self, actor_task: dict) -> None:
-        actor_id = actor_task['actor_id']
+    def _execute_collector_task(self, collector_task: dict) -> None:
+        collector_id = collector_task['collector_id']
         while not self._end_flag:
             try:
-                data_task = self._connection_actor[actor_id].new_task({'name': 'actor_data_task'})
+                data_task = self._connection_collector[collector_id].new_task({'name': 'collector_data_task'})
                 data_task.start().join()
                 if data_task.status != TaskStatus.COMPLETED:
                     # ignore and retry
@@ -390,17 +390,17 @@ class CoordinatorInteraction(object):
                     if finished_task:
                         # result['finished_task'] is a flag
                         task_id = result.get('task_id', None)
-                        self._callback_fn['deal_with_actor_finish_task'](task_id, result)
-                        resource_task = self._get_resource(self._connection_actor[actor_id])
+                        self._callback_fn['deal_with_collector_finish_task'](task_id, result)
+                        resource_task = self._get_resource(self._connection_collector[collector_id])
                         if resource_task.status == TaskStatus.COMPLETED:
                             with self._resource_lock:
-                                self._resource_manager.update('actor', actor_id, resource_task.result)
+                                self._resource_manager.update('collector', collector_id, resource_task.result)
                         break
                     else:
                         task_id = result.get('task_id', None)
                         buffer_id = result.get('buffer_id', None)
                         data_id = result.get('data_id', None)
-                        self._callback_fn['deal_with_actor_send_data'](task_id, buffer_id, data_id, result)
+                        self._callback_fn['deal_with_collector_send_data'](task_id, buffer_id, data_id, result)
             except requests.exceptions.HTTPError as e:
                 if self._end_flag:
                     break
@@ -408,7 +408,7 @@ class CoordinatorInteraction(object):
                     raise e
 
         with self._remain_lock:
-            self._remain_actor_task.remove(task_id)
+            self._remain_collector_task.remove(task_id)
 
     def send_learner_task(self, learner_task: dict) -> bool:
         # assert not self._end_flag, "please start interaction first"

@@ -98,7 +98,7 @@ class MockLearner(Slave):
             }
             return ret
         else:
-            raise TaskFail(result={'message': 'task name error'}, message='illegal actor task <{}>'.format(task_name))
+            raise TaskFail(result={'message': 'task name error'}, message='illegal learner task <{}>'.format(task_name))
 
     def deal_with_learner_start(self, task_info):
 

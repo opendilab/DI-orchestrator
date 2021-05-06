@@ -32,7 +32,7 @@ def get_args():
     args = parser.parse_args()
     return args
 
-class MockActor(Slave):
+class MockCollector(Slave):
 
     def __init__(self, host, port):
         self.__host = host
@@ -42,7 +42,7 @@ class MockActor(Slave):
 
         self.data_queue = Queue(10)
 
-        self._actor_close_flag = False
+        self._collector_close_flag = False
         self._eval_flag = False
         self._target = None
 
@@ -53,28 +53,28 @@ class MockActor(Slave):
         task_name = task['name']
         if task_name == 'resource':
             return {'gpu': 1, 'cpu': 20}
-        elif task_name == 'actor_start_task':
+        elif task_name == 'collector_start_task':
             self._current_task_info = task['task_info']
-            self.deal_with_actor_start(self._current_task_info)
-            return {'message': 'actor task has started'}
-        elif task_name == 'actor_data_task':
-            data = self.deal_with_actor_data_task()
+            self.deal_with_collector_start(self._current_task_info)
+            return {'message': 'collector task has started'}
+        elif task_name == 'collector_data_task':
+            data = self.deal_with_collector_data_task()
             data['buffer_id'] = self._current_task_info['buffer_id']
             data['task_id'] = self._current_task_info['task_id']
             return data
-        elif task_name == 'actor_close_task':
-            data = self.deal_with_actor_close()
+        elif task_name == 'collector_close_task':
+            data = self.deal_with_collector_close()
             return data
         else:
             pass
 
-    def deal_with_actor_start(self, task):
+    def deal_with_collector_start(self, task):
         self._target = task['target']
-        self._eval_flag = task['actor_cfg']['eval_flag']
-        self._actor_thread = Thread(target=self._mock_actor_gen_data, args=(self._target, ), daemon=True, name='actor_start')
-        self._actor_thread.start()
+        self._eval_flag = task['collector_cfg']['eval_flag']
+        self._collector_thread = Thread(target=self._mock_collector_gen_data, args=(self._target, ), daemon=True, name='collector_start')
+        self._collector_thread.start()
 
-    def deal_with_actor_data_task(self):
+    def deal_with_collector_data_task(self):
         while True:
             if not self.data_queue.empty():
                 data = self.data_queue.get()
@@ -83,17 +83,17 @@ class MockActor(Slave):
                 time.sleep(0.1)
         return data
 
-    def deal_with_actor_close(self):
-        self._actor_close_flag = True
-        self._actor_thread.join()
-        del self._actor_thread
+    def deal_with_collector_close(self):
+        self._collector_close_flag = True
+        self._collector_thread.join()
+        del self._collector_thread
         finish_info = {
             'eval_flag': self._eval_flag,
             'target': self._target,
             }
         return finish_info
 
-    def _mock_actor_gen_data(self, target):
+    def _mock_collector_gen_data(self, target):
         st = time.time()
         num = 0
         while True:
@@ -109,8 +109,8 @@ class MockActor(Slave):
             time.sleep(1)
 
 def main(args):
-    actor = MockActor(args.listen, args.port)
-    actor.start()
+    collector = MockCollector(args.listen, args.port)
+    collector.start()
 
 if __name__ == "__main__":
     args = get_args()

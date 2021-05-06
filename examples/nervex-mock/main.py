@@ -2,7 +2,7 @@ import time
 import argparse
 from threading import Thread
 
-from worker import MockCoordinator, MockActor, MockLearner, MockLearnerAggregator
+from worker import MockCoordinator, MockCollector, MockLearner, MockLearnerAggregator
 
 def info(args):
     print("====")
@@ -24,10 +24,10 @@ def start_cooridnator(args):
 
     coordinator.start()
 
-def start_actor(args):
+def start_collector(args):
     host, port = args.listen, args.port
-    actor = MockActor(host, port)
-    actor.start()
+    collector = MockCollector(host, port)
+    collector.start()
 
 def start_learner(args):
     host, port = args.listen, args.port
@@ -52,11 +52,11 @@ def parse_args():
     parser_coordinator.add_argument("-p", "--port", type=int, default=8000, help="Specify the port on which the server listens")
     parser_coordinator.set_defaults(func=start_cooridnator)
 
-    # Actor
-    parser_actor = subparsers.add_parser("actor", help="start a new actor")
-    parser_actor.add_argument("-l", "--listen", default="localhost", help="Specify the IP address on which the server listens")
-    parser_actor.add_argument("-p", "--port", type=int, default=13339, help="Specify the port on which the server listens")
-    parser_actor.set_defaults(func=start_actor)
+    # Collector
+    parser_collector = subparsers.add_parser("collector", help="start a new collector")
+    parser_collector.add_argument("-l", "--listen", default="localhost", help="Specify the IP address on which the server listens")
+    parser_collector.add_argument("-p", "--port", type=int, default=13339, help="Specify the port on which the server listens")
+    parser_collector.set_defaults(func=start_collector)
 
     # Learner
     parser_learner = subparsers.add_parser("learner", help="start a new learner")

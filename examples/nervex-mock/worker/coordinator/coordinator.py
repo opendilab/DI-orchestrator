@@ -22,11 +22,11 @@ from utils import LockContext, LockContextType, get_task_uid
 
 cfg = {
     'interaction': {
-        'actor_limits': 1,
+        'collector_limits': 1,
         'learner_limits': 1,
-        'actor': {
-            '0': ['actor0', 'localhost', 13339],
-            # '1': ['actor1', 'localhost', '8001'],
+        'collector': {
+            '0': ['collector0', 'localhost', 13339],
+            # '1': ['collector1', 'localhost', '8001'],
         },
         'learner': {
             '0': ['learner0', 'localhost', 12333]
@@ -36,9 +36,9 @@ cfg = {
     'commander': {
         'parallel_commander_type': 'solo',
         'import_names': ['worker.coordinator.solo_parallel_commander'],
-        'actor_task_space': 0,
+        'collector_task_space': 0,
         'learner_task_space': 0,
-        'actor_cfg': {
+        'collector_cfg': {
             'env_kwargs': {
                 'eval_stop_ptg': 0.2,   
             }
@@ -53,7 +53,7 @@ cfg = {
         'max_iterations': 10000,
         'eval_interval': 5,
     },
-    'actor_task_timeout': 5,
+    'collector_task_timeout': 5,
     'learner_task_timeout': 5,
 }
 
@@ -80,17 +80,17 @@ class MockCoordinator(object):
 
         self._coordinator_uid = get_task_uid()
         self._cfg = cfg
-        self._actor_task_timeout = cfg.actor_task_timeout
+        self._collector_task_timeout = cfg.collector_task_timeout
         self._learner_task_timeout = cfg.learner_task_timeout
 
         self._callback = {
-            'deal_with_actor_send_data': self.deal_with_actor_send_data,
-            'deal_with_actor_finish_task': self.deal_with_actor_finish_task,
+            'deal_with_collector_send_data': self.deal_with_collector_send_data,
+            'deal_with_collector_finish_task': self.deal_with_collector_finish_task,
             'deal_with_learner_get_data': self.deal_with_learner_get_data,
             'deal_with_learner_send_info': self.deal_with_learner_send_info,
             'deal_with_learner_finish_task': self.deal_with_learner_finish_task,
-            'deal_with_increase_actor': self.deal_with_increase_actor,
-            'deal_with_decrease_actor': self.deal_with_decrease_actor,
+            'deal_with_increase_collector': self.deal_with_increase_collector,
+            'deal_with_decrease_collector': self.deal_with_decrease_collector,
             'deal_with_increase_learner': self.deal_with_increase_learner,
             'deal_with_decrease_learner': self.deal_with_decrease_learner,
         }
@@ -98,14 +98,14 @@ class MockCoordinator(object):
         self._logger = None
         self._interaction = CoordinatorInteraction(cfg.interaction, self.__nerver_server, self._callback, self._logger)
         self._learner_task_queue = Queue()
-        self._actor_task_queue = Queue()
+        self._collector_task_queue = Queue()
         self._commander = create_parallel_commander(cfg.commander)
         self._commander_lock = LockContext(LockContextType.THREAD_LOCK)
 
         # ############## Thread #####################
-        self._assign_actor_thread = Thread(target=self._assign_actor_task, args=())
+        self._assign_collector_thread = Thread(target=self._assign_collector_task, args=())
         self._assign_learner_thread = Thread(target=self._assign_learner_task, args=())
-        self._produce_actor_thread = Thread(target=self._produce_actor_task, args=())
+        self._produce_collector_thread = Thread(target=self._produce_collector_task, args=())
         self._produce_learner_thread = Thread(target=self._produce_learner_task, args=())
 
         self._replay_buffer = {}
@@ -116,51 +116,51 @@ class MockCoordinator(object):
 
         self._end_flag = True
 
-    def _assign_actor_task(self) -> None:
+    def _assign_collector_task(self) -> None:
         r"""
         Overview:
-            The function to be called in the assign_actor_task thread.
-            Will get an actor task from ``actor_task_queue`` and assign the task.
+            The function to be called in the assign_collector_task thread.
+            Will get an collector task from ``collector_task_queue`` and assign the task.
         """
         while not self._end_flag:
             time.sleep(0.01)
             # get valid task, abandon timeout task
-            if self._actor_task_queue.empty():
+            if self._collector_task_queue.empty():
                 continue
             else:
-                actor_task, put_time = self._actor_task_queue.get()
+                collector_task, put_time = self._collector_task_queue.get()
                 start_retry_time = time.time()
-                max_retry_time = 0.3 * self._actor_task_timeout
+                max_retry_time = 0.3 * self._collector_task_timeout
                 while True:
-                    # timeout or assigned to actor
+                    # timeout or assigned to collector
                     get_time = time.time()
-                    if get_time - put_time >= self._actor_task_timeout:
+                    if get_time - put_time >= self._collector_task_timeout:
                         self.info(
-                            'actor task({}) timeout: [{}, {}, {}/{}]'.format(
-                                actor_task['task_id'], get_time, put_time, get_time - put_time, self._actor_task_timeout
+                            'collector task({}) timeout: [{}, {}, {}/{}]'.format(
+                                collector_task['task_id'], get_time, put_time, get_time - put_time, self._collector_task_timeout
                             )
                         )
                         with self._commander_lock:
-                            self._commander.notify_fail_actor_task(actor_task)
+                            self._commander.notify_fail_collector_task(collector_task)
                         break
-                    buffer_id = actor_task['buffer_id']
+                    buffer_id = collector_task['buffer_id']
                     if buffer_id in self._replay_buffer:
-                        if self._interaction.send_actor_task(actor_task):
-                            self._record_task(actor_task)
-                            self.info("actor_task({}) is successful to be assigned".format(actor_task['task_id']))
-                            print("actor_task({}) is successful to be assigned".format(actor_task['task_id']))
+                        if self._interaction.send_collector_task(collector_task):
+                            self._record_task(collector_task)
+                            self.info("collector_task({}) is successful to be assigned".format(collector_task['task_id']))
+                            print("collector_task({}) is successful to be assigned".format(collector_task['task_id']))
                             break
                         else:
-                            self.info("actor_task({}) is failed to be assigned".format(actor_task['task_id']))
+                            self.info("collector_task({}) is failed to be assigned".format(collector_task['task_id']))
                     else:
                         self.info(
-                            "actor_task({}) can't find proper buffer_id({})".format(actor_task['task_id'], buffer_id)
+                            "collector_task({}) can't find proper buffer_id({})".format(collector_task['task_id'], buffer_id)
                         )
                     if time.time() - start_retry_time >= max_retry_time:
                         # reput into queue
-                        self._actor_task_queue.put([actor_task, put_time])
+                        self._collector_task_queue.put([collector_task, put_time])
                         start_retry_time = time.time()
-                        self.info("actor task({}) reput into queue".format(actor_task['task_id']))
+                        self.info("collector task({}) reput into queue".format(collector_task['task_id']))
                         break
                     time.sleep(3)
 
@@ -210,20 +210,20 @@ class MockCoordinator(object):
                         break
                     time.sleep(3)
 
-    def _produce_actor_task(self) -> None:
+    def _produce_collector_task(self) -> None:
         r"""
         Overview:
-            The function to be called in the ``produce_actor_task`` thread.
-            Will ask commander to produce a actor task, then put it into ``actor_task_queue``.
+            The function to be called in the ``produce_collector_task`` thread.
+            Will ask commander to produce a collector task, then put it into ``collector_task_queue``.
         """
         while not self._end_flag:
             time.sleep(0.01)
             with self._commander_lock:
-                actor_task = self._commander.get_actor_task()
-                if actor_task is None:
+                collector_task = self._commander.get_collector_task()
+                if collector_task is None:
                     continue
-            self.info("actor task({}) put into queue".format(actor_task['task_id']))
-            self._actor_task_queue.put([actor_task, time.time()])
+            self.info("collector task({}) put into queue".format(collector_task['task_id']))
+            self._collector_task_queue.put([collector_task, time.time()])
 
     def _produce_learner_task(self) -> None:
         r"""
@@ -249,8 +249,8 @@ class MockCoordinator(object):
     def start(self) -> None:
         self._end_flag = False
         self._interaction.start()
-        self._produce_actor_thread.start()
-        self._assign_actor_thread.start()
+        self._produce_collector_thread.start()
+        self._assign_collector_thread.start()
         self._produce_learner_thread.start()
         self._assign_learner_thread.start()
 
@@ -259,8 +259,8 @@ class MockCoordinator(object):
             return
         self._end_flag = True
         time.sleep(1)
-        self._produce_actor_thread.join()
-        self._assign_actor_thread.join()
+        self._produce_collector_thread.join()
+        self._assign_collector_thread.join()
         self._produce_learner_thread.join()
         self._assign_learner_thread.join()
         self._interaction.close()
@@ -274,38 +274,38 @@ class MockCoordinator(object):
     def __del__(self) -> None:
         self.close()
 
-    def deal_with_actor_send_data(self, task_id: str, buffer_id: str, data_id: str, data: dict) -> None:
+    def deal_with_collector_send_data(self, task_id: str, buffer_id: str, data_id: str, data: dict) -> None:
         if task_id not in self._task_state:
-            self.error('actor task({}) not in self._task_state when send data, throw it'.format(task_id))
+            self.error('collector task({}) not in self._task_state when send data, throw it'.format(task_id))
             return
         if buffer_id not in self._replay_buffer:
-            self.error("actor task({}) data({}) doesn't have proper buffer_id({})".format(task_id, data_id, buffer_id))
+            self.error("collector task({}) data({}) doesn't have proper buffer_id({})".format(task_id, data_id, buffer_id))
             return
         self._replay_buffer[buffer_id].push_data(data)
-        self.info('actor task({}) send data({})'.format(task_id, data_id))
+        self.info('collector task({}) send data({})'.format(task_id, data_id))
 
-    def deal_with_actor_finish_task(self, task_id: str, finished_task: dict) -> None:
+    def deal_with_collector_finish_task(self, task_id: str, finished_task: dict) -> None:
         if task_id not in self._task_state:
-            self.error('actor task({}) not in self._task_state when finish, throw it'.format(task_id))
+            self.error('collector task({}) not in self._task_state when finish, throw it'.format(task_id))
             return
         # finish_task
         with self._commander_lock:
-            system_shutdown_flag = self._commander.finish_actor_task(task_id, finished_task)
+            system_shutdown_flag = self._commander.finish_collector_task(task_id, finished_task)
         self._task_state.pop(task_id)
         self._historical_task.append(task_id)
-        self.info('actor task({}) is finished'.format(task_id))
+        self.info('collector task({}) is finished'.format(task_id))
         if system_shutdown_flag:
             self.info('coordinator will be closed')
             close_thread = Thread(target=self.close, args=())
             close_thread.start()
 
-    def deal_with_increase_actor(self):
+    def deal_with_increase_collector(self):
         with self._commander_lock:
-            self._commander.increase_actor_task_space()
+            self._commander.increase_collector_task_space()
 
-    def deal_with_decrease_actor(self):
+    def deal_with_decrease_collector(self):
         with self._commander_lock:
-            self._commander.decrease_actor_task_space()
+            self._commander.decrease_collector_task_space()
 
     def deal_with_increase_learner(self):
         with self._commander_lock:

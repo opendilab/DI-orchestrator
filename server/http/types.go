@@ -50,8 +50,8 @@ type Response struct {
 }
 
 const (
-	CODE_SUCCESS = iota
-	CODE_FAILED
+	CodeSuccess = iota
+	CodeFailed
 )
 
 type NerveXJobResponse struct {

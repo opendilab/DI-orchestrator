@@ -57,10 +57,10 @@ func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var success bool = true
-	var code int = CODE_SUCCESS
+	var code int = CodeSuccess
 	if err != nil {
 		success = false
-		code = CODE_FAILED
+		code = CodeFailed
 		msg = err.Error()
 	}
 

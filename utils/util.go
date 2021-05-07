@@ -109,7 +109,6 @@ func BuildPodFromTemplate(
 		podName = GenerateName(podName)
 	case AggregatorName:
 		portEnv = "AGGREGATOR_PORT"
-
 	case CoordinatorName:
 		portEnv = "COORDINATOR_PORT"
 	default:

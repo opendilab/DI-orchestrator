@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	. "go-sensephoenix.sensetime.com/nervex-operator/server/errors"
+	servererrors "go-sensephoenix.sensetime.com/nervex-operator/server/errors"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
@@ -67,11 +67,11 @@ func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 		msg = err.Error()
 
 		// define status code
-		if IsNotFound(err) {
+		if servererrors.IsNotFound(err) {
 			statusCode = http.StatusNotFound
-		} else if IsAlreadyExists(err) {
+		} else if servererrors.IsAlreadyExists(err) {
 			statusCode = http.StatusConflict
-		} else if IsBadRequest(err) {
+		} else if servererrors.IsBadRequest(err) {
 			statusCode = http.StatusBadRequest
 		} else {
 			statusCode = http.StatusInternalServerError
@@ -108,7 +108,7 @@ func (s *NerveXServer) getReplicas(r *http.Request) (interface{}, error) {
 			rp.Name = v
 		default:
 			errInfo := fmt.Sprintf("request param %s is not supported", k)
-			return nil, &NerveXError{Type: ErrorBadRequest, Message: errInfo}
+			return nil, &servererrors.NerveXError{Type: servererrors.ErrorBadRequest, Message: errInfo}
 		}
 	}
 
@@ -275,7 +275,7 @@ func (s *NerveXServer) addReplicas(r *http.Request) (NerveXJobResponse, error) {
 	err := json.NewDecoder(r.Body).Decode(&njreq)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
-		return NerveXJobResponse{}, &NerveXError{Type: ErrorBadRequest, Message: errMsg}
+		return NerveXJobResponse{}, &servererrors.NerveXError{Type: servererrors.ErrorBadRequest, Message: errMsg}
 	}
 
 	// get ownReference of request coordinator
@@ -306,7 +306,7 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (NerveXJobResponse, error
 	err := json.NewDecoder(r.Body).Decode(&njreq)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
-		return NerveXJobResponse{}, &NerveXError{Type: ErrorBadRequest, Message: errMsg}
+		return NerveXJobResponse{}, &servererrors.NerveXError{Type: servererrors.ErrorBadRequest, Message: errMsg}
 	}
 
 	// get ownReference of the request coordinator
@@ -368,7 +368,7 @@ func (s *NerveXServer) getNerveXJob(namespace, coordinatorName string) (*nervexv
 	}
 	if !ownByNerveX {
 		errMsg := fmt.Sprintf("coordinator %s is not owned by any NerveXJob", coordinatorName)
-		return nil, &NerveXError{Type: ErrorNotFound, Message: errMsg}
+		return nil, &servererrors.NerveXError{Type: servererrors.ErrorNotFound, Message: errMsg}
 	}
 
 	// get NerveXJob
@@ -390,7 +390,7 @@ func (s *NerveXServer) getNerveXJobByKey(key string) (*nervexv1alpha1.NerveXJob,
 
 	if !exists {
 		errMsg := fmt.Sprintf("NerveXJob: %s not exists in cache", key)
-		return nil, &NerveXError{Type: ErrorNotFound, Message: errMsg}
+		return nil, &servererrors.NerveXError{Type: servererrors.ErrorNotFound, Message: errMsg}
 	}
 	nvxUn := obj.(*unstructured.Unstructured)
 	var nvxJob nervexv1alpha1.NerveXJob
@@ -411,7 +411,7 @@ func (s *NerveXServer) getPodByKey(key string) (*corev1.Pod, error) {
 	}
 	if !exists {
 		errMsg := fmt.Sprintf("pod: %s not exists in cache", key)
-		return nil, &NerveXError{Type: ErrorNotFound, Message: errMsg}
+		return nil, &servererrors.NerveXError{Type: servererrors.ErrorNotFound, Message: errMsg}
 	}
 
 	podUn := obj.(*unstructured.Unstructured)
@@ -553,7 +553,7 @@ func (s *NerveXServer) createPodsAndServices(
 		_, err = s.KubeClient.CoreV1().Pods(ns).Create(context.Background(), pod, metav1.CreateOptions{})
 		if err != nil {
 			if k8serrors.IsAlreadyExists(err) {
-				return results, &NerveXError{Type: ErrorAlreadyExists, Message: err.Error()}
+				return results, &servererrors.NerveXError{Type: servererrors.ErrorAlreadyExists, Message: err.Error()}
 			}
 			return results, err
 		}
@@ -567,7 +567,7 @@ func (s *NerveXServer) createPodsAndServices(
 		_, err = s.KubeClient.CoreV1().Services(ns).Create(context.Background(), svc, metav1.CreateOptions{})
 		if err != nil {
 			if k8serrors.IsAlreadyExists(err) {
-				return results, &NerveXError{Type: ErrorAlreadyExists, Message: err.Error()}
+				return results, &servererrors.NerveXError{Type: servererrors.ErrorAlreadyExists, Message: err.Error()}
 			}
 			return results, err
 		}
@@ -617,7 +617,7 @@ func (s *NerveXServer) DeletePodsAndServices(pods []*corev1.Pod, njreq *NerveXJo
 		portName = nervexutil.DefaultLearnerPortName
 		defaultPort = nervexutil.DefaultLearnerPort
 	default:
-		return nil, &NerveXError{Type: ErrorBadRequest, Message: fmt.Sprintf("replica type %s is not supported", replicaType)}
+		return nil, &servererrors.NerveXError{Type: servererrors.ErrorBadRequest, Message: fmt.Sprintf("replica type %s is not supported", replicaType)}
 	}
 
 	for _, pod := range pods {
@@ -630,7 +630,7 @@ func (s *NerveXServer) DeletePodsAndServices(pods []*corev1.Pod, njreq *NerveXJo
 		err := s.KubeClient.CoreV1().Pods(njreq.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				return results, &NerveXError{Type: ErrorNotFound, Message: err.Error()}
+				return results, &servererrors.NerveXError{Type: servererrors.ErrorNotFound, Message: err.Error()}
 			}
 			return results, err
 		}
@@ -639,7 +639,7 @@ func (s *NerveXServer) DeletePodsAndServices(pods []*corev1.Pod, njreq *NerveXJo
 		err = s.KubeClient.CoreV1().Services(njreq.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				return results, &NerveXError{Type: ErrorNotFound, Message: err.Error()}
+				return results, &servererrors.NerveXError{Type: servererrors.ErrorNotFound, Message: err.Error()}
 			}
 			return results, err
 		}

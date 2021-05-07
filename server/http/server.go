@@ -266,16 +266,16 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinatorAndName(namespace, coor
 }
 
 func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
-	// log := s.Log.WithName("NerveXServer")
+	log := s.Log.WithName("NerveXServer")
 
-	// // parse request body
-	// var njreq NerveXJobRequest
-	// err := json.NewDecoder(r.Body).Decode(&njreq)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// log.Info("delete request body: ", "request", njreq)
+	// parse request body
+	var njreq servertypes.NerveXJobResponse
+	err := json.NewDecoder(r.Body).Decode(&njreq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log.Info("delete request body: ", "request", njreq)
 
 	// rep, err := s.deleteReplicas(njreq)
 	// if err != nil {
@@ -291,6 +291,7 @@ func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
 
 // add replicas api
 func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
 	// get request body
 	var njreq servertypes.NerveXJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
@@ -310,6 +311,7 @@ func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobRespon
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
+	log.Info("create replicas", "collectors", collectors, "learners", learners)
 
 	rep := servertypes.NerveXJobResponse{
 		Namespace:   njreq.Namespace,
@@ -323,6 +325,7 @@ func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobRespon
 
 // delete replicas api
 func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
 	// get request body
 	var njreq servertypes.NerveXJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
@@ -350,16 +353,18 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	}
 
 	// delete collector pods
-	delCollectors, err := serverk8s.DeletePodsAndServices(s.KubeClient, collectors, &njreq, nervexutil.CollectorName)
+	delCollectors, err := serverk8s.DeleteReplicas(s.KubeClient, collectors, &njreq, nervexutil.CollectorName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
 
 	// delete learner pods
-	delLearners, err := serverk8s.DeletePodsAndServices(s.KubeClient, learners, &njreq, nervexutil.LearnerName)
+	delLearners, err := serverk8s.DeleteReplicas(s.KubeClient, learners, &njreq, nervexutil.LearnerName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
+
+	log.Info("delete replicas", "collectors", delCollectors, "learners", delLearners)
 
 	rep := servertypes.NerveXJobResponse{
 		Namespace:   njreq.Namespace,

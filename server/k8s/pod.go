@@ -69,8 +69,9 @@ func CreatePodsAndServices(
 		// create pod
 		_, err = kubeClient.CoreV1().Pods(ns).Create(context.Background(), pod, metav1.CreateOptions{})
 		if err != nil {
+			// continue if pod already exists
 			if k8serrors.IsAlreadyExists(err) {
-
+				continue
 			}
 			return results, err
 		}
@@ -84,7 +85,7 @@ func CreatePodsAndServices(
 		_, err = kubeClient.CoreV1().Services(ns).Create(context.Background(), svc, metav1.CreateOptions{})
 		if err != nil {
 			if k8serrors.IsAlreadyExists(err) {
-
+				continue
 			}
 			return results, err
 		}
@@ -146,7 +147,7 @@ func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	return results
 }
 
-func DeletePodsAndServices(kubeClient *kubernetes.Clientset, pods []*corev1.Pod, njreq *servertypes.NerveXJobRequest, replicaType string) ([]string, error) {
+func DeleteReplicas(kubeClient *kubernetes.Clientset, pods []*corev1.Pod, njreq *servertypes.NerveXJobRequest, replicaType string) ([]string, error) {
 	results := []string{}
 	resources := servertypes.ResourceQuantity{}
 	var containerName, portName string
@@ -177,8 +178,9 @@ func DeletePodsAndServices(kubeClient *kubernetes.Clientset, pods []*corev1.Pod,
 		// delete pods
 		err := kubeClient.CoreV1().Pods(njreq.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
 		if err != nil {
+			// continue if pod does not exist
 			if k8serrors.IsNotFound(err) {
-
+				continue
 			}
 			return results, err
 		}
@@ -187,7 +189,7 @@ func DeletePodsAndServices(kubeClient *kubernetes.Clientset, pods []*corev1.Pod,
 		err = kubeClient.CoreV1().Services(njreq.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-
+				continue
 			}
 			return results, err
 		}

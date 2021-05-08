@@ -1,10 +1,12 @@
-package http
+package k8s
 
 import (
 	corev1 "k8s.io/api/core/v1"
+
+	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
 )
 
-func SetPodResources(template *corev1.Pod, resources ResourceQuantity, containerName string) {
+func SetPodResources(template *corev1.Pod, resources servertypes.ResourceQuantity, containerName string) {
 	for i := range template.Spec.Containers {
 		if template.Spec.Containers[i].Name != containerName {
 			continue

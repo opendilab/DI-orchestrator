@@ -18,13 +18,13 @@ var (
 	ResyncPeriod = 30 * time.Second
 )
 
-type DynamicInformers struct {
+type Informers struct {
 	NJInformer  informers.GenericInformer
 	AGInformer  informers.GenericInformer
 	PodInformer informers.GenericInformer
 }
 
-func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) DynamicInformers {
+func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Informers {
 	// add ALConfig informer
 	aggregatorGVR := schema.GroupVersionResource{
 		Group:    nervexv1alpha1.GroupVersion.Group,
@@ -45,7 +45,7 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Dynami
 		Version:  corev1.SchemeGroupVersion.Version,
 		Resource: "pods",
 	}
-	dyi := DynamicInformers{
+	dyi := Informers{
 		NJInformer:  dif.ForResource(njGVR),
 		AGInformer:  dif.ForResource(aggregatorGVR),
 		PodInformer: dif.ForResource(podGVR),

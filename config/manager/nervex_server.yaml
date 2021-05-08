@@ -24,7 +24,7 @@ spec:
         - "--lease-lock-namespace=nervex-system"
         - "--lease-lock-name=nervex-server"
         image: registry.sensetime.com/cloudnative4ai/nervex-server:v0.0.1-alpha.0
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         name: server
         securityContext:
           allowPrivilegeEscalation: false

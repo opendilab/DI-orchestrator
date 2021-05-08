@@ -109,7 +109,6 @@ func BuildPodFromTemplate(
 		podName = GenerateName(podName)
 	case AggregatorName:
 		portEnv = "AGGREGATOR_PORT"
-
 	case CoordinatorName:
 		portEnv = "COORDINATOR_PORT"
 	default:
@@ -199,6 +198,14 @@ func SplitNamespaceName(namespaceName string) (types.NamespacedName, error) {
 
 func ConcatURL(name, ns string, port int32) string {
 	return fmt.Sprintf("%s.%s:%d", name, ns, port)
+}
+
+func GetPodAccessURL(pod *corev1.Pod, namespace, containerName, portName string, defaultPort int32) string {
+	port, found := GetPortFromPod(pod, containerName, portName)
+	if !found {
+		port = defaultPort
+	}
+	return ConcatURL(pod.Name, namespace, port)
 }
 
 func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {

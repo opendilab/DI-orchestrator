@@ -14,7 +14,6 @@ import (
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	serverdynamic "go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
-	serverk8s "go-sensephoenix.sensetime.com/nervex-operator/server/k8s"
 	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
@@ -167,7 +166,7 @@ func (s *NerveXServer) getNamespacedReplicas(namespace string) ([]servertypes.Ne
 	}
 
 	// list coordinators in namespace
-	pods, err := serverk8s.ListPodsWithSelector(s.dyi, namespace, labelSelector)
+	pods, err := s.ListPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +188,7 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinator
 	log := s.Log.WithName("NerveXServer")
 
 	// get ownReference of the request coordinator
-	nvxJob, err := serverk8s.GetNerveXJob(s.dyi, namespace, coordinatorName)
+	nvxJob, err := s.GetNerveXJob(namespace, coordinatorName)
 	if err != nil {
 		log.Error(err, "failed to get owner reference")
 		return servertypes.NerveXJobResponse{}, err
@@ -202,7 +201,7 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinator
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	collectors, learners, _, _, err := serverk8s.ListReplicaPodsWithSelector(s.dyi, namespace, labelSelector)
+	collectors, learners, _, _, err := s.ListReplicaPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
 		return servertypes.NerveXJobResponse{}, err
@@ -252,13 +251,13 @@ func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobRespon
 	}
 
 	// get ownReference of request coordinator
-	nvxJob, err := serverk8s.GetNerveXJob(s.dyi, njreq.Namespace, njreq.Coordinator)
+	nvxJob, err := s.GetNerveXJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
 
 	// create collectors and learners
-	collectors, learners, err := serverk8s.CreateCollectorsAndLearnersForNerveXJob(s.KubeClient, &njreq, nvxJob)
+	collectors, learners, err := s.CreateCollectorsAndLearnersForNerveXJob(&njreq, nvxJob)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
@@ -286,7 +285,7 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	}
 
 	// get ownReference of the request coordinator
-	nvxJob, err := serverk8s.GetNerveXJob(s.dyi, njreq.Namespace, njreq.Coordinator)
+	nvxJob, err := s.GetNerveXJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
@@ -298,19 +297,19 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	collectors, learners, _, _, err := serverk8s.ListReplicaPodsWithSelector(s.dyi, njreq.Namespace, labelSelector)
+	collectors, learners, _, _, err := s.ListReplicaPodsWithSelector(njreq.Namespace, labelSelector)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
 
 	// delete collector pods
-	delCollectors, err := serverk8s.DeleteReplicas(s.KubeClient, collectors, njreq.Namespace, njreq.Collectors.Replicas, nervexutil.CollectorName)
+	delCollectors, err := s.DeleteReplicas(collectors, njreq.Namespace, njreq.Collectors.Replicas, nervexutil.CollectorName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
 
 	// delete learner pods
-	delLearners, err := serverk8s.DeleteReplicas(s.KubeClient, learners, njreq.Namespace, njreq.Learners.Replicas, nervexutil.LearnerName)
+	delLearners, err := s.DeleteReplicas(learners, njreq.Namespace, njreq.Learners.Replicas, nervexutil.LearnerName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
@@ -362,13 +361,13 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 	}
 	log.Info("delete request body: ", "request", njreq)
 
-	cpods, err := serverk8s.GetPodsByNames(s.dyi, njreq.Namespace, njreq.Collectors)
-	collectors, err := serverk8s.RecreateReplicas(s.KubeClient, cpods, njreq.Namespace, nervexutil.CollectorName)
+	cpods, err := s.GetPodsByNames(njreq.Namespace, njreq.Collectors)
+	collectors, err := s.RecreateReplicas(cpods, njreq.Namespace, nervexutil.CollectorName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	lpods, err := serverk8s.GetPodsByNames(s.dyi, njreq.Namespace, njreq.Learners)
-	learners, err := serverk8s.RecreateReplicas(s.KubeClient, lpods, njreq.Namespace, nervexutil.LearnerName)
+	lpods, err := s.GetPodsByNames(njreq.Namespace, njreq.Learners)
+	learners, err := s.RecreateReplicas(lpods, njreq.Namespace, nervexutil.LearnerName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}

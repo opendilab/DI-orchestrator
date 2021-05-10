@@ -1,4 +1,4 @@
-package k8s
+package http
 
 import (
 	"fmt"
@@ -8,18 +8,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	"go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
 	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
-func GetNerveXJob(dyi dynamic.Informers, namespace, coordinatorName string) (*nervexv1alpha1.NerveXJob, error) {
+func (s *NerveXServer) GetNerveXJob(namespace, coordinatorName string) (*nervexv1alpha1.NerveXJob, error) {
 	// get coordinator
 	coorKey := nervexutil.NamespacedName(namespace, coordinatorName)
-	coordinator, err := GetPodByKey(dyi, coorKey)
+	coordinator, err := s.GetPodByKey(coorKey)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +38,7 @@ func GetNerveXJob(dyi dynamic.Informers, namespace, coordinatorName string) (*ne
 
 	// get NerveXJob
 	njKey := nervexutil.NamespacedName(namespace, ownRefer.Name)
-	nvxJob, err := GetNerveXJobByKey(dyi, njKey)
+	nvxJob, err := s.GetNerveXJobByKey(njKey)
 	if err != nil {
 		return nil, err
 	}
@@ -48,8 +46,8 @@ func GetNerveXJob(dyi dynamic.Informers, namespace, coordinatorName string) (*ne
 	return nvxJob, nil
 }
 
-func GetNerveXJobByKey(dyi dynamic.Informers, key string) (*nervexv1alpha1.NerveXJob, error) {
-	obj, exists, err := dyi.NJInformer.Informer().GetIndexer().GetByKey(key)
+func (s *NerveXServer) GetNerveXJobByKey(key string) (*nervexv1alpha1.NerveXJob, error) {
+	obj, exists, err := s.dyi.NJInformer.Informer().GetIndexer().GetByKey(key)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get NerveXJob: %s", err)
 		return nil, fmt.Errorf(errMsg)
@@ -70,8 +68,7 @@ func GetNerveXJobByKey(dyi dynamic.Informers, key string) (*nervexv1alpha1.Nerve
 	return &nvxJob, nil
 }
 
-func CreateCollectorsAndLearnersForNerveXJob(
-	kubeClient *kubernetes.Clientset,
+func (s *NerveXServer) CreateCollectorsAndLearnersForNerveXJob(
 	njreq *servertypes.NerveXJobRequest,
 	job *nervexv1alpha1.NerveXJob) ([]string, []string, error) {
 
@@ -86,7 +83,7 @@ func CreateCollectorsAndLearnersForNerveXJob(
 
 	// create collectors
 	collectorTemplate := job.Spec.Collector.Template
-	collectors, err := CreateReplicas(kubeClient, &collectorTemplate, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.CollectorName)
+	collectors, err := s.CreateReplicas(&collectorTemplate, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.CollectorName)
 
 	if err != nil {
 		return collectors, nil, err
@@ -94,7 +91,7 @@ func CreateCollectorsAndLearnersForNerveXJob(
 
 	// create learners
 	learnerTemplate := job.Spec.Learner.Template
-	learners, err := CreateReplicas(kubeClient, &learnerTemplate, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.LearnerName)
+	learners, err := s.CreateReplicas(&learnerTemplate, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.LearnerName)
 
 	if err != nil {
 		return collectors, learners, err
@@ -103,8 +100,7 @@ func CreateCollectorsAndLearnersForNerveXJob(
 	return collectors, learners, nil
 }
 
-func CreateReplicas(
-	kubeClient *kubernetes.Clientset,
+func (s *NerveXServer) CreateReplicas(
 	template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	resources servertypes.ResourceQuantity,
@@ -134,7 +130,7 @@ func CreateReplicas(
 			return results, err
 		}
 		// set pod resources
-		SetPodResources(pod, resources, containerName)
+		s.SetPodResources(pod, resources, containerName)
 
 		// build service
 		svc := nervexutil.BuildService(pod.GetLabels(), port, portName)
@@ -142,7 +138,7 @@ func CreateReplicas(
 		svc.Name = pod.Name
 
 		// create pod
-		if err := CreatePodAndService(kubeClient, namespace, pod, svc); err != nil {
+		if err := s.CreatePodAndService(namespace, pod, svc); err != nil {
 			return results, err
 		}
 
@@ -153,7 +149,7 @@ func CreateReplicas(
 	return results, nil
 }
 
-func DeleteReplicas(kubeClient *kubernetes.Clientset, pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
+func (s *NerveXServer) DeleteReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
 	var containerName, portName string
 	var defaultPort int32
 
@@ -178,7 +174,7 @@ func DeleteReplicas(kubeClient *kubernetes.Clientset, pods []*corev1.Pod, namesp
 		}
 
 		// delete pods and services
-		if err := DeletePodAndService(kubeClient, namespace, pod.Name); err != nil {
+		if err := s.DeletePodAndService(namespace, pod.Name); err != nil {
 			return results, err
 		}
 
@@ -189,7 +185,7 @@ func DeleteReplicas(kubeClient *kubernetes.Clientset, pods []*corev1.Pod, namesp
 	return results, nil
 }
 
-func RecreateReplicas(kubeClient *kubernetes.Clientset, pods []*corev1.Pod, namespace, replicaType string) ([]string, error) {
+func (s *NerveXServer) RecreateReplicas(pods []*corev1.Pod, namespace, replicaType string) ([]string, error) {
 	var containerName, portName string
 	var defaultPort int32
 	switch replicaType {
@@ -207,7 +203,7 @@ func RecreateReplicas(kubeClient *kubernetes.Clientset, pods []*corev1.Pod, name
 
 	// delete pods and services
 	for _, pod := range pods {
-		if err := DeletePodAndService(kubeClient, namespace, pod.Name); err != nil {
+		if err := s.DeletePodAndService(namespace, pod.Name); err != nil {
 			return nil, err
 		}
 	}
@@ -237,7 +233,7 @@ func RecreateReplicas(kubeClient *kubernetes.Clientset, pods []*corev1.Pod, name
 		svc.SetOwnerReferences(pod.GetOwnerReferences())
 		svc.Name = pod.Name
 
-		if err := CreatePodAndService(kubeClient, namespace, pod, svc); err != nil {
+		if err := s.CreatePodAndService(namespace, pod, svc); err != nil {
 			return results, err
 		}
 

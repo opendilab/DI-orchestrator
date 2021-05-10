@@ -1,4 +1,4 @@
-package k8s
+package http
 
 import (
 	"context"
@@ -11,14 +11,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 
-	"go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
 	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
-func GetPodsByNames(dyi dynamic.Informers, namespace string, names []string) ([]*corev1.Pod, error) {
+func (s *NerveXServer) GetPodsByNames(namespace string, names []string) ([]*corev1.Pod, error) {
 	var keys []string
 	var pods []*corev1.Pod
 	for _, name := range names {
@@ -26,17 +24,17 @@ func GetPodsByNames(dyi dynamic.Informers, namespace string, names []string) ([]
 		keys = append(keys, key)
 	}
 
-	pods, err := GetPodsByKeys(dyi, keys)
+	pods, err := s.GetPodsByKeys(keys)
 	if err != nil {
 		return pods, err
 	}
 	return pods, nil
 }
 
-func GetPodsByKeys(dyi dynamic.Informers, keys []string) ([]*corev1.Pod, error) {
+func (s *NerveXServer) GetPodsByKeys(keys []string) ([]*corev1.Pod, error) {
 	var pods []*corev1.Pod
 	for _, key := range keys {
-		pod, err := GetPodByKey(dyi, key)
+		pod, err := s.GetPodByKey(key)
 		if err != nil {
 			return pods, err
 		}
@@ -45,8 +43,8 @@ func GetPodsByKeys(dyi dynamic.Informers, keys []string) ([]*corev1.Pod, error) 
 	return pods, nil
 }
 
-func GetPodByKey(dyi dynamic.Informers, key string) (*corev1.Pod, error) {
-	obj, exists, err := dyi.PodInformer.Informer().GetIndexer().GetByKey(key)
+func (s *NerveXServer) GetPodByKey(key string) (*corev1.Pod, error) {
+	obj, exists, err := s.dyi.PodInformer.Informer().GetIndexer().GetByKey(key)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get pod: %s", err)
 		return nil, fmt.Errorf(errMsg)
@@ -67,9 +65,9 @@ func GetPodByKey(dyi dynamic.Informers, key string) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
-func CreatePodAndService(kubeClient *kubernetes.Clientset, namespace string, pod *corev1.Pod, service *corev1.Service) error {
+func (s *NerveXServer) CreatePodAndService(namespace string, pod *corev1.Pod, service *corev1.Service) error {
 	// create pod
-	_, err := kubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	_, err := s.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
 	if err != nil {
 		if k8serrors.IsAlreadyExists(err) {
 			return &servertypes.NerveXError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
@@ -77,7 +75,7 @@ func CreatePodAndService(kubeClient *kubernetes.Clientset, namespace string, pod
 		return err
 	}
 	// create service
-	_, err = kubeClient.CoreV1().Services(namespace).Create(context.Background(), service, metav1.CreateOptions{})
+	_, err = s.KubeClient.CoreV1().Services(namespace).Create(context.Background(), service, metav1.CreateOptions{})
 	if err != nil {
 		if k8serrors.IsAlreadyExists(err) {
 			return &servertypes.NerveXError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
@@ -87,20 +85,20 @@ func CreatePodAndService(kubeClient *kubernetes.Clientset, namespace string, pod
 	return nil
 }
 
-func DeletePodAndService(kubeClient *kubernetes.Clientset, namespace, name string) error {
+func (s *NerveXServer) DeletePodAndService(namespace, name string) error {
 	// delete pods
-	if err := kubeClient.CoreV1().Pods(namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
+	if err := s.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	}
 
 	// delete services
-	if err := kubeClient.CoreV1().Services(namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
+	if err := s.KubeClient.CoreV1().Services(namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	}
 	return nil
 }
 
-func SetPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity, containerName string) {
+func (s *NerveXServer) SetPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity, containerName string) {
 	for i := range pod.Spec.Containers {
 		if pod.Spec.Containers[i].Name != containerName {
 			continue
@@ -128,7 +126,7 @@ func SetPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity, co
 	}
 }
 
-func GetPodResources(pod *corev1.Pod, containerName string) servertypes.ResourceQuantity {
+func (s *NerveXServer) GetPodResources(pod *corev1.Pod, containerName string) servertypes.ResourceQuantity {
 	resource := servertypes.ResourceQuantity{
 		CPU:    resource.MustParse("0"),
 		GPU:    resource.MustParse("0"),
@@ -155,16 +153,16 @@ func GetPodResources(pod *corev1.Pod, containerName string) servertypes.Resource
 	return resource
 }
 
-func ListReplicaPodsWithSelector(dyi dynamic.Informers, namespace string, labelSelector labels.Selector) (
+func (s *NerveXServer) ListReplicaPodsWithSelector(namespace string, labelSelector labels.Selector) (
 	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {
 	// list pods that belong to the NerveXJob
-	pods, err := ListPodsWithSelector(dyi, namespace, labelSelector)
+	pods, err := s.ListPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		return
 	}
 
 	// filter out terminating pods since these pods are deleted
-	pods = FilterOutTerminatingPods(pods)
+	pods = nervexutil.FilterOutTerminatingPods(pods)
 
 	// classify pods
 	collectors, learners, coordinator, aggregator, err = nervexutil.ClassifyPods(pods)
@@ -174,8 +172,8 @@ func ListReplicaPodsWithSelector(dyi dynamic.Informers, namespace string, labelS
 	return
 }
 
-func ListPodsWithSelector(dyi dynamic.Informers, namespace string, labelSelector labels.Selector) ([]*corev1.Pod, error) {
-	ret, err := dyi.PodInformer.Lister().ByNamespace(namespace).List(labelSelector)
+func (s *NerveXServer) ListPodsWithSelector(namespace string, labelSelector labels.Selector) ([]*corev1.Pod, error) {
+	ret, err := s.dyi.PodInformer.Lister().ByNamespace(namespace).List(labelSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -191,21 +189,4 @@ func ListPodsWithSelector(dyi dynamic.Informers, namespace string, labelSelector
 	}
 
 	return pods, nil
-}
-
-func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
-	results := []*corev1.Pod{}
-	for _, pod := range pods {
-		if isTerminating(pod) {
-			continue
-		}
-		results = append(results, pod)
-	}
-
-	return results
-}
-
-// isTerminating returns true if pod's DeletionTimestamp has been set
-func isTerminating(pod *corev1.Pod) bool {
-	return pod.DeletionTimestamp != nil
 }

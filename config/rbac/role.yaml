@@ -1,0 +1,50 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: nervex-operator-cluster-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - nervex.sensetime.com
+  resources:
+  - aggregatorconfigs
+  - nervexjobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - nervex.sensetime.com
+  resources:
+  - aggregatorconfigs/finalizers
+  - nervexjobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - nervex.sensetime.com
+  resources:
+  - aggregatorconfigs/status
+  - nervexjobs/status
+  verbs:
+  - get
+  - patch
+  - update

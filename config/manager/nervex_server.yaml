@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nervex-server
+  namespace: nervex-system
+  labels:
+    control-plane: nervex-server
+spec:
+  selector:
+    matchLabels:
+      control-plane: nervex-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        control-plane: nervex-server
+    spec:
+      containers:
+      - command:
+        - /nervex-server
+        args:
+        - "--server-bind-address=:8080"
+        - "--leader-elect"
+        - "--lease-lock-namespace=nervex-system"
+        - "--lease-lock-name=nervex-server"
+        image: registry.sensetime.com/cloudnative4ai/nervex-server:v0.0.1-alpha.0
+        imagePullPolicy: Always
+        name: server
+        securityContext:
+          allowPrivilegeEscalation: false
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        resources:
+          limits:
+            cpu: 100m
+            memory: 30Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+      terminationGracePeriodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nervex-server
+  namespace: nervex-system
+spec:
+  selector:
+    control-plane: nervex-server
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nervex-server-nodeport
+  namespace: nervex-system
+spec:
+  selector:
+    control-plane: nervex-server
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      nodePort: 32270

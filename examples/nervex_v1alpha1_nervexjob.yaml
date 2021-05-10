@@ -1,0 +1,128 @@
+apiVersion: nervex.sensetime.com/v1alpha1
+kind: NerveXJob
+metadata:
+  name: nervexjob-example
+spec:
+  group: xxx
+  priorityClassName: default
+  coordinator:
+    template:
+      spec:
+        containers:
+        - name: coordinator
+          image: registry.sensetime.com/cloudnative4ai/nervex-parallel-linklink-migration:v0.10
+          imagePullPolicy: Always
+          env:
+          - name: LC_ALL
+            value: "en_US.utf-8"
+          - name: LANG
+            value: "en_US.utf-8"
+          - name: NCCL_SHM_DISABLE
+            value: "1"
+          command: ["/bin/bash", "-c",]
+          args:
+          - >
+            cd /nfs/lijianwen/test_atari/test3;
+            python3 -u -c 'import nervex.entry.parallel_entry as pe; pe.launch_coordinator(filename="atari_impala_default_config.py.pkl")';
+            while true; do sleep 30; done;
+          ports:
+          - name: coordinator
+            containerPort: 22273
+          resources:
+            requests:
+              cpu: 2
+              memory: 5Gi
+            limits:
+              cpu: 2
+              memory: 5Gi
+          volumeMounts:
+          - name: config
+            mountPath: /data/nervex
+        volumes:
+        - name: config
+          nfs:
+            path: /data/nfs/nervex
+            server: 10.152.197.14
+  collector:
+    template:
+      spec:
+        containers:
+        - name: collector
+          image: registry.sensetime.com/cloudnative4ai/nervex-parallel-linklink-migration:v0.10
+          imagePullPolicy: Always
+          env:
+          - name: LC_ALL
+            value: "en_US.utf-8"
+          - name: LANG
+            value: "en_US.utf-8"
+          - name: NCCL_SHM_DISABLE
+            value: "1"
+          command: ["/bin/bash", "-c",]
+          args:
+          - >
+            until ping -c 1 $HOSTNAME &>/dev/null ; do sleep 1 ; done ;
+            cd $EXECTIONPATH;
+            python3 -u -c 'import os; import nervex.entry.parallel_entry as pe; pe.launch_actor(filename="$REALFILENAME", name="actor{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
+          ports:
+          - name: collector
+            containerPort: 22270
+          resources:
+            requests:
+              cpu: 2
+              memory: 5Gi
+            limits:
+              cpu: 2
+              memory: 5Gi
+          volumeMounts:
+          - name: config
+            mountPath: /data/nervex
+        volumes:
+        - name: config
+          nfs:
+            path: /data/nfs/nervex
+            server: 10.152.197.14
+  learner:
+    template:
+      spec:
+        containers:
+        - name: learner
+          image: registry.sensetime.com/cloudnative4ai/nervex-parallel-linklink-migration:v0.10
+          imagePullPolicy: Always
+          env:
+          - name: LC_ALL
+            value: "en_US.utf-8"
+          - name: LANG
+            value: "en_US.utf-8"
+          - name: NCCL_SHM_DISABLE
+            value: "1"
+          command: ["/bin/bash", "-c",]
+          args:
+          - >
+            until ping -c 1 $HOSTNAME &>/dev/null ; do sleep 1 ; done ;
+            cd $EXECTIONPATH;
+            mpirun -np $REPEATNUM python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
+            python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
+          ports:
+          - name: learner
+            containerPort: 22271
+          resources:
+            requests:
+              cpu: 2
+              memory: 5Gi
+            limits:
+              cpu: 2
+              memory: 5Gi
+          volumeMounts:
+          - name: config
+            mountPath: /data/nervex
+          - name: cache-volume
+            mountPath: /dev/shm
+        volumes:
+        - name: config
+          nfs:
+            path: /data/nfs/nervex
+            server: 10.152.197.14
+        - name: cache-volume
+          emptyDir:
+            medium: Memory
+            sizeLimit: 128Mi

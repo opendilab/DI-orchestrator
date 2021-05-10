@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -16,6 +17,33 @@ import (
 	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
+
+func GetPodsByNames(dyi dynamic.Informers, namespace string, names []string) ([]*corev1.Pod, error) {
+	var keys []string
+	var pods []*corev1.Pod
+	for _, name := range names {
+		key := nervexutil.NamespacedName(namespace, name)
+		keys = append(keys, key)
+	}
+
+	pods, err := GetPodsByKeys(dyi, keys)
+	if err != nil {
+		return pods, err
+	}
+	return pods, nil
+}
+
+func GetPodsByKeys(dyi dynamic.Informers, keys []string) ([]*corev1.Pod, error) {
+	var pods []*corev1.Pod
+	for _, key := range keys {
+		pod, err := GetPodByKey(dyi, key)
+		if err != nil {
+			return pods, err
+		}
+		pods = append(pods, pod)
+	}
+	return pods, nil
+}
 
 func GetPodByKey(dyi dynamic.Informers, key string) (*corev1.Pod, error) {
 	obj, exists, err := dyi.PodInformer.Informer().GetIndexer().GetByKey(key)
@@ -39,68 +67,98 @@ func GetPodByKey(dyi dynamic.Informers, key string) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
-func CreatePodsAndServices(
-	kubeClient *kubernetes.Clientset,
-	template *corev1.PodTemplateSpec,
-	ownRefer metav1.OwnerReference,
-	njreq *servertypes.NerveXJobRequest,
-	replicaType, containerName, portName string, defaultPort int32) ([]string, error) {
-
-	ns := njreq.Namespace
-	resources := servertypes.ResourceQuantity{}
-	switch replicaType {
-	case nervexutil.CollectorName:
-		resources = njreq.Collectors
-	case nervexutil.LearnerName:
-		resources = njreq.Learners
+func CreatePodAndService(kubeClient *kubernetes.Clientset, namespace string, pod *corev1.Pod, service *corev1.Service) error {
+	// create pod
+	_, err := kubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
+	if err != nil {
+		if k8serrors.IsAlreadyExists(err) {
+			return &servertypes.NerveXError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
+		}
+		return err
 	}
-
-	results := []string{}
-	// create pods and services
-	for i := 0; i < resources.Replicas; i++ {
-		// build pod
-		pod, port, err := nervexutil.BuildPodFromTemplate(template.DeepCopy(), ownRefer, ns, replicaType, containerName, portName, defaultPort)
-		if err != nil {
-			return results, err
+	// create service
+	_, err = kubeClient.CoreV1().Services(namespace).Create(context.Background(), service, metav1.CreateOptions{})
+	if err != nil {
+		if k8serrors.IsAlreadyExists(err) {
+			return &servertypes.NerveXError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
 		}
-		// set pod resources
-		SetPodResources(pod, resources, containerName)
-
-		// create pod
-		_, err = kubeClient.CoreV1().Pods(ns).Create(context.Background(), pod, metav1.CreateOptions{})
-		if err != nil {
-			// continue if pod already exists
-			if k8serrors.IsAlreadyExists(err) {
-				continue
-			}
-			return results, err
-		}
-
-		// build service
-		svc := nervexutil.BuildService(pod.GetLabels(), port, portName)
-		svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
-		svc.Name = pod.Name
-
-		// create service
-		_, err = kubeClient.CoreV1().Services(ns).Create(context.Background(), svc, metav1.CreateOptions{})
-		if err != nil {
-			if k8serrors.IsAlreadyExists(err) {
-				continue
-			}
-			return results, err
-		}
-
-		result := nervexutil.ConcatURL(svc.Name, ns, port)
-		results = append(results, result)
+		return err
 	}
-
-	return results, nil
+	return nil
 }
 
-func ListReplicaPodsWithSelector(dyi dynamic.Informers, ns string, labelSelector labels.Selector) (
+func DeletePodAndService(kubeClient *kubernetes.Clientset, namespace, name string) error {
+	// delete pods
+	if err := kubeClient.CoreV1().Pods(namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
+		return err
+	}
+
+	// delete services
+	if err := kubeClient.CoreV1().Services(namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func SetPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity, containerName string) {
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name != containerName {
+			continue
+		}
+		if pod.Spec.Containers[i].Resources.Limits == nil {
+			pod.Spec.Containers[i].Resources.Limits = make(corev1.ResourceList)
+		}
+		if pod.Spec.Containers[i].Resources.Requests == nil {
+			pod.Spec.Containers[i].Resources.Requests = make(corev1.ResourceList)
+		}
+
+		// cpu and memory must not be zero
+		if !resources.CPU.IsZero() {
+			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = resources.CPU
+			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = resources.CPU
+		}
+		if !resources.Memory.IsZero() {
+			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = resources.Memory
+			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = resources.Memory
+		}
+		if !resources.GPU.IsZero() {
+			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
+			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
+		}
+	}
+}
+
+func GetPodResources(pod *corev1.Pod, containerName string) servertypes.ResourceQuantity {
+	resource := servertypes.ResourceQuantity{
+		CPU:    resource.MustParse("0"),
+		GPU:    resource.MustParse("0"),
+		Memory: resource.MustParse("0"),
+	}
+	for _, container := range pod.Spec.Containers {
+		if container.Name != containerName {
+			continue
+		}
+		if container.Resources.Limits == nil && container.Resources.Requests == nil {
+			break
+		}
+		if container.Resources.Requests != nil {
+			resource.CPU = container.Resources.Requests[corev1.ResourceCPU].DeepCopy()
+			resource.GPU = container.Resources.Requests[corev1.ResourceName("nvidia.com/gpu")].DeepCopy()
+			resource.Memory = container.Resources.Requests[corev1.ResourceMemory].DeepCopy()
+		}
+		if container.Resources.Limits != nil {
+			resource.CPU = container.Resources.Limits[corev1.ResourceCPU].DeepCopy()
+			resource.GPU = container.Resources.Limits[corev1.ResourceName("nvidia.com/gpu")].DeepCopy()
+			resource.Memory = container.Resources.Limits[corev1.ResourceMemory].DeepCopy()
+		}
+	}
+	return resource
+}
+
+func ListReplicaPodsWithSelector(dyi dynamic.Informers, namespace string, labelSelector labels.Selector) (
 	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {
 	// list pods that belong to the NerveXJob
-	pods, err := ListPodsWithSelector(dyi, ns, labelSelector)
+	pods, err := ListPodsWithSelector(dyi, namespace, labelSelector)
 	if err != nil {
 		return
 	}
@@ -145,60 +203,6 @@ func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	}
 
 	return results
-}
-
-func DeleteReplicas(kubeClient *kubernetes.Clientset, pods []*corev1.Pod, njreq *servertypes.NerveXJobRequest, replicaType string) ([]string, error) {
-	results := []string{}
-	resources := servertypes.ResourceQuantity{}
-	var containerName, portName string
-	var defaultPort int32
-	ns := njreq.Namespace
-
-	switch replicaType {
-	case nervexutil.CollectorName:
-		resources = njreq.Collectors
-		containerName = nervexutil.DefaultCollectorContainerName
-		portName = nervexutil.DefaultCollectorPortName
-		defaultPort = nervexutil.DefaultCollectorPort
-	case nervexutil.LearnerName:
-		resources = njreq.Learners
-		containerName = nervexutil.DefaultLearnerContainerName
-		portName = nervexutil.DefaultLearnerPortName
-		defaultPort = nervexutil.DefaultLearnerPort
-	default:
-
-	}
-
-	for _, pod := range pods {
-		// break if enough
-		if len(results) >= resources.Replicas {
-			break
-		}
-
-		// delete pods
-		err := kubeClient.CoreV1().Pods(njreq.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
-		if err != nil {
-			// continue if pod does not exist
-			if k8serrors.IsNotFound(err) {
-				continue
-			}
-			return results, err
-		}
-
-		// delete services
-		err = kubeClient.CoreV1().Services(njreq.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				continue
-			}
-			return results, err
-		}
-
-		result := nervexutil.GetPodAccessURL(pod, ns, containerName, portName, defaultPort)
-		results = append(results, result)
-	}
-
-	return results, nil
 }
 
 // isTerminating returns true if pod's DeletionTimestamp has been set

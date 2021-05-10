@@ -76,37 +76,12 @@ func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		msg = "successfully delete replicas"
 		reps, err = s.deleteReplicas(r)
+	default:
+		err = &servertypes.NerveXError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
+		log.Error(err, "method not implemented")
 	}
 
-	var success bool = true
-	var code int = servertypes.CodeSuccess
-	var statusCode int = http.StatusOK
-	if err != nil {
-		success = false
-		code = servertypes.CodeFailed
-		msg = err.Error()
-
-		// define status code
-		if servertypes.IsNotFound(err) {
-			statusCode = http.StatusNotFound
-		} else if servertypes.IsAlreadyExists(err) {
-			statusCode = http.StatusConflict
-		} else if servertypes.IsBadRequest(err) {
-			statusCode = http.StatusBadRequest
-		} else {
-			statusCode = http.StatusInternalServerError
-		}
-
-		log.Error(err, "failed to process request")
-	}
-
-	// build response
-	rep := servertypes.Response{
-		Success: success,
-		Code:    code,
-		Message: msg,
-		Data:    reps,
-	}
+	rep, statusCode := s.buildResponse(reps, msg, err)
 
 	// write response
 	if err = writeResponse(w, rep, statusCode); err != nil {
@@ -265,30 +240,6 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinatorAndName(namespace, coor
 
 }
 
-func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
-	log := s.Log.WithName("NerveXServer")
-
-	// parse request body
-	var njreq servertypes.NerveXJobResponse
-	err := json.NewDecoder(r.Body).Decode(&njreq)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	log.Info("delete request body: ", "request", njreq)
-
-	// rep, err := s.deleteReplicas(njreq)
-	// if err != nil {
-	// 	log.Error(err, "failed to delete replicas")
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// }
-
-	// // write response
-	// if err = writeResponse(w, rep); err != nil {
-	// 	log.Error(err, "failed to write response")
-	// }
-}
-
 // add replicas api
 func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobResponse, error) {
 	log := s.Log.WithName("NerveXServer")
@@ -353,13 +304,13 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	}
 
 	// delete collector pods
-	delCollectors, err := serverk8s.DeleteReplicas(s.KubeClient, collectors, &njreq, nervexutil.CollectorName)
+	delCollectors, err := serverk8s.DeleteReplicas(s.KubeClient, collectors, njreq.Namespace, njreq.Collectors.Replicas, nervexutil.CollectorName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
 
 	// delete learner pods
-	delLearners, err := serverk8s.DeleteReplicas(s.KubeClient, learners, &njreq, nervexutil.LearnerName)
+	delLearners, err := serverk8s.DeleteReplicas(s.KubeClient, learners, njreq.Namespace, njreq.Learners.Replicas, nervexutil.LearnerName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
@@ -374,6 +325,98 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	}
 
 	return rep, nil
+}
+
+// ReplicasFailed will delete the failed replicas reported by caller, and recreate the same number of replicas
+func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
+	log := s.Log.WithName("NerveXServer")
+
+	var reps interface{}
+	var err error
+	var msg string
+	switch r.Method {
+	case "POST":
+		msg = "successfully recreate replicas"
+		reps, err = s.replicasFailed(r)
+	default:
+		err = &servertypes.NerveXError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
+		log.Error(err, "method not implemented")
+	}
+
+	rep, statusCode := s.buildResponse(reps, msg, err)
+	// write response
+	if err = writeResponse(w, rep, statusCode); err != nil {
+		log.Error(err, "failed to write response")
+	}
+}
+
+func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
+
+	// parse request body
+	var njreq servertypes.NerveXJobResponse
+	err := json.NewDecoder(r.Body).Decode(&njreq)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
+		return servertypes.NerveXJobResponse{}, &servertypes.NerveXError{Type: servertypes.ErrorBadRequest, Message: errMsg}
+	}
+	log.Info("delete request body: ", "request", njreq)
+
+	cpods, err := serverk8s.GetPodsByNames(s.dyi, njreq.Namespace, njreq.Collectors)
+	collectors, err := serverk8s.RecreateReplicas(s.KubeClient, cpods, njreq.Namespace, nervexutil.CollectorName)
+	if err != nil {
+		return servertypes.NerveXJobResponse{}, err
+	}
+	lpods, err := serverk8s.GetPodsByNames(s.dyi, njreq.Namespace, njreq.Learners)
+	learners, err := serverk8s.RecreateReplicas(s.KubeClient, lpods, njreq.Namespace, nervexutil.LearnerName)
+	if err != nil {
+		return servertypes.NerveXJobResponse{}, err
+	}
+
+	rep := servertypes.NerveXJobResponse{
+		Namespace:   njreq.Namespace,
+		Coordinator: njreq.Coordinator,
+		Collectors:  collectors,
+		Learners:    learners,
+	}
+	return rep, nil
+}
+
+func (s *NerveXServer) buildResponse(reps interface{}, msg string, err error) (servertypes.Response, int) {
+	log := s.Log.WithName("NerveXServer")
+
+	var success bool = true
+	var code int = servertypes.CodeSuccess
+	var statusCode int = http.StatusOK
+	if err != nil {
+		success = false
+		code = servertypes.CodeFailed
+		msg = err.Error()
+
+		// define status code
+		if servertypes.IsNotFound(err) {
+			statusCode = http.StatusNotFound
+		} else if servertypes.IsAlreadyExists(err) {
+			statusCode = http.StatusConflict
+		} else if servertypes.IsBadRequest(err) {
+			statusCode = http.StatusBadRequest
+		} else if servertypes.IsNotImplemented(err) {
+			statusCode = http.StatusNotImplemented
+		} else {
+			statusCode = http.StatusInternalServerError
+		}
+
+		log.Error(err, "failed to process request")
+	}
+
+	// build response
+	rep := servertypes.Response{
+		Success: success,
+		Code:    code,
+		Message: msg,
+		Data:    reps,
+	}
+	return rep, statusCode
 }
 
 func writeResponse(w http.ResponseWriter, rep servertypes.Response, statusCode int) error {

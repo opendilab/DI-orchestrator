@@ -14,7 +14,6 @@ import (
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	serverdynamic "go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
-	serverk8s "go-sensephoenix.sensetime.com/nervex-operator/server/k8s"
 	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
@@ -76,37 +75,12 @@ func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		msg = "successfully delete replicas"
 		reps, err = s.deleteReplicas(r)
+	default:
+		err = &servertypes.NerveXError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
+		log.Error(err, "method not implemented")
 	}
 
-	var success bool = true
-	var code int = servertypes.CodeSuccess
-	var statusCode int = http.StatusOK
-	if err != nil {
-		success = false
-		code = servertypes.CodeFailed
-		msg = err.Error()
-
-		// define status code
-		if servertypes.IsNotFound(err) {
-			statusCode = http.StatusNotFound
-		} else if servertypes.IsAlreadyExists(err) {
-			statusCode = http.StatusConflict
-		} else if servertypes.IsBadRequest(err) {
-			statusCode = http.StatusBadRequest
-		} else {
-			statusCode = http.StatusInternalServerError
-		}
-
-		log.Error(err, "failed to process request")
-	}
-
-	// build response
-	rep := servertypes.Response{
-		Success: success,
-		Code:    code,
-		Message: msg,
-		Data:    reps,
-	}
+	rep, statusCode := s.buildResponse(reps, msg, err)
 
 	// write response
 	if err = writeResponse(w, rep, statusCode); err != nil {
@@ -192,7 +166,7 @@ func (s *NerveXServer) getNamespacedReplicas(namespace string) ([]servertypes.Ne
 	}
 
 	// list coordinators in namespace
-	pods, err := serverk8s.ListPodsWithSelector(s.dyi, namespace, labelSelector)
+	pods, err := s.ListPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +188,7 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinator
 	log := s.Log.WithName("NerveXServer")
 
 	// get ownReference of the request coordinator
-	nvxJob, err := serverk8s.GetNerveXJob(s.dyi, namespace, coordinatorName)
+	nvxJob, err := s.GetNerveXJob(namespace, coordinatorName)
 	if err != nil {
 		log.Error(err, "failed to get owner reference")
 		return servertypes.NerveXJobResponse{}, err
@@ -227,7 +201,7 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinator
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	collectors, learners, _, _, err := serverk8s.ListReplicaPodsWithSelector(s.dyi, namespace, labelSelector)
+	collectors, learners, _, _, err := s.ListReplicaPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
 		return servertypes.NerveXJobResponse{}, err
@@ -265,32 +239,9 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinatorAndName(namespace, coor
 
 }
 
-func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
-	// log := s.Log.WithName("NerveXServer")
-
-	// // parse request body
-	// var njreq NerveXJobRequest
-	// err := json.NewDecoder(r.Body).Decode(&njreq)
-	// if err != nil {
-	// 	http.Error(w, err.Error(), http.StatusBadRequest)
-	// 	return
-	// }
-	// log.Info("delete request body: ", "request", njreq)
-
-	// rep, err := s.deleteReplicas(njreq)
-	// if err != nil {
-	// 	log.Error(err, "failed to delete replicas")
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// }
-
-	// // write response
-	// if err = writeResponse(w, rep); err != nil {
-	// 	log.Error(err, "failed to write response")
-	// }
-}
-
 // add replicas api
 func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
 	// get request body
 	var njreq servertypes.NerveXJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
@@ -300,16 +251,17 @@ func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobRespon
 	}
 
 	// get ownReference of request coordinator
-	nvxJob, err := serverk8s.GetNerveXJob(s.dyi, njreq.Namespace, njreq.Coordinator)
+	nvxJob, err := s.GetNerveXJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
 
 	// create collectors and learners
-	collectors, learners, err := serverk8s.CreateCollectorsAndLearnersForNerveXJob(s.KubeClient, &njreq, nvxJob)
+	collectors, learners, err := s.CreateCollectorsAndLearnersForNerveXJob(&njreq, nvxJob)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
+	log.Info("create replicas", "collectors", collectors, "learners", learners)
 
 	rep := servertypes.NerveXJobResponse{
 		Namespace:   njreq.Namespace,
@@ -323,6 +275,7 @@ func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobRespon
 
 // delete replicas api
 func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
 	// get request body
 	var njreq servertypes.NerveXJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
@@ -332,7 +285,7 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	}
 
 	// get ownReference of the request coordinator
-	nvxJob, err := serverk8s.GetNerveXJob(s.dyi, njreq.Namespace, njreq.Coordinator)
+	nvxJob, err := s.GetNerveXJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
@@ -344,22 +297,24 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	collectors, learners, _, _, err := serverk8s.ListReplicaPodsWithSelector(s.dyi, njreq.Namespace, labelSelector)
+	collectors, learners, _, _, err := s.ListReplicaPodsWithSelector(njreq.Namespace, labelSelector)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
 
 	// delete collector pods
-	delCollectors, err := serverk8s.DeletePodsAndServices(s.KubeClient, collectors, &njreq, nervexutil.CollectorName)
+	delCollectors, err := s.DeleteReplicas(collectors, njreq.Namespace, njreq.Collectors.Replicas, nervexutil.CollectorName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
 
 	// delete learner pods
-	delLearners, err := serverk8s.DeletePodsAndServices(s.KubeClient, learners, &njreq, nervexutil.LearnerName)
+	delLearners, err := s.DeleteReplicas(learners, njreq.Namespace, njreq.Learners.Replicas, nervexutil.LearnerName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
+
+	log.Info("delete replicas", "collectors", delCollectors, "learners", delLearners)
 
 	rep := servertypes.NerveXJobResponse{
 		Namespace:   njreq.Namespace,
@@ -369,6 +324,98 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	}
 
 	return rep, nil
+}
+
+// ReplicasFailed will delete the failed replicas reported by caller, and recreate the same number of replicas
+func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
+	log := s.Log.WithName("NerveXServer")
+
+	var reps interface{}
+	var err error
+	var msg string
+	switch r.Method {
+	case "POST":
+		msg = "successfully recreate replicas"
+		reps, err = s.replicasFailed(r)
+	default:
+		err = &servertypes.NerveXError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
+		log.Error(err, "method not implemented")
+	}
+
+	rep, statusCode := s.buildResponse(reps, msg, err)
+	// write response
+	if err = writeResponse(w, rep, statusCode); err != nil {
+		log.Error(err, "failed to write response")
+	}
+}
+
+func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobResponse, error) {
+	log := s.Log.WithName("NerveXServer")
+
+	// parse request body
+	var njreq servertypes.NerveXJobResponse
+	err := json.NewDecoder(r.Body).Decode(&njreq)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
+		return servertypes.NerveXJobResponse{}, &servertypes.NerveXError{Type: servertypes.ErrorBadRequest, Message: errMsg}
+	}
+	log.Info("delete request body: ", "request", njreq)
+
+	cpods, err := s.GetPodsByNames(njreq.Namespace, njreq.Collectors)
+	collectors, err := s.RecreateReplicas(cpods, njreq.Namespace, nervexutil.CollectorName)
+	if err != nil {
+		return servertypes.NerveXJobResponse{}, err
+	}
+	lpods, err := s.GetPodsByNames(njreq.Namespace, njreq.Learners)
+	learners, err := s.RecreateReplicas(lpods, njreq.Namespace, nervexutil.LearnerName)
+	if err != nil {
+		return servertypes.NerveXJobResponse{}, err
+	}
+
+	rep := servertypes.NerveXJobResponse{
+		Namespace:   njreq.Namespace,
+		Coordinator: njreq.Coordinator,
+		Collectors:  collectors,
+		Learners:    learners,
+	}
+	return rep, nil
+}
+
+func (s *NerveXServer) buildResponse(reps interface{}, msg string, err error) (servertypes.Response, int) {
+	log := s.Log.WithName("NerveXServer")
+
+	var success bool = true
+	var code int = servertypes.CodeSuccess
+	var statusCode int = http.StatusOK
+	if err != nil {
+		success = false
+		code = servertypes.CodeFailed
+		msg = err.Error()
+
+		// define status code
+		if servertypes.IsNotFound(err) {
+			statusCode = http.StatusNotFound
+		} else if servertypes.IsAlreadyExists(err) {
+			statusCode = http.StatusConflict
+		} else if servertypes.IsBadRequest(err) {
+			statusCode = http.StatusBadRequest
+		} else if servertypes.IsNotImplemented(err) {
+			statusCode = http.StatusNotImplemented
+		} else {
+			statusCode = http.StatusInternalServerError
+		}
+
+		log.Error(err, "failed to process request")
+	}
+
+	// build response
+	rep := servertypes.Response{
+		Success: success,
+		Code:    code,
+		Message: msg,
+		Data:    reps,
+	}
+	return rep, statusCode
 }
 
 func writeResponse(w http.ResponseWriter, rep servertypes.Response, statusCode int) error {

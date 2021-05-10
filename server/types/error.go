@@ -27,6 +27,9 @@ const (
 
 	// StatusCode = 400
 	ErrorBadRequest ErrorType = "BadRequest"
+
+	// StatusCode = 501
+	ErrorNotImplemented ErrorType = "NotImplemented"
 )
 
 func IsNotFound(err error) bool {
@@ -39,6 +42,10 @@ func IsAlreadyExists(err error) bool {
 
 func IsBadRequest(err error) bool {
 	return TypeForError(err) == ErrorBadRequest
+}
+
+func IsNotImplemented(err error) bool {
+	return TypeForError(err) == ErrorNotImplemented
 }
 
 func TypeForError(err error) ErrorType {

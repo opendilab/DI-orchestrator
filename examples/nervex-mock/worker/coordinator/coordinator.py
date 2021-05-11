@@ -22,6 +22,7 @@ from utils import LockContext, LockContextType, get_task_uid
 
 cfg = {
     'interaction': {
+        'api_version': '/v1alpha1',
         'collector_limits': 1,
         'learner_limits': 1,
         'collector': {
@@ -40,7 +41,7 @@ cfg = {
         'learner_task_space': 0,
         'collector_cfg': {
             'env_kwargs': {
-                'eval_stop_ptg': 0.2,   
+                'eval_stop_ptg': 0.6,
             }
         },
         'learner_cfg': {
@@ -89,6 +90,7 @@ class MockCoordinator(object):
             'deal_with_learner_get_data': self.deal_with_learner_get_data,
             'deal_with_learner_send_info': self.deal_with_learner_send_info,
             'deal_with_learner_finish_task': self.deal_with_learner_finish_task,
+            # 
             'deal_with_increase_collector': self.deal_with_increase_collector,
             'deal_with_decrease_collector': self.deal_with_decrease_collector,
             'deal_with_increase_learner': self.deal_with_increase_learner,
@@ -115,6 +117,7 @@ class MockCoordinator(object):
         # TODO load/save state_dict
 
         self._end_flag = True
+        self._system_shutdown_flag = False
 
     def _assign_collector_task(self) -> None:
         r"""
@@ -148,7 +151,6 @@ class MockCoordinator(object):
                         if self._interaction.send_collector_task(collector_task):
                             self._record_task(collector_task)
                             self.info("collector_task({}) is successful to be assigned".format(collector_task['task_id']))
-                            print("collector_task({}) is successful to be assigned".format(collector_task['task_id']))
                             break
                         else:
                             self.info("collector_task({}) is failed to be assigned".format(collector_task['task_id']))
@@ -290,14 +292,12 @@ class MockCoordinator(object):
             return
         # finish_task
         with self._commander_lock:
-            system_shutdown_flag = self._commander.finish_collector_task(task_id, finished_task)
+            self._system_shutdown_flag = self._commander.finish_collector_task(task_id, finished_task)
         self._task_state.pop(task_id)
         self._historical_task.append(task_id)
         self.info('collector task({}) is finished'.format(task_id))
-        if system_shutdown_flag:
+        if self._system_shutdown_flag:
             self.info('coordinator will be closed')
-            close_thread = Thread(target=self.close, args=())
-            close_thread.start()
 
     def deal_with_increase_collector(self):
         with self._commander_lock:
@@ -378,4 +378,4 @@ class MockCoordinator(object):
 
     @property
     def system_shutdown_flag(self) -> bool:
-        return self._end_flag
+        return self._system_shutdown_flag

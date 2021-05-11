@@ -1,4 +1,3 @@
-# FROM registry.sensetime.com/cloudnative4ai/liqingping/mock_nervex:v0.0.1
 FROM python:3
 
 WORKDIR /app

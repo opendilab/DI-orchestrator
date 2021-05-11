@@ -12,7 +12,7 @@ from requests.exceptions import RequestException
 from urlobject import URLObject
 
 from .connection import SlaveConnectionProxy, SlaveConnection, _ISlaveConnection, _get_connection_class, \
-    _slave_task_complete, _slave_task_fail
+    _slave_task_complete, _slave_task_fail, ServerConnection
 from .error_code import MasterErrorCode
 from .task import TaskResultType
 from ..base import random_token, ControllableService, failure_response, success_response, get_host_ip, \
@@ -75,7 +75,8 @@ class Master(ControllableService):
         self.__shutdown_event = Event()
         self.__lock = Lock()
 
-        
+        # k8s: nervex-server
+        self.__server_http_engine = None
 
     # slave connection
     def __connection_open(self, name: str, token: str, connection: SlaveConnectionProxy):
@@ -109,39 +110,23 @@ class Master(ControllableService):
         app.route(
             '/slave/task/fail', methods=['PUT']
         )(self.__check_slave_request(self.__check_task_info(self.__task_fail)))
-        
-        # nervex-server api
-        app.route('/addedReplicas', methods=['POST'])(self.__added_replicas)
-        app.route('/deletedReplicas', methods=['POST'])(self.__deleted_replicas)
 
         return app
-
-    def __added_replicas(self):
-        _data = json.loads(request.data.decode())
-        _result = {
-            'method': 'add',
-            'data': _data,
-        }
-        self.replicas_update_queue.put(_result)
-        return 'OK'
-
-    def __deleted_replicas(self):
-        _data = json.loads(request.data.decode())
-        _result = {
-            'method': 'delete',
-            'data': _data,
-        }
-        self.replicas_update_queue.put(_result)
-        return 'OK'
 
     def __flask_app(self) -> Flask:
         return self.__flask_app_value or self.__generate_app()
 
     def __run_app(self):
-        self.__flask_app().run(
-            host=self.__host,
-            port=self.__port,
-        )
+        while True:
+            try:
+                self.__flask_app().run(
+                    host=self.__host,
+                    port=self.__port,
+                )
+            except:
+                print("failed to run flask app on {}:{}..".format(self.__host, self.__port))
+            else:
+                break
 
     # both method checkers
     def __check_shutdown(self, func: Callable[[], Any]) -> Callable[[], Any]:
@@ -391,6 +376,18 @@ class Master(ControllableService):
     ) -> SlaveConnectionProxy:
         with self.__lock:
             return self.__get_new_connection(name, host, port, https)
+
+    def setup_server_conn(
+            self, host: str, port: int, api_version: str, namespace: str, name: str, https: bool = False
+    ):
+        return ServerConnection(
+                                host=host, 
+                                port=port, 
+                                api_version=api_version, 
+                                namespace=namespace, 
+                                name=name, 
+                                https=https
+                                )
 
     def __contains__(self, name: str):
         with self.__lock:

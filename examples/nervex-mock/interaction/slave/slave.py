@@ -5,7 +5,7 @@ import traceback
 from abc import abstractmethod
 from functools import wraps
 from threading import Thread, Event, Lock
-from typing import Optional, Callable, Any, Mapping
+from typing import Optional, Callable, Any, Mapping, List
 from uuid import UUID
 
 import requests
@@ -94,10 +94,8 @@ class Slave(ControllableService):
         app.route('/connect', methods=['POST'])(self.__check_master_request(self.__connect, False))
         app.route('/disconnect', methods=['DELETE'])(self.__check_master_request(self.__disconnect, True))
         app.route('/task/new', methods=['POST'])(self.__check_master_request(self.__new_task, True))
-        # app.route('/addedReplicas', methods=['POST'])(self.__check_master_request(self.__added_replicas))
-        app.route('/addedReplicas', methods=['POST'])(self.__added_replicas)
-        # app.route('/deletedReplicas', methods=['POST'])(self.__check_master_request(self.__deleted_replicas))
-        app.route('/deletedReplicas', methods=['POST'])(self.__deleted_replicas)
+        # For aggregator only
+        app.route('/learners', methods=['POST'])(self.__check_master_request(self.__update_learners, True))
 
         # self apis
         app.route('/ping', methods=['GET'])(self.__check_self_request(self.__self_ping))
@@ -105,15 +103,8 @@ class Slave(ControllableService):
 
         return app
 
-    def __added_replicas(self):
-        _data = json.loads(request.data.decode())
-        result = self._process_replicas_update('add', _data['learners'])
-        return 'OK'
-
-    def __deleted_replicas(self):
-        _data = json.loads(request.data.decode())
-        result = self._process_replicas_update('delete', _data['learners'])
-        return 'OK'
+    def __update_learners(self, token: str, data: List[str]):
+        return success_response(data=self._process_learners_update(data))
 
     def __flask_app(self) -> Flask:
         return self.__flask_app_value or self.__generate_app()
@@ -404,6 +395,10 @@ class Slave(ControllableService):
 
     def _lost_connection(self, master_address: str, err: requests.exceptions.RequestException):
         pass
+
+    # For aggregator only
+    def _process_learners_update(self, replicas: Mapping[str, Any]):
+        raise NotImplementedError
 
     @abstractmethod
     def _process_task(self, task: Mapping[str, Any]):

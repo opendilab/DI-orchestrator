@@ -1,6 +1,7 @@
 import time
 import argparse
-from threading import Thread
+from threading import Thread, Event
+import logging
 
 from worker import MockCoordinator, MockCollector, MockLearner, MockLearnerAggregator
 
@@ -8,21 +9,29 @@ def info(args):
     print("====")
 
 def start_cooridnator(args):
+    if args.disable_flask_log == True:
+        log = logging.getLogger('werkzeug')
+        log.disabled = True
+
     host, port      = args.listen, args.port
     nervex_server   = args.server
 
     coordinator = MockCoordinator(host, port, nervex_server)
+    coordinator.start()
+    system_shutdown_event = Event()
+
     def shutdown_monitor():
         while True:
             time.sleep(3)
             if coordinator.system_shutdown_flag:
                 coordinator.close()
+                system_shutdown_event.set()
                 break
 
     shutdown_monitor_thread = Thread(target=shutdown_monitor, args=(), daemon=True, name='shutdown_monitor')
     shutdown_monitor_thread.start()
-
-    coordinator.start()
+    system_shutdown_event.wait()
+    print("[nerveX parallel pipeline]Your RL agent is converged, you can refer to 'log' and 'tensorboard' for details")
 
 def start_collector(args):
     host, port = args.listen, args.port
@@ -50,6 +59,7 @@ def parse_args():
     parser_coordinator.add_argument("--server", type=str, default='http://nervex-server.nervex-system:8080', help="ip address")
     parser_coordinator.add_argument("-l", "--listen", default="localhost", help="Specify the IP address on which the server listens")
     parser_coordinator.add_argument("-p", "--port", type=int, default=8000, help="Specify the port on which the server listens")
+    parser_coordinator.add_argument('--disable_flask_log', default=True, type=bool, help='whether disable flask log')
     parser_coordinator.set_defaults(func=start_cooridnator)
 
     # Collector

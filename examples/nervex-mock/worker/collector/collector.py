@@ -2,7 +2,7 @@ import os
 import argparse
 import json
 import time
-
+import uuid
 import numpy as np
 
 from easydict import EasyDict
@@ -100,6 +100,7 @@ class MockCollector(Slave):
             if not self.data_queue.full():
                 num = num + 1
                 self.data_queue.put({
+                    'data_id': "{}".format(str(uuid.uuid1())),
                     'data': num,
                     'finished_task': (num == target),
                     'eval_flag': self._eval_flag,

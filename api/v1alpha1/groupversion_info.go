@@ -28,8 +28,8 @@ var (
 	// KindNerveXJob is kind of NerveXJob
 	KindNerveXJob = "NerveXJob"
 
-	// KindALConfig if kind of KindALConfig
-	KindALConfig = "ActorLearnerConfig"
+	// KindAGConfig is kind of AGConfig
+	KindAGConfig = "AggregatorConfig"
 
 	// GroupVersion is group version used to register these objects
 	GroupVersion = schema.GroupVersion{Group: "nervex.sensetime.com", Version: "v1alpha1"}

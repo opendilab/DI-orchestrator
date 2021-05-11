@@ -99,7 +99,7 @@ func BuildPodFromTemplate(
 	// generate name is the NerveXJob name
 	jobName := ownRefer.Name
 	portEnv := ""
-	podName := fmt.Sprintf("%s-%s", jobName, replicaType)
+	podName := ReplicaPodName(jobName, replicaType)
 	switch replicaType {
 	case CollectorName:
 		portEnv = "COLLECTOR_PORT"
@@ -148,6 +148,10 @@ func BuildPodFromTemplate(
 	envs[portEnv] = fmt.Sprintf("%d", port)
 	SetPodEnv(pod, envs)
 	return pod, port, nil
+}
+
+func ReplicaPodName(name, replicaType string) string {
+	return fmt.Sprintf("%s-%s", name, replicaType)
 }
 
 func SetPodEnv(pod *corev1.Pod, envs map[string]string) {

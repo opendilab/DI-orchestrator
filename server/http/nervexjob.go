@@ -91,7 +91,7 @@ func (s *NerveXServer) CreateCollectorsAndLearnersForNerveXJob(
 
 	// create learners
 	learnerTemplate := job.Spec.Learner.Template
-	learners, err := s.CreateReplicas(&learnerTemplate, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.LearnerName)
+	learners, err := s.CreateReplicas(&learnerTemplate, ownRefer, njreq.Learners, njreq.Namespace, nervexutil.LearnerName)
 
 	if err != nil {
 		return collectors, learners, err

@@ -17,12 +17,17 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
@@ -30,13 +35,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
+	testutil "go-sensephoenix.sensetime.com/nervex-operator/utils/testutils"
 	//+kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-// var cfg *rest.Config
+const (
+	timeout  = 30 * time.Second
+	interval = 250 * time.Millisecond
+	duration = 10 * time.Second
+)
+
+var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
@@ -70,6 +82,47 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	By("Apply AggregatorConfig")
+	ctx := context.Background()
+	agconfig := testutil.NewAggregatorConfig()
+
+	err = k8sClient.Create(ctx, testutil.NewNamespace(agconfig.Namespace), &client.CreateOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Create(ctx, agconfig, &client.CreateOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Agconfig successfully created")
+	key := types.NamespacedName{Namespace: agconfig.Namespace, Name: agconfig.Name}
+	createdAg := nervexv1alpha1.AggregatorConfig{}
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, key, &createdAg)
+		if err != nil {
+			return false
+		}
+		return true
+	}, timeout, interval).Should(BeTrue())
+
+	// create controller manager
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme.Scheme,
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	err = (&NerveXJobReconciler{
+		Scheme:   k8sManager.GetScheme(),
+		Client:   k8sManager.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("NerveXJob"),
+		AGConfig: key.String(),
+	}).SetupWithManager(k8sManager)
+
+	Expect(err).NotTo(HaveOccurred())
+
+	// starting manager
+	go func() {
+		err = k8sManager.Start(ctrl.SetupSignalHandler())
+		Expect(err).NotTo(HaveOccurred())
+	}()
 }, 60)
 
 var _ = AfterSuite(func() {

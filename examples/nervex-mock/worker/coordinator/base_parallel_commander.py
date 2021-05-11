@@ -7,7 +7,7 @@ from utils import import_module
 class BaseCommander(ABC):
 
     @abstractmethod
-    def get_actor_task(self) -> dict:
+    def get_collector_task(self) -> dict:
         raise NotImplementedError
 
 
@@ -15,24 +15,24 @@ class NaiveCommander(BaseCommander):
 
     def __init__(self, cfg: dict) -> None:
         self._cfg = cfg
-        self.actor_task_space = cfg.actor_task_space
+        self.collector_task_space = cfg.collector_task_space
         self.learner_task_space = cfg.learner_task_space
-        self.actor_task_count = 0
+        self.collector_task_count = 0
         self.learner_task_count = 0
         self._learner_info = defaultdict(list)
         self._learner_task_finish_count = 0
-        self._actor_task_finish_count = 0
+        self._collector_task_finish_count = 0
 
-    def get_actor_task(self) -> dict:
-        if self.actor_task_count < self.actor_task_space:
-            self.actor_task_count += 1
-            actor_cfg = self._cfg.actor_cfg
-            actor_cfg.collect_setting = {'eps': 0.9}
-            actor_cfg.eval_flag = False
+    def get_collector_task(self) -> dict:
+        if self.collector_task_count < self.collector_task_space:
+            self.collector_task_count += 1
+            collector_cfg = self._cfg.collector_cfg
+            collector_cfg.collect_setting = {'eps': 0.9}
+            collector_cfg.eval_flag = False
             return {
-                'task_id': 'actor_task_id{}'.format(self.actor_task_count),
+                'task_id': 'collector_task_id{}'.format(self.collector_task_count),
                 'buffer_id': 'test',
-                'actor_cfg': actor_cfg,
+                'collector_cfg': collector_cfg,
                 'policy': self._cfg.policy,
             }
         else:
@@ -54,14 +54,14 @@ class NaiveCommander(BaseCommander):
         else:
             return None
 
-    def finish_actor_task(self, task_id: str, finished_task: dict) -> None:
-        self._actor_task_finish_count += 1
+    def finish_collector_task(self, task_id: str, finished_task: dict) -> None:
+        self._collector_task_finish_count += 1
 
     def finish_learner_task(self, task_id: str, finished_task: dict) -> None:
         self._learner_task_finish_count += 1
         return finished_task['buffer_id']
 
-    def notify_fail_actor_task(self, task: dict) -> None:
+    def notify_fail_collector_task(self, task: dict) -> None:
         pass
 
     def notify_fail_learner_task(self, task: dict) -> None:

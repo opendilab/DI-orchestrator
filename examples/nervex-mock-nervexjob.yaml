@@ -1,7 +1,7 @@
 apiVersion: nervex.sensetime.com/v1alpha1
 kind: NerveXJob
 metadata:
-  name: nervexjob-example-4
+  name: nervexjob-example
 spec:
   group: xxx
   priorityClassName: default

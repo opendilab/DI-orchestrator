@@ -1,5 +1,6 @@
 # Build nervex-operator with local nervex-operator binary
 FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as dev-nervex-operator
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /
 COPY /bin/nervex-operator  .
 
@@ -31,8 +32,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o nervex-o
 # Use distroless as minimal base image to package the nervex-operator binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as nervex-operator
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /
 COPY --from=builder /workspace/nervex-operator .
-RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 
 ENTRYPOINT ["/nervex-operator"]

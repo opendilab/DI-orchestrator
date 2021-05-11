@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - command:
-        - /manager
+        - /nervex-operator
         args:
         - "--health-probe-bind-address=:8081"
         - "--metrics-bind-address=:8080"

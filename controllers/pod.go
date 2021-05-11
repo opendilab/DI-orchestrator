@@ -15,7 +15,7 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
 
 	// classify pods
-	actors, learners, coordinator, ag, err := nervexutil.ClassifyPods(pods)
+	collectors, learners, coordinator, ag, err := nervexutil.ClassifyPods(pods)
 	if err != nil {
 		log.Error(err, "unable to classify pods")
 		return err
@@ -23,23 +23,23 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 
 	// update NerveXJob status if coordinator and aggregator are created
 	if coordinator != nil && ag != nil {
-		if err := r.checkPodsStatus(ctx, job, actors, learners, coordinator, ag); err != nil {
+		if err := r.checkPodsStatus(ctx, job, collectors, learners, coordinator, ag); err != nil {
 			return err
 		}
 	} else {
-		// get alconfig to fetch aggregator definition
-		alconfig := nervexv1alpha1.ActorLearnerConfig{}
-		nsn, err := nervexutil.SplitNamespaceName(r.ALConfig)
+		// get agconfig to fetch aggregator definition
+		agconfig := nervexv1alpha1.AggregatorConfig{}
+		nsn, err := nervexutil.SplitNamespaceName(r.AGConfig)
 		if err != nil {
 			return err
 		}
-		err = r.Get(ctx, nsn, &alconfig)
+		err = r.Get(ctx, nsn, &agconfig)
 		if err != nil {
 			return err
 		}
 
 		// build aggregator pod
-		template := alconfig.Spec.Aggregator.Template.DeepCopy()
+		template := agconfig.Spec.Aggregator.Template.DeepCopy()
 		agpod, agsvc, agurl, err := buildPodAndServiceForReplica(template, job, nervexutil.AggregatorName,
 			nervexutil.DefaultAggregatorContainerName, nervexutil.DefaultAggregatorPortName, nervexutil.DefaultAggregatorPort)
 		if err != nil {
@@ -86,9 +86,9 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 }
 
 func (r *NerveXJobReconciler) checkPodsStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob,
-	actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) error {
+	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) error {
 	// update replica status
-	updateReplicasStatues(job, actors, learners, coordinator, aggregator)
+	updateReplicasStatues(job, collectors, learners, coordinator, aggregator)
 
 	if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Active > 0 && job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeAggregator].Active > 0 {
 		job.Status.Phase = nervexv1alpha1.JobRunning

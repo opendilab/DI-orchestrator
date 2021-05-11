@@ -43,17 +43,17 @@ func initializeNerveXJobReplicaStatus(job *nervexv1alpha1.NerveXJob) {
 		job.Status.ReplicaStatus = make(map[nervexv1alpha1.ReplicaType]*nervexv1alpha1.ReplicaStatus)
 	}
 
-	for _, replicaType := range []nervexv1alpha1.ReplicaType{nervexv1alpha1.ReplicaTypeActor,
+	for _, replicaType := range []nervexv1alpha1.ReplicaType{nervexv1alpha1.ReplicaTypeCollector,
 		nervexv1alpha1.ReplicaTypeLearner, nervexv1alpha1.ReplicaTypeAggregator, nervexv1alpha1.ReplicaTypeCoordinator} {
 		job.Status.ReplicaStatus[replicaType] = &nervexv1alpha1.ReplicaStatus{}
 	}
 }
 
 func updateReplicasStatues(job *nervexv1alpha1.NerveXJob,
-	actors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) {
-	// update actor status
-	for _, actor := range actors {
-		updateReplicaStatus(actor, job, nervexv1alpha1.ReplicaTypeActor)
+	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) {
+	// update collector status
+	for _, collector := range collectors {
+		updateReplicaStatus(collector, job, nervexv1alpha1.ReplicaTypeCollector)
 	}
 
 	// update learner status

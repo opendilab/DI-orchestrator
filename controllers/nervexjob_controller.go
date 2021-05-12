@@ -22,7 +22,6 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -71,7 +70,7 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	jobStatus := nvxJob.Status.DeepCopy()
 
 	// list pods of NerveXJob
-	pods, err := r.listPods(ctx, nvxJob)
+	pods, err := nervexutil.ListPods(ctx, r.Client, nvxJob)
 	if err != nil {
 		log.Error(err, "failed to list pods of NerveXJob", "job", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -105,30 +104,6 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		}
 	}()
 	return ctrl.Result{}, nil
-}
-
-func (r *NerveXJobReconciler) listPods(ctx context.Context, job *nervexv1alpha1.NerveXJob) ([]*corev1.Pod, error) {
-	podList := &corev1.PodList{}
-
-	// generate label selector
-	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: nervexutil.GenLabels(job.Name),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// list pods of job
-	err = r.List(ctx, podList, &client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
-	if err != nil {
-		return nil, err
-	}
-
-	pods := []*corev1.Pod{}
-	for _, pod := range podList.Items {
-		pods = append(pods, pod.DeepCopy())
-	}
-	return pods, nil
 }
 
 // func (r *NerveXJobReconciler) deletePods(ctx context.Context, pods []*corev1.Pod) error {

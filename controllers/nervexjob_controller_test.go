@@ -225,51 +225,13 @@ var _ = Describe("NerveXJob Controller", func() {
 				colStatus := make([]int, 3)
 				for _, col := range c.collectors {
 					By(fmt.Sprintf("Create pod %s", col.name))
-					pod := testutil.NewPod(col.name, nervexjob.Name, ownRefer)
-					labs := nervexutil.GenLabels(nervexjob.Name)
-					labs[nervexutil.ReplicaTypeLabel] = nervexutil.CollectorName
-					labs[nervexutil.PodNameLabel] = pod.Name
-					pod.SetLabels(labs)
-
-					err = k8sClient.Create(ctx, pod, &client.CreateOptions{})
-					Expect(err).NotTo(HaveOccurred())
-
-					podKey := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-					testutil.UpdatePodPhase(ctx, k8sClient, podKey, col.status)
-
-					switch col.status {
-					case corev1.PodRunning:
-						colStatus[0]++
-					case corev1.PodFailed:
-						colStatus[1]++
-					case corev1.PodSucceeded:
-						colStatus[2]++
-					}
+					createAndUpdatePodPhase(ctx, k8sClient, col.name, nervexjob.Name, col.status, nervexutil.CollectorName, ownRefer, colStatus)
 				}
 
 				lrStatus := make([]int, 3)
 				for _, lr := range c.learners {
 					By(fmt.Sprintf("Create pod %s", lr.name))
-					pod := testutil.NewPod(lr.name, nervexjob.Name, ownRefer)
-					labs := nervexutil.GenLabels(nervexjob.Name)
-					labs[nervexutil.ReplicaTypeLabel] = nervexutil.LearnerName
-					labs[nervexutil.PodNameLabel] = pod.Name
-					pod.SetLabels(labs)
-
-					err = k8sClient.Create(ctx, pod, &client.CreateOptions{})
-					Expect(err).NotTo(HaveOccurred())
-
-					podKey := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-					testutil.UpdatePodPhase(ctx, k8sClient, podKey, lr.status)
-
-					switch lr.status {
-					case corev1.PodRunning:
-						lrStatus[0]++
-					case corev1.PodFailed:
-						lrStatus[1]++
-					case corev1.PodSucceeded:
-						lrStatus[2]++
-					}
+					createAndUpdatePodPhase(ctx, k8sClient, lr.name, nervexjob.Name, lr.status, nervexutil.LearnerName, ownRefer, lrStatus)
 				}
 
 				for _, rtype := range []nervexv1alpha1.ReplicaType{
@@ -337,6 +299,33 @@ func createNerveXJob(ctx context.Context, k8sClient client.Client) (nervexv1alph
 		}, timeout, interval).Should(BeTrue())
 	}
 	return createdNvxjob, key
+}
+
+func createAndUpdatePodPhase(
+	ctx context.Context, k8sClient client.Client,
+	name, jobName string, status corev1.PodPhase, replicaType string,
+	ownRefer metav1.OwnerReference, statuses []int) {
+
+	pod := testutil.NewPod(name, jobName, ownRefer)
+	labs := nervexutil.GenLabels(jobName)
+	labs[nervexutil.ReplicaTypeLabel] = replicaType
+	labs[nervexutil.PodNameLabel] = pod.Name
+	pod.SetLabels(labs)
+
+	err := k8sClient.Create(ctx, pod, &client.CreateOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	podKey := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	testutil.UpdatePodPhase(ctx, k8sClient, podKey, status)
+
+	switch status {
+	case corev1.PodRunning:
+		statuses[0]++
+	case corev1.PodFailed:
+		statuses[1]++
+	case corev1.PodSucceeded:
+		statuses[2]++
+	}
 }
 
 func cleanUpJob(ctx context.Context, job *nervexv1alpha1.NerveXJob, key types.NamespacedName) {

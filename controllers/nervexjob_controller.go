@@ -77,15 +77,9 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// check the phase of NerveXJob
-	// if isSucceeded(nvxJob) || isFailed(nvxJob) {
-	// 	// delete collectors and learners owned by nvcJob
-	// 	// if err := r.deletePods(ctx, collectors); err != nil {
-	// 	// 	return ctrl.Result{}, client.IgnoreNotFound(err)
-	// 	// }
-	// 	// if err := r.deletePods(ctx, learners); err != nil {
-	// 	// 	return ctrl.Result{}, client.IgnoreNotFound(err)
-	// 	// }
-	// }
+	if isSucceeded(nvxJob) || isFailed(nvxJob) {
+		return ctrl.Result{}, nil
+	}
 
 	// initialize NerveXJob status
 	initializeNerveXJobReplicaStatus(nvxJob)

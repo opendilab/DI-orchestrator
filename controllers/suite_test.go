@@ -42,7 +42,7 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 const (
-	timeout  = 10 * time.Second
+	timeout  = 5 * time.Second
 	interval = 250 * time.Millisecond
 	duration = 5 * time.Second
 )

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,7 +13,8 @@ import (
 )
 
 var (
-	statusUpdateRetries = 3
+	statusUpdateRetries       = 3
+	statusUpdatedPauseSeconds = 50 * time.Millisecond
 )
 
 const (
@@ -32,6 +34,7 @@ func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *ne
 		}
 		newJob.Status = job.Status
 		if err := r.Status().Update(ctx, newJob, &client.UpdateOptions{}); err == nil {
+			time.Sleep(statusUpdatedPauseSeconds)
 			break
 		}
 	}

@@ -30,7 +30,7 @@ var _ = Describe("NerveXJob Controller", func() {
 			err := k8sClient.Create(ctx, nervexjob, &client.CreateOptions{})
 			Expect(err).ShouldNot(HaveOccurred())
 
-			By("Successfully created")
+			By(fmt.Sprintf("Successfully created NerveXJob %s", name))
 			key := types.NamespacedName{Namespace: nervexjob.Namespace, Name: nervexjob.Name}
 			createdNvxjob := nervexv1alpha1.NerveXJob{}
 			Eventually(func() bool {
@@ -104,7 +104,7 @@ var _ = Describe("NerveXJob Controller", func() {
 			Eventually(func() nervexv1alpha1.Phase {
 				err := k8sClient.Get(ctx, key, &createdNvxjob)
 				if err != nil {
-					return ""
+					return nervexv1alpha1.JobUnknown
 				}
 				return createdNvxjob.Status.Phase
 			}, timeout, interval).Should(Equal(nervexv1alpha1.JobSucceeded))
@@ -121,7 +121,7 @@ var _ = Describe("NerveXJob Controller", func() {
 			}
 
 			By("Cleaning up")
-			cleanUpJob(ctx, createdNvxjob, key)
+			go cleanUpJob(ctx, createdNvxjob.DeepCopy(), key)
 		})
 
 		It("NerveXJob status changed with components status", func() {
@@ -150,7 +150,7 @@ var _ = Describe("NerveXJob Controller", func() {
 				err := k8sClient.Create(ctx, nervexjob, &client.CreateOptions{})
 				Expect(err).ShouldNot(HaveOccurred())
 
-				By("Successfully created")
+				By(fmt.Sprintf("Successfully created NerveXJob %s", name))
 				key := types.NamespacedName{Namespace: nervexjob.Namespace, Name: nervexjob.Name}
 				createdNvxjob := nervexv1alpha1.NerveXJob{}
 				Eventually(func() bool {
@@ -235,20 +235,20 @@ var _ = Describe("NerveXJob Controller", func() {
 				}, timeout, interval).Should(Equal(c.expectStatus))
 
 				By("Cleaning up")
-				cleanUpJob(ctx, createdNvxjob, key)
+				go cleanUpJob(ctx, createdNvxjob.DeepCopy(), key)
 			}
 		})
 	})
 })
 
-func cleanUpJob(ctx context.Context, createdNvxjob nervexv1alpha1.NerveXJob, key types.NamespacedName) {
+func cleanUpJob(ctx context.Context, job *nervexv1alpha1.NerveXJob, key types.NamespacedName) {
 	By("Deleting NerveXJob")
-	err := k8sClient.Delete(ctx, &createdNvxjob, &client.DeleteOptions{})
+	err := k8sClient.Delete(ctx, job, &client.DeleteOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Successfully deleted")
 	Eventually(func() bool {
-		err := k8sClient.Get(ctx, key, &createdNvxjob)
+		err := k8sClient.Get(ctx, key, job)
 		if err != nil && errors.IsNotFound(err) {
 			return true
 		}
@@ -256,7 +256,7 @@ func cleanUpJob(ctx context.Context, createdNvxjob nervexv1alpha1.NerveXJob, key
 	}, timeout, interval).Should(BeTrue())
 
 	By("Listing and deleting pods")
-	pods, err := nervexutil.ListPods(ctx, k8sClient, &createdNvxjob)
+	pods, err := nervexutil.ListPods(ctx, k8sClient, job)
 	Expect(err).NotTo(HaveOccurred())
 
 	for _, pod := range pods {
@@ -265,36 +265,11 @@ func cleanUpJob(ctx context.Context, createdNvxjob nervexv1alpha1.NerveXJob, key
 	}
 
 	By("Listing and deleting services")
-	svcs, err := nervexutil.ListServices(ctx, k8sClient, &createdNvxjob)
+	svcs, err := nervexutil.ListServices(ctx, k8sClient, job)
 	Expect(err).NotTo(HaveOccurred())
 
 	for _, svc := range svcs {
 		err = k8sClient.Delete(ctx, svc, &client.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred())
-	}
-
-	By("Waiting for pods and services to be deleted")
-	for _, pod := range pods {
-		podKey := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
-		var newPod corev1.Pod
-		Eventually(func() bool {
-			err = k8sClient.Get(ctx, podKey, &newPod)
-			if err != nil && errors.IsNotFound(err) {
-				return true
-			}
-			return false
-		}, timeout, interval).Should(BeTrue())
-	}
-
-	for _, svc := range svcs {
-		svcKey := types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name}
-		var newsvc corev1.Service
-		Eventually(func() bool {
-			err = k8sClient.Get(ctx, svcKey, &newsvc)
-			if err != nil && errors.IsNotFound(err) {
-				return true
-			}
-			return false
-		}, timeout, interval).Should(BeTrue())
 	}
 }

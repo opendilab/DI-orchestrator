@@ -78,6 +78,10 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// check the phase of NerveXJob
 	if isSucceeded(nvxJob) || isFailed(nvxJob) {
+		if err := r.deletePodsAndServices(ctx, nvxJob, pods); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		return ctrl.Result{}, nil
 	}
 
@@ -100,14 +104,42 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-// func (r *NerveXJobReconciler) deletePods(ctx context.Context, pods []*corev1.Pod) error {
-// 	for _, pod := range pods {
-// 		if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil {
-// 			return client.IgnoreNotFound(err)
-// 		}
-// 	}
-// 	return nil
-// }
+func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *nervexv1alpha1.NerveXJob, pods []*corev1.Pod) error {
+	if len(pods) == 0 {
+		return nil
+	}
+
+	// Delete nothing when the cleanPodPolicy is None.
+	if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyNone {
+		return nil
+	}
+
+	for _, pod := range pods {
+		// Just delete running pod when the cleanPodPolicy is Running
+		if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyRunning && pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
+			continue
+		}
+
+		needsDelete := true
+		if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyRunning && pod.Status.Phase == corev1.PodRunning {
+			// pods that are in crashLoopBackoff status are in Running phase, these pods should not be deleted
+			for _, ctStatus := range pod.Status.ContainerStatuses {
+				if ctStatus.State.Terminated != nil || ctStatus.State.Waiting != nil && ctStatus.State.Waiting.Reason == "CrashLoopBackOff" {
+					needsDelete = false
+					break
+				}
+			}
+		}
+		if !needsDelete {
+			continue
+		}
+
+		if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NerveXJobReconciler) SetupWithManager(mgr ctrl.Manager) error {

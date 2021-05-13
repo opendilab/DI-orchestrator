@@ -4,7 +4,7 @@ metadata:
   name: nervexjob-example
 spec:
   group: xxx
-  priorityClassName: default
+  priorityClassName: ""
   coordinator:
     template:
       spec:

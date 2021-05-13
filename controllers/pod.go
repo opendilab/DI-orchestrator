@@ -80,7 +80,6 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 		job.Status.Phase = nervexv1alpha1.JobCreated
 		msg := fmt.Sprintf("NerveXJob %s created", job.Name)
 		updateNerveXJobConditions(job, nervexv1alpha1.JobCreated, NerveXJobCreatedReason, msg)
-
 	}
 	return nil
 }
@@ -128,7 +127,9 @@ func (r *NerveXJobReconciler) createPodAndService(ctx context.Context, pod *core
 
 func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *nervexv1alpha1.NerveXJob,
 	replicaType, containerName, portName string, defaultPort int32) (*corev1.Pod, *corev1.Service, string, error) {
-	template.Spec.PriorityClassName = string(job.Spec.PriorityClassName)
+	if string(job.Spec.PriorityClassName) != "" {
+		template.Spec.PriorityClassName = string(job.Spec.PriorityClassName)
+	}
 
 	// set restart policy for coordinator
 	if replicaType == nervexutil.CoordinatorName && template.Spec.RestartPolicy == "" {

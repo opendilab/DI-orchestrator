@@ -12,16 +12,14 @@ import (
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 )
 
-var (
-	statusUpdateRetries       = 3
-	statusUpdatedPauseSeconds = 50 * time.Millisecond
-)
-
 const (
 	NerveXJobCreatedReason   = "NerveXJobCreated"
 	NerveXJobRunningReason   = "NerveXJobRunning"
 	NerveXJobFailedReason    = "NerveXJobFailed"
 	NerveXJobSucceededReason = "NerveXJobSucceeded"
+
+	statusUpdateRetries        = 3
+	statusUpdatedPauseDuration = 50 * time.Millisecond
 )
 
 func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
@@ -34,7 +32,7 @@ func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *ne
 		}
 		newJob.Status = job.Status
 		if err := r.Status().Update(ctx, newJob, &client.UpdateOptions{}); err == nil {
-			time.Sleep(statusUpdatedPauseSeconds)
+			time.Sleep(statusUpdatedPauseDuration)
 			break
 		}
 	}

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 )
@@ -172,6 +174,9 @@ func SetPodEnv(pod *corev1.Pod, envs map[string]string) {
 
 func BuildService(labels map[string]string, port int32, portName string) *corev1.Service {
 	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: labels,
+		},
 		Spec: corev1.ServiceSpec{
 			Type:      corev1.ServiceTypeClusterIP,
 			ClusterIP: "None",
@@ -210,6 +215,54 @@ func GetPodAccessURL(pod *corev1.Pod, namespace, containerName, portName string,
 		port = defaultPort
 	}
 	return ConcatURL(pod.Name, namespace, port)
+}
+
+func ListPods(ctx context.Context, cli client.Client, job *nervexv1alpha1.NerveXJob) ([]*corev1.Pod, error) {
+	podList := &corev1.PodList{}
+
+	// generate label selector
+	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: GenLabels(job.Name),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// list pods of job
+	err = cli.List(ctx, podList, &client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
+	if err != nil {
+		return nil, err
+	}
+
+	pods := []*corev1.Pod{}
+	for _, pod := range podList.Items {
+		pods = append(pods, pod.DeepCopy())
+	}
+	return pods, nil
+}
+
+func ListServices(ctx context.Context, cli client.Client, job *nervexv1alpha1.NerveXJob) ([]*corev1.Service, error) {
+	svcList := &corev1.ServiceList{}
+
+	// generate label selector
+	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: GenLabels(job.Name),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// list svcs of job
+	err = cli.List(ctx, svcList, &client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
+	if err != nil {
+		return nil, err
+	}
+
+	svcs := []*corev1.Service{}
+	for _, svc := range svcList.Items {
+		svcs = append(svcs, svc.DeepCopy())
+	}
+	return svcs, nil
 }
 
 func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {

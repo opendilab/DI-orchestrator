@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,15 +12,14 @@ import (
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 )
 
-var (
-	statusUpdateRetries = 3
-)
-
 const (
 	NerveXJobCreatedReason   = "NerveXJobCreated"
 	NerveXJobRunningReason   = "NerveXJobRunning"
 	NerveXJobFailedReason    = "NerveXJobFailed"
 	NerveXJobSucceededReason = "NerveXJobSucceeded"
+
+	statusUpdateRetries        = 3
+	statusUpdatedPauseDuration = 50 * time.Millisecond
 )
 
 func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
@@ -32,6 +32,7 @@ func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *ne
 		}
 		newJob.Status = job.Status
 		if err := r.Status().Update(ctx, newJob, &client.UpdateOptions{}); err == nil {
+			time.Sleep(statusUpdatedPauseDuration)
 			break
 		}
 	}

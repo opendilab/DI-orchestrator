@@ -73,6 +73,7 @@ vet: ## Run go vet against code.
 lint:
 	golangci-lint run -v --timeout=5m
 
+.PHONY: test
 test: ## Run tests.
 	go test -v -cover ./... -coverprofile=coverage.out
 

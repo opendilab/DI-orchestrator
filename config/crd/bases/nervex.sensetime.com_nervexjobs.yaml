@@ -45,6 +45,10 @@ spec:
           spec:
             description: NerveXJobSpec defines the desired state of NerveXJob
             properties:
+              cleanPodPolicy:
+                description: CleanPodPolicy defines the policy to clean pods after
+                  NerveXJob completed
+                type: string
               collector:
                 description: CollectorSpec defines the desired state of CollectorSpec
                 properties:
@@ -13174,7 +13178,7 @@ spec:
                 - template
                 type: object
               group:
-                description: Group is a collection of nervex jobs
+                description: Group is a collection of NerveXJobs
                 type: string
               learner:
                 description: Learner defines the desired state of Learner
@@ -19741,7 +19745,7 @@ spec:
                 - template
                 type: object
               priorityClassName:
-                description: Priority labels the priority of nervex job
+                description: Priority labels the priority of NerveXJob
                 type: string
             required:
             - collector

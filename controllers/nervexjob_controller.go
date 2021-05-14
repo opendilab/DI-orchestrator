@@ -18,10 +18,12 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -63,7 +65,7 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	nvxJob := &nervexv1alpha1.NerveXJob{}
 	err := r.Get(ctx, req.NamespacedName, nvxJob)
 	if err != nil {
-		log.Error(err, "failed to get NerveXJob", "job", req.NamespacedName)
+		log.Error(client.IgnoreNotFound(err), "failed to get NerveXJob", "job", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -72,14 +74,21 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// list pods of NerveXJob
 	pods, err := nervexutil.ListPods(ctx, r.Client, nvxJob)
 	if err != nil {
-		log.Error(err, "failed to list pods of NerveXJob", "job", req.NamespacedName)
+		log.Error(client.IgnoreNotFound(err), "failed to list pods of NerveXJob", "job", req.NamespacedName)
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// list services of NerveXJob
+	services, err := nervexutil.ListServices(ctx, r.Client, nvxJob)
+	if err != nil {
+		log.Error(client.IgnoreNotFound(err), "failed to list services of NerveXJob", "job", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// check the phase of NerveXJob
 	if isSucceeded(nvxJob) || isFailed(nvxJob) {
-		if err := r.deletePodsAndServices(ctx, nvxJob, pods); err != nil {
-			return ctrl.Result{}, err
+		if err := r.deletePodsAndServices(ctx, nvxJob, pods, services); err != nil {
+			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 
 		return ctrl.Result{}, nil
@@ -104,13 +113,14 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *nervexv1alpha1.NerveXJob, pods []*corev1.Pod) error {
+func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *nervexv1alpha1.NerveXJob, pods []*corev1.Pod, services []*corev1.Service) error {
+	log := r.Log.WithValues("nervexjob", fmt.Sprintf("%s/%s", job.Namespace, job.Name))
 	if len(pods) == 0 {
 		return nil
 	}
 
 	// Delete nothing when the cleanPodPolicy is None.
-	if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyNone {
+	if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyNone || job.Spec.CleanPodPolicy == "" {
 		return nil
 	}
 
@@ -130,11 +140,25 @@ func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *ne
 				}
 			}
 		}
+
+		// if pod is already in terminating state, do not delete it
+		if nervexutil.IsTerminating(pod) {
+			needsDelete = false
+		}
 		if !needsDelete {
 			continue
 		}
 
-		if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil {
+		msg := fmt.Sprintf("Delete pod %s of job %s/%s, since the CleanPodPolicy is %s", pod.Name, job.Namespace, job.Name, job.Spec.CleanPodPolicy)
+		log.Info(msg)
+		if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// delete services of NerveXJob
+	for _, svc := range services {
+		if err := r.Delete(ctx, svc, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}

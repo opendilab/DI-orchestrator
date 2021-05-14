@@ -331,7 +331,7 @@ func filterReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod, e
 func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	results := []*corev1.Pod{}
 	for _, pod := range pods {
-		if isTerminating(pod) {
+		if IsTerminating(pod) {
 			continue
 		}
 		results = append(results, pod)
@@ -340,7 +340,7 @@ func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	return results
 }
 
-// isTerminating returns true if pod's DeletionTimestamp has been set
-func isTerminating(pod *corev1.Pod) bool {
+// IsTerminating returns true if pod's DeletionTimestamp has been set
+func IsTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }

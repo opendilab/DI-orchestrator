@@ -4,4 +4,4 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
-  name: actorleanerconfigs.nervex.sensetime.com
+  name: aggregatorconfigs.nervex.sensetime.com

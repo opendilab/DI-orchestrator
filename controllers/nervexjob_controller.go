@@ -119,14 +119,15 @@ func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *ne
 		return nil
 	}
 
-	// Delete nothing when the cleanPodPolicy is None.
-	if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyNone || job.Spec.CleanPodPolicy == "" {
+	if job.Spec.CleanPodPolicy != nervexv1alpha1.CleanPodPolicyAll ||
+		job.Spec.CleanPodPolicy != nervexv1alpha1.CleanPodPolicyRunning {
 		return nil
 	}
 
 	for _, pod := range pods {
 		// Just delete running pod when the cleanPodPolicy is Running
-		if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyRunning && pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
+		if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyRunning && pod.Status.Phase != corev1.PodRunning &&
+			pod.Status.Phase != corev1.PodPending {
 			continue
 		}
 

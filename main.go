@@ -97,6 +97,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&nervexv1alpha1.NerveXJob{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "NerveXJob")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

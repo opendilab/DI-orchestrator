@@ -17,3 +17,6 @@ namespace:
 
 varReference:
 - path: metadata/annotations
+- kind: CustomResourceDefinition
+  group: apiextensions.k8s.io
+  path: spec/conversion/webhook/clientConfig/service/name

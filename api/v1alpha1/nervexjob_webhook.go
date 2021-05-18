@@ -59,7 +59,7 @@ func (r *NerveXJob) ValidateCreate() error {
 	nervexjoblog.Info("validate create", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
-	if r.Spec.CleanPodPolicy != CleanPodPolicyAll || r.Spec.CleanPodPolicy != CleanPodPolicyNone ||
+	if r.Spec.CleanPodPolicy != CleanPodPolicyAll && r.Spec.CleanPodPolicy != CleanPodPolicyNone &&
 		r.Spec.CleanPodPolicy != CleanPodPolicyRunning {
 		return fmt.Errorf("Invalid CleanPodPolicy %s, expected in [%s, %s, %s]",
 			r.Spec.CleanPodPolicy, CleanPodPolicyNone, CleanPodPolicyRunning, CleanPodPolicyAll)

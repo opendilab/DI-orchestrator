@@ -42,7 +42,7 @@ Referenced to [server](./server)
 
 Run the following command in the project root directory.
 ```bash
-# build images
+# build images. If you are not working in Linux, here you should use `make docker-build`
 make dev-images
 # deploy nervex-operator and server to cluster
 make dev-deploy

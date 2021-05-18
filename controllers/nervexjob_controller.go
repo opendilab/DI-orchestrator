@@ -119,7 +119,7 @@ func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *ne
 		return nil
 	}
 
-	if job.Spec.CleanPodPolicy != nervexv1alpha1.CleanPodPolicyAll ||
+	if job.Spec.CleanPodPolicy != nervexv1alpha1.CleanPodPolicyAll &&
 		job.Spec.CleanPodPolicy != nervexv1alpha1.CleanPodPolicyRunning {
 		return nil
 	}

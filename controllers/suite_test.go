@@ -44,7 +44,7 @@ import (
 const (
 	timeout  = 5 * time.Second
 	interval = 250 * time.Millisecond
-	duration = 5 * time.Second
+	duration = 500 * time.Millisecond
 )
 
 // var cfg *rest.Config

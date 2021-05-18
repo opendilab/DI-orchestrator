@@ -119,7 +119,14 @@ func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *ne
 		return nil
 	}
 
-	if job.Spec.CleanPodPolicy != nervexv1alpha1.CleanPodPolicyAll &&
+	// delete services of NerveXJob
+	for _, svc := range services {
+		if err := r.Delete(ctx, svc, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	if job.Spec.CleanPodPolicy != nervexv1alpha1.CleanPodPolicyALL &&
 		job.Spec.CleanPodPolicy != nervexv1alpha1.CleanPodPolicyRunning {
 		return nil
 	}
@@ -153,13 +160,6 @@ func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *ne
 		msg := fmt.Sprintf("Delete pod %s of job %s/%s, since the CleanPodPolicy is %s", pod.Name, job.Namespace, job.Name, job.Spec.CleanPodPolicy)
 		log.Info(msg)
 		if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	// delete services of NerveXJob
-	for _, svc := range services {
-		if err := r.Delete(ctx, svc, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}

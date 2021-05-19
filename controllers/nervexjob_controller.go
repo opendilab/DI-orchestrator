@@ -133,16 +133,15 @@ func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *ne
 
 	for _, pod := range pods {
 		// Just delete running pod when the cleanPodPolicy is Running
-		if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyRunning && pod.Status.Phase != corev1.PodRunning &&
-			pod.Status.Phase != corev1.PodPending {
-			continue
-		}
-
 		needsDelete := true
-		if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyRunning && pod.Status.Phase == corev1.PodRunning {
+		if job.Spec.CleanPodPolicy == nervexv1alpha1.CleanPodPolicyRunning {
+			if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
+				continue
+			}
 			// pods that are in crashLoopBackoff status are in Running phase, these pods should not be deleted
 			for _, ctStatus := range pod.Status.ContainerStatuses {
-				if ctStatus.State.Terminated != nil || ctStatus.State.Waiting != nil && ctStatus.State.Waiting.Reason == "CrashLoopBackOff" {
+				if ctStatus.State.Terminated != nil || ctStatus.State.Waiting != nil &&
+					ctStatus.State.Waiting.Reason == "CrashLoopBackOff" {
 					needsDelete = false
 					break
 				}

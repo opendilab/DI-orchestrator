@@ -62,6 +62,54 @@ var _ = Describe("Webhook test", func() {
 			}
 
 		})
+		It("Should be validated by webhook before updating", func() {
+			type testCase struct {
+				cleanPodPolicy       CleanPodPolicy
+				expectCleanPodPolicy CleanPodPolicy
+			}
+			testCases := []testCase{
+				{cleanPodPolicy: CleanPodPolicyRunning, expectCleanPodPolicy: CleanPodPolicyRunning},
+				{cleanPodPolicy: CleanPodPolicyALL, expectCleanPodPolicy: CleanPodPolicyALL},
+				{cleanPodPolicy: CleanPodPolicyNone, expectCleanPodPolicy: CleanPodPolicyNone},
+				{cleanPodPolicy: CleanPodPolicy(""), expectCleanPodPolicy: CleanPodPolicyRunning},
+				{cleanPodPolicy: CleanPodPolicy("hello"), expectCleanPodPolicy: CleanPodPolicy("will be refused by webhook")},
+				{cleanPodPolicy: CleanPodPolicy("sdft"), expectCleanPodPolicy: CleanPodPolicy("will be refused by webhook")},
+			}
+			for i := range testCases {
+				c := testCases[i]
+				job := NewNerveXJob()
+				name := GenerateName(job.Name)
+				job.SetName(name)
+
+				var err error
+				ctx := context.Background()
+				err = k8sClient.Create(ctx, job, &client.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				job.Spec.CleanPodPolicy = c.cleanPodPolicy
+				err = k8sClient.Update(ctx, job, &client.UpdateOptions{})
+				if err != nil {
+					if c.cleanPodPolicy != CleanPodPolicyRunning && c.cleanPodPolicy != CleanPodPolicyNone &&
+						c.cleanPodPolicy != CleanPodPolicyALL {
+						Expect(err.Error()).To(ContainSubstring("Invalid CleanPodPolicy"))
+						continue
+					} else {
+						Expect(err).NotTo(HaveOccurred())
+					}
+				}
+
+				cjob := NerveXJob{}
+				jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
+				Eventually(func() CleanPodPolicy {
+					err = k8sClient.Get(ctx, jobKey, &cjob)
+					if err != nil {
+						return CleanPodPolicy(err.Error())
+					}
+					return cjob.Spec.CleanPodPolicy
+				}, timeout, interval).Should(Equal(c.expectCleanPodPolicy))
+			}
+
+		})
 	})
 })
 

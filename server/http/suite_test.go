@@ -51,7 +51,7 @@ import (
 const (
 	timeout  = 5 * time.Second
 	interval = 250 * time.Millisecond
-	duration = 500 * time.Millisecond
+	// duration = 500 * time.Millisecond
 
 	localServingHost = "localhost"
 	localServingPort = 8080

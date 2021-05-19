@@ -14,10 +14,10 @@ import (
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
-func (s *NerveXServer) GetNerveXJob(namespace, coordinatorName string) (*nervexv1alpha1.NerveXJob, error) {
+func (s *NerveXServer) getNerveXJob(namespace, coordinatorName string) (*nervexv1alpha1.NerveXJob, error) {
 	// get coordinator
 	coorKey := nervexutil.NamespacedName(namespace, coordinatorName)
-	coordinator, err := s.GetPodByKey(coorKey)
+	coordinator, err := s.getPodByKey(coorKey)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (s *NerveXServer) GetNerveXJob(namespace, coordinatorName string) (*nervexv
 
 	// get NerveXJob
 	njKey := nervexutil.NamespacedName(namespace, ownRefer.Name)
-	nvxJob, err := s.GetNerveXJobByKey(njKey)
+	nvxJob, err := s.getNerveXJobByKey(njKey)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (s *NerveXServer) GetNerveXJob(namespace, coordinatorName string) (*nervexv
 	return nvxJob, nil
 }
 
-func (s *NerveXServer) GetNerveXJobByKey(key string) (*nervexv1alpha1.NerveXJob, error) {
+func (s *NerveXServer) getNerveXJobByKey(key string) (*nervexv1alpha1.NerveXJob, error) {
 	obj, exists, err := s.dyi.NJInformer.Informer().GetIndexer().GetByKey(key)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get NerveXJob: %s", err)
@@ -68,7 +68,7 @@ func (s *NerveXServer) GetNerveXJobByKey(key string) (*nervexv1alpha1.NerveXJob,
 	return &nvxJob, nil
 }
 
-func (s *NerveXServer) CreateCollectorsAndLearnersForNerveXJob(
+func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 	njreq *servertypes.NerveXJobRequest,
 	job *nervexv1alpha1.NerveXJob) ([]string, []string, error) {
 
@@ -83,7 +83,7 @@ func (s *NerveXServer) CreateCollectorsAndLearnersForNerveXJob(
 
 	// create collectors
 	collectorTemplate := job.Spec.Collector.Template
-	collectors, err := s.CreateReplicas(&collectorTemplate, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.CollectorName)
+	collectors, err := s.createReplicas(&collectorTemplate, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.CollectorName)
 
 	if err != nil {
 		return collectors, nil, err
@@ -91,7 +91,7 @@ func (s *NerveXServer) CreateCollectorsAndLearnersForNerveXJob(
 
 	// create learners
 	learnerTemplate := job.Spec.Learner.Template
-	learners, err := s.CreateReplicas(&learnerTemplate, ownRefer, njreq.Learners, njreq.Namespace, nervexutil.LearnerName)
+	learners, err := s.createReplicas(&learnerTemplate, ownRefer, njreq.Learners, njreq.Namespace, nervexutil.LearnerName)
 
 	if err != nil {
 		return collectors, learners, err
@@ -100,7 +100,7 @@ func (s *NerveXServer) CreateCollectorsAndLearnersForNerveXJob(
 	return collectors, learners, nil
 }
 
-func (s *NerveXServer) CreateReplicas(
+func (s *NerveXServer) createReplicas(
 	template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	resources servertypes.ResourceQuantity,
@@ -130,7 +130,7 @@ func (s *NerveXServer) CreateReplicas(
 			return results, err
 		}
 		// set pod resources
-		s.SetPodResources(pod, resources, containerName)
+		s.setPodResources(pod, resources, containerName)
 
 		// build service
 		svc := nervexutil.BuildService(pod.GetLabels(), port, portName)
@@ -138,7 +138,7 @@ func (s *NerveXServer) CreateReplicas(
 		svc.Name = pod.Name
 
 		// create pod
-		if err := s.CreatePodAndService(namespace, pod, svc); err != nil {
+		if err := s.createPodAndService(namespace, pod, svc); err != nil {
 			return results, err
 		}
 
@@ -149,7 +149,7 @@ func (s *NerveXServer) CreateReplicas(
 	return results, nil
 }
 
-func (s *NerveXServer) DeleteReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
+func (s *NerveXServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
 	var containerName, portName string
 	var defaultPort int32
 
@@ -174,7 +174,7 @@ func (s *NerveXServer) DeleteReplicas(pods []*corev1.Pod, namespace string, repl
 		}
 
 		// delete pods and services
-		if err := s.DeletePodAndService(namespace, pod.Name); err != nil {
+		if err := s.deletePodAndService(namespace, pod.Name); err != nil {
 			return results, err
 		}
 
@@ -185,7 +185,7 @@ func (s *NerveXServer) DeleteReplicas(pods []*corev1.Pod, namespace string, repl
 	return results, nil
 }
 
-func (s *NerveXServer) RecreateReplicas(pods []*corev1.Pod, namespace, replicaType string) ([]string, error) {
+func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, namespace, replicaType string) ([]string, error) {
 	var containerName, portName string
 	var defaultPort int32
 	switch replicaType {
@@ -203,7 +203,7 @@ func (s *NerveXServer) RecreateReplicas(pods []*corev1.Pod, namespace, replicaTy
 
 	// delete pods and services
 	for _, pod := range pods {
-		if err := s.DeletePodAndService(namespace, pod.Name); err != nil {
+		if err := s.deletePodAndService(namespace, pod.Name); err != nil {
 			return nil, err
 		}
 	}
@@ -233,7 +233,7 @@ func (s *NerveXServer) RecreateReplicas(pods []*corev1.Pod, namespace, replicaTy
 		svc.SetOwnerReferences(pod.GetOwnerReferences())
 		svc.Name = pod.Name
 
-		if err := s.CreatePodAndService(namespace, pod, svc); err != nil {
+		if err := s.createPodAndService(namespace, pod, svc); err != nil {
 			return results, err
 		}
 

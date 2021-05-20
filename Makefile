@@ -80,8 +80,8 @@ lint:
 	golangci-lint run -v --timeout=5m
 
 .PHONY: test
-test: ## Run tests.
-	ginkgo -nodes 4 -v -cover -coverprofile=coverage.out ./... 
+test: ginkgo ## Run tests.
+	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./... 
 
 ##@ Build
 
@@ -140,6 +140,10 @@ controller-gen: ## Download controller-gen locally if necessary.
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
+
+GINKGO = $(shell pwd)/bin/ginkgo
+ginkgo: ## Download ginkgo locally if necessary.
+	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/ginkgo@v1.14.1)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

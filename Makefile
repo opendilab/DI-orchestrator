@@ -16,8 +16,14 @@ VERSION := $(MASTER_VERSION)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG ?= registry.sensetime.com/cloudnative4ai/nervex-operator:${VERSION}
-SERVER_IMG ?= registry.sensetime.com/cloudnative4ai/nervex-server:${VERSION}
+IMG_BASE ?= registry.sensetime.com/cloudnative4ai/nervex-operator
+SERVER_IMG_BASE ?= registry.sensetime.com/cloudnative4ai/nervex-server
+
+IMG ?= ${IMG_BASE}:${VERSION}
+MASTER_IMG ?= ${IMG_BASE}:${MASTER_VERSION}
+
+SERVER_IMG ?= ${SERVER_IMG_BASE}:${VERSION}
+MASTER_SERVER_IMG ?= ${SERVER_IMG_BASE}:${MASTER_VERSION}
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
@@ -50,14 +56,14 @@ help: ## Display this help.
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=nervex-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
+	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG} ${SERVER_IMG_BASE}=${MASTER_SERVER_IMG}
 	./hack/update-version.sh ${MASTER_VERSION}
 
 # dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
 # used `make manifests` when commited git
 dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=nervex-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	./hack/update-image-tags.sh config/manager ${VERSION}
+	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG} ${SERVER_IMG_BASE}=${SERVER_IMG}
 	./hack/update-version.sh ${VERSION}
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -98,6 +104,12 @@ docker-push: ## Push docker image with the nervex-operator.
 	docker push ${IMG}
 	docker push ${SERVER_IMG}
 
+docker-release: ## Release docker image with the nervex-operator.
+	docker tag ${IMG} ${MASTER_IMG}
+	docker tag ${SERVER_IMG} ${MASTER_SERVER_IMG}
+	docker push ${MASTER_IMG} 
+	docker push ${MASTER_SERVER_IMG}
+
 ##@ Deployment
 
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
@@ -107,12 +119,13 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 dev-deploy: dev-manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
+
+installer-gen: manifests kustomize ## generate nervex-manager.yaml
+	$(KUSTOMIZE) build config/default > config/nervex-manager.yaml
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -

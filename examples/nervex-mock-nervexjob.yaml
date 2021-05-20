@@ -4,7 +4,8 @@ metadata:
   name: nervexjob-example
 spec:
   group: xxx
-  priorityClassName: default
+  priorityClassName: ""
+  cleanPodPolicy: "Running"
   coordinator:
     template:
       spec:

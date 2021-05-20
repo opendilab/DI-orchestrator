@@ -228,13 +228,11 @@ var _ = Describe("NerveXJob Controller", func() {
 				By(fmt.Sprintf("ownRefer: %s %s", ownRefer.APIVersion, ownRefer.Kind))
 				colStatus := make([]int, 3)
 				for _, col := range c.collectors {
-					By(fmt.Sprintf("Create pod %s", col.name))
 					createAndUpdatePodPhase(ctx, k8sClient, col.name, nervexjob.Name, col.status, nervexutil.CollectorName, ownRefer, colStatus)
 				}
 
 				lrStatus := make([]int, 3)
 				for _, lr := range c.learners {
-					By(fmt.Sprintf("Create pod %s", lr.name))
 					createAndUpdatePodPhase(ctx, k8sClient, lr.name, nervexjob.Name, lr.status, nervexutil.LearnerName, ownRefer, lrStatus)
 				}
 

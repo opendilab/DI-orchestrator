@@ -72,6 +72,11 @@ func (r *NerveXJob) ValidateUpdate(old runtime.Object) error {
 	nervexjoblog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
+	if r.Spec.CleanPodPolicy != CleanPodPolicyALL && r.Spec.CleanPodPolicy != CleanPodPolicyNone &&
+		r.Spec.CleanPodPolicy != CleanPodPolicyRunning {
+		return fmt.Errorf("Invalid CleanPodPolicy %s, expected in [%s, %s, %s]",
+			r.Spec.CleanPodPolicy, CleanPodPolicyNone, CleanPodPolicyRunning, CleanPodPolicyALL)
+	}
 	return nil
 }
 

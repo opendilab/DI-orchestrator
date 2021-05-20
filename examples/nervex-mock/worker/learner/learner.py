@@ -94,11 +94,10 @@ class MockLearner(Slave):
                 'task_id': self._current_task_info['task_id'],
                 'buffer_id': self._current_task_info['buffer_id'],
                 'info': learn_info,
-                'finished_task': False,
             }
             return ret
         else:
-            raise TaskFail(result={'message': 'task name error'}, message='illegal actor task <{}>'.format(task_name))
+            raise TaskFail(result={'message': 'task name error'}, message='illegal learner task <{}>'.format(task_name))
 
     def deal_with_learner_start(self, task_info):
 
@@ -119,6 +118,7 @@ class MockLearner(Slave):
             learner_info = {
                 'learner_step': str(self._last_iter),
                 'sum': str(self._sum),
+                'learner_done': False,
             }
             self._learn_info_queue.put(learner_info)
     

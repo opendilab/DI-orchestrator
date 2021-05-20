@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -21,7 +22,7 @@ import (
 
 var _ = Describe("Server Test", func() {
 	Context("When send request to server", func() {
-		It("Should create the right number of replicas", func() {
+		It("Should have correct response when request /v1alpha1/replicas and /v1alpha1/replicas/failed", func() {
 			job := testutil.NewNerveXJob()
 			name := nervexutil.GenerateName(job.Name)
 			job.SetName(name)
@@ -47,8 +48,10 @@ var _ = Describe("Server Test", func() {
 					Replicas: ln,
 				},
 			}
+			rbody, err := json.Marshal(req)
+			Expect(err).NotTo(HaveOccurred())
 
-			njresp, err := sendRequest(http.MethodPost, req, rurl)
+			njresp, err := sendRequest(http.MethodPost, rbody, rurl, http.StatusOK, true)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(len(njresp.Collectors)).Should(Equal(cn))
@@ -58,10 +61,42 @@ var _ = Describe("Server Test", func() {
 			gurl := fmt.Sprintf("%s?namespace=%s&coordinator=%s", rurl, job.Namespace, coorname)
 			resp, err := http.Get(gurl)
 			Expect(err).NotTo(HaveOccurred())
-			gnjresp, err := parseResponse(resp)
+			gnjresp, err := parseResponse(resp, http.StatusOK, true)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(gnjresp.Collectors)).Should(Equal(cn))
 			Expect(len(gnjresp.Learners)).Should(Equal(ln))
+
+			By("Send request on POST /v1alpha1/replicas/failed")
+			furl := fmt.Sprintf("http://%s/v1alpha1/replicas/failed", addr)
+			freq := servertypes.NerveXJobResponse{
+				Namespace:   job.Namespace,
+				Coordinator: coorname,
+				Collectors: []string{
+					strings.Split(gnjresp.Collectors[0], ".")[0],
+				},
+				Learners: []string{
+					strings.Split(gnjresp.Learners[0], ".")[0],
+				},
+			}
+			frbody, err := json.Marshal(freq)
+			Expect(err).NotTo(HaveOccurred())
+			fnjresp, err := sendRequest(http.MethodPost, frbody, furl, http.StatusOK, true)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(fnjresp.Collectors)).Should(Equal(1))
+			Expect(len(fnjresp.Learners)).Should(Equal(1))
+
+			By("Waiting for server's cache to be synced")
+			time.Sleep(250 * time.Millisecond)
+
+			By("Checking the number of pods has not changed")
+			totalPods := cn + ln + 1 // collectors + learners + coordinator
+			Eventually(func() int {
+				pods, err := nervexutil.ListPods(ctx, k8sClient, job)
+				if err != nil {
+					return -1
+				}
+				return len(pods)
+			}, timeout, interval).Should(Equal(totalPods))
 
 			By("Send request on DELETE /v1alpha1/replicas")
 			var dcn, dln int = 1, 1
@@ -75,10 +110,161 @@ var _ = Describe("Server Test", func() {
 					Replicas: dln,
 				},
 			}
-			dnjresp, err := sendRequest(http.MethodDelete, dreq, rurl)
+			drbody, err := json.Marshal(dreq)
+			Expect(err).NotTo(HaveOccurred())
+
+			dnjresp, err := sendRequest(http.MethodDelete, drbody, rurl, http.StatusOK, true)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(dnjresp.Collectors)).Should(Equal(dcn))
 			Expect(len(dnjresp.Learners)).Should(Equal(dln))
+
+			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy(), timeout, interval)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Should have matched responses when requests are refused", func() {
+			job := testutil.NewNerveXJob()
+			name := nervexutil.GenerateName(job.Name)
+			job.SetName(name)
+
+			By(fmt.Sprintf("Create %dth NerveXJob", 1))
+			var err error
+			ctx := context.Background()
+			err = creatNerveXJob(ctx, job)
+			Expect(err).NotTo(HaveOccurred())
+
+			addr := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
+
+			By("Send request on /healthz")
+			hurl := fmt.Sprintf("http://%s/healthz", addr)
+			hresp, err := http.Get(hurl)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(hresp.StatusCode).Should(Equal(http.StatusOK))
+
+			By("Send request on POST /v1alpha1/replicas")
+			coorname := nervexutil.ReplicaPodName(job.Name, "coordinator")
+			rurl := fmt.Sprintf("http://%s/v1alpha1/replicas", addr)
+			var cn, ln int = 2, 3
+			req := servertypes.NerveXJobRequest{
+				Namespace:   job.Namespace,
+				Coordinator: coorname,
+				Collectors: servertypes.ResourceQuantity{
+					Replicas: cn,
+				},
+				Learners: servertypes.ResourceQuantity{
+					Replicas: ln,
+				},
+			}
+			rbody, err := json.Marshal(req)
+			Expect(err).NotTo(HaveOccurred())
+
+			njresp, err := sendRequest(http.MethodPost, rbody, rurl, http.StatusOK, true)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(len(njresp.Collectors)).Should(Equal(cn))
+			Expect(len(njresp.Learners)).Should(Equal(ln))
+
+			By("Send not found resource on POST /v1alpha1/replicas")
+			req.Coordinator = "not-exists"
+			rbody, err = json.Marshal(req)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Send bad request on POST /v1alpha1/replicas")
+			_, err = sendRequest(http.MethodPost, rbody, rurl, http.StatusNotFound, false)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Send not implemented method on /v1alpha1/replicas")
+			_, err = sendRequest(http.MethodPatch, rbody, rurl, http.StatusNotImplemented, false)
+			Expect(err).NotTo(HaveOccurred())
+
+			rbody = []byte{}
+			_, err = sendRequest(http.MethodPost, rbody, rurl, http.StatusBadRequest, false)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Send request on GET /v1alpha1/replicas with namespace and coordinator")
+			gurl := fmt.Sprintf("%s?namespace=%s&coordinator=%s", rurl, job.Namespace, coorname)
+			resp, err := http.Get(gurl)
+			Expect(err).NotTo(HaveOccurred())
+			gnjresp, err := parseResponse(resp, http.StatusOK, true)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(gnjresp.Collectors)).Should(Equal(cn))
+			Expect(len(gnjresp.Learners)).Should(Equal(ln))
+
+			By("Send request on GET /v1alpha1/replicas with namespace")
+			gurl = fmt.Sprintf("%s?namespace=%s", rurl, job.Namespace)
+			resp, err = http.Get(gurl)
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			var nresp servertypes.Response
+			err = json.NewDecoder(resp.Body).Decode(&nresp)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).Should(Equal(http.StatusOK))
+			Expect(nresp.Success).Should(BeTrue())
+
+			By("Send request on GET /v1alpha1/replicas")
+			gurl = rurl
+			resp, err = http.Get(gurl)
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			err = json.NewDecoder(resp.Body).Decode(&nresp)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).Should(Equal(http.StatusOK))
+			Expect(nresp.Success).Should(BeTrue())
+
+			By("Send request on POST /v1alpha1/replicas/failed")
+			furl := fmt.Sprintf("http://%s/v1alpha1/replicas/failed", addr)
+			freq := servertypes.NerveXJobResponse{
+				Namespace:   job.Namespace,
+				Coordinator: coorname,
+				Collectors: []string{
+					strings.Split(gnjresp.Collectors[0], ".")[0],
+				},
+				Learners: []string{
+					strings.Split(gnjresp.Learners[0], ".")[0],
+				},
+			}
+			frbody, err := json.Marshal(freq)
+			Expect(err).NotTo(HaveOccurred())
+			fnjresp, err := sendRequest(http.MethodPost, frbody, furl, http.StatusOK, true)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(fnjresp.Collectors)).Should(Equal(1))
+			Expect(len(fnjresp.Learners)).Should(Equal(1))
+
+			By("Waiting for server's cache to be synced")
+			time.Sleep(250 * time.Millisecond)
+
+			By("Checking the number of pods has not changed")
+			totalPods := cn + ln + 1 // collectors + learners + coordinator
+			Eventually(func() int {
+				pods, err := nervexutil.ListPods(ctx, k8sClient, job)
+				if err != nil {
+					return -1
+				}
+				return len(pods)
+			}, timeout, interval).Should(Equal(totalPods))
+
+			By("Send request on DELETE /v1alpha1/replicas")
+			var dcn, dln int = 1, 1
+			dreq := servertypes.NerveXJobRequest{
+				Namespace:   job.Namespace,
+				Coordinator: coorname,
+				Collectors: servertypes.ResourceQuantity{
+					Replicas: dcn,
+				},
+				Learners: servertypes.ResourceQuantity{
+					Replicas: dln,
+				},
+			}
+			drbody, err := json.Marshal(dreq)
+			Expect(err).NotTo(HaveOccurred())
+
+			dnjresp, err := sendRequest(http.MethodDelete, drbody, rurl, http.StatusOK, true)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(dnjresp.Collectors)).Should(Equal(dcn))
+			Expect(len(dnjresp.Learners)).Should(Equal(dln))
+
+			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy(), timeout, interval)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
@@ -100,6 +286,9 @@ func creatNerveXJob(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
 	}
 	coorname := nervexutil.ReplicaPodName(job.Name, "coordinator")
 	coorpod := testutil.NewPod(coorname, job.Name, ownRefer)
+	lbs := nervexutil.GenLabels(job.Name)
+	coorpod.SetLabels(lbs)
+
 	err = k8sClient.Create(ctx, coorpod, &client.CreateOptions{})
 	if err != nil {
 		return err
@@ -110,11 +299,7 @@ func creatNerveXJob(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
 	return nil
 }
 
-func sendRequest(method string, req servertypes.NerveXJobRequest, url string) (*servertypes.NerveXJobResponse, error) {
-	rbody, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
+func sendRequest(method string, rbody []byte, url string, expectedCode int, expectedSuccess bool) (*servertypes.NerveXJobResponse, error) {
 
 	// Create client
 	reqs, err := http.NewRequest(method, url, bytes.NewReader(rbody))
@@ -129,10 +314,10 @@ func sendRequest(method string, req servertypes.NerveXJobRequest, url string) (*
 		return nil, err
 	}
 
-	return parseResponse(resp)
+	return parseResponse(resp, expectedCode, expectedSuccess)
 }
 
-func parseResponse(resp *http.Response) (*servertypes.NerveXJobResponse, error) {
+func parseResponse(resp *http.Response, expectedCode int, expectedSuccess bool) (*servertypes.NerveXJobResponse, error) {
 	defer resp.Body.Close()
 	var nresp servertypes.Response
 	err := json.NewDecoder(resp.Body).Decode(&nresp)
@@ -140,7 +325,8 @@ func parseResponse(resp *http.Response) (*servertypes.NerveXJobResponse, error) 
 		return nil, err
 	}
 
-	Expect(nresp.Success).Should(BeTrue())
+	Expect(resp.StatusCode).Should(Equal(expectedCode))
+	Expect(nresp.Success).Should(Equal(expectedSuccess))
 
 	var njresp servertypes.NerveXJobResponse
 	jsonBytes, err := json.Marshal(nresp.Data)

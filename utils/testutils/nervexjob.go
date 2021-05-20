@@ -1,8 +1,16 @@
 package testutils
 
 import (
+	"context"
+	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
@@ -100,4 +108,48 @@ func NewAggregatorConfig() *nervexv1alpha1.AggregatorConfig {
 			},
 		},
 	}
+}
+
+func CleanUpJob(ctx context.Context, k8sClient client.Client, job *nervexv1alpha1.NerveXJob, timeout, interval time.Duration) error {
+	err := k8sClient.Delete(ctx, job, &client.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	By("Checking the NerveXJob is successfully deleted")
+	key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, key, job)
+		if err != nil && errors.IsNotFound(err) {
+			return true
+		}
+		return false
+	}, timeout, interval).Should(BeTrue())
+
+	By("List and delete pods")
+	pods, err := nervexutil.ListPods(ctx, k8sClient, job)
+	if err != nil {
+		return err
+	}
+
+	for _, pod := range pods {
+		err = k8sClient.Delete(ctx, pod, &client.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+	}
+
+	By("List and delete services")
+	svcs, err := nervexutil.ListServices(ctx, k8sClient, job)
+	if err != nil {
+		return err
+	}
+
+	for _, svc := range svcs {
+		err = k8sClient.Delete(ctx, svc, &client.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

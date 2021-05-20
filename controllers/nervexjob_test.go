@@ -170,7 +170,8 @@ var _ = Describe("NerveXJob Specification", func() {
 					}
 
 					By("Clean up pods")
-					cleanUpJob(ctx, nervexjob.DeepCopy(), jobKey)
+					err = testutil.CleanUpJob(ctx, k8sClient, nervexjob.DeepCopy(), timeout, interval)
+					Expect(err).NotTo(HaveOccurred())
 				}
 			}
 		})

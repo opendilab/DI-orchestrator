@@ -359,18 +359,27 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
 		return servertypes.NerveXJobResponse{}, &servertypes.NerveXError{Type: servertypes.ErrorBadRequest, Message: errMsg}
 	}
-	log.Info("delete request body: ", "request", njreq)
+	log.Info("failed request body: ", "request", njreq)
 
 	cpods, err := s.getPodsByNames(njreq.Namespace, njreq.Collectors)
+	if err != nil {
+		return servertypes.NerveXJobResponse{}, err
+	}
 	collectors, err := s.recreateReplicas(cpods, njreq.Namespace, nervexutil.CollectorName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
+
 	lpods, err := s.getPodsByNames(njreq.Namespace, njreq.Learners)
+	if err != nil {
+		return servertypes.NerveXJobResponse{}, err
+	}
 	learners, err := s.recreateReplicas(lpods, njreq.Namespace, nervexutil.LearnerName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
+
+	log.Info("recreate replicas", "collectors", collectors, "learners", learners)
 
 	rep := servertypes.NerveXJobResponse{
 		Namespace:   njreq.Namespace,

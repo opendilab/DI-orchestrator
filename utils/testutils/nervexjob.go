@@ -4,12 +4,8 @@ import (
 	"context"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
@@ -116,17 +112,8 @@ func CleanUpJob(ctx context.Context, k8sClient client.Client, job *nervexv1alpha
 		return err
 	}
 
-	By("Checking the NerveXJob is successfully deleted")
-	key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, key, job)
-		if err != nil && errors.IsNotFound(err) {
-			return true
-		}
-		return false
-	}, timeout, interval).Should(BeTrue())
+	time.Sleep(250 * time.Millisecond)
 
-	By("List and delete pods")
 	pods, err := nervexutil.ListPods(ctx, k8sClient, job)
 	if err != nil {
 		return err
@@ -139,7 +126,6 @@ func CleanUpJob(ctx context.Context, k8sClient client.Client, job *nervexv1alpha
 		}
 	}
 
-	By("List and delete services")
 	svcs, err := nervexutil.ListServices(ctx, k8sClient, job)
 	if err != nil {
 		return err

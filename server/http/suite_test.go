@@ -54,7 +54,7 @@ const (
 	// duration = 500 * time.Millisecond
 
 	localServingHost = "localhost"
-	localServingPort = 8080
+	localServingPort = 8118
 )
 
 // var cfg *rest.Config
@@ -137,7 +137,7 @@ var _ = BeforeSuite(func() {
 	addrPort := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
 	go func() {
 		err := nervexServer.Start(addrPort)
-		Expect(err).NotTo(HaveOccurred())
+		fmt.Println(err.Error())
 	}()
 
 	// wait for the server to get ready

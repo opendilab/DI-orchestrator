@@ -25,7 +25,8 @@ var _ = Describe("NerveXJob Controller", func() {
 			By("Create a NerveXJob")
 			var err error
 			ctx := context.Background()
-			nervexjob, jobKey := createNerveXJob(ctx, k8sClient)
+			jobTmpl := testutil.NewNerveXJob()
+			nervexjob, jobKey := createNerveXJob(ctx, k8sClient, jobTmpl)
 
 			By("Update coordinator and aggregator to Running")
 			for _, replicaName := range []string{
@@ -113,7 +114,8 @@ var _ = Describe("NerveXJob Controller", func() {
 				By(fmt.Sprintf("Create the %dth NerveXJob", i+1))
 				var err error
 				ctx := context.Background()
-				nervexjob, jobKey := createNerveXJob(ctx, k8sClient)
+				jobTmpl := testutil.NewNerveXJob()
+				nervexjob, jobKey := createNerveXJob(ctx, k8sClient, jobTmpl)
 
 				By("Update coordinator and aggregator status")
 				for _, replicaName := range []string{
@@ -211,7 +213,8 @@ var _ = Describe("NerveXJob Controller", func() {
 				By("Create a NerveXJob")
 				var err error
 				ctx := context.Background()
-				nervexjob, jobKey := createNerveXJob(ctx, k8sClient)
+				jobTmpl := testutil.NewNerveXJob()
+				nervexjob, jobKey := createNerveXJob(ctx, k8sClient, jobTmpl)
 
 				// build owner reference
 				ownRefer := metav1.OwnerReference{
@@ -264,8 +267,8 @@ var _ = Describe("NerveXJob Controller", func() {
 	})
 })
 
-func createNerveXJob(ctx context.Context, k8sClient client.Client) (nervexv1alpha1.NerveXJob, types.NamespacedName) {
-	nervexjob := testutil.NewNerveXJob()
+func createNerveXJob(ctx context.Context, k8sClient client.Client, nervexjob *nervexv1alpha1.NerveXJob) (
+	nervexv1alpha1.NerveXJob, types.NamespacedName) {
 	name := nervexutil.GenerateName(nervexjob.Name)
 	nervexjob.SetName(name)
 

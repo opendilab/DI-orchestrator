@@ -62,8 +62,8 @@ const (
 	// CleanPodPolicyRunning means deleting all running pods of the job after completed
 	CleanPodPolicyRunning CleanPodPolicy = "Running"
 
-	// CleanPodPolicyAll means deleting all pods of the job after completed
-	CleanPodPolicyAll CleanPodPolicy = "ALL"
+	// CleanPodPolicyALL means deleting all pods of the job after completed
+	CleanPodPolicyALL CleanPodPolicy = "ALL"
 
 	// CleanPodPolicyNone means never deleting any pods of the job after completed
 	CleanPodPolicyNone CleanPodPolicy = "None"

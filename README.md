@@ -7,22 +7,15 @@ Refers to [developer-guide](./docs/developer-guide.md)
 
 ### prerequisites
 - a well prepared kubernetes cluster. Follow the [instructions](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create a kubernetes cluster, or create a local kubernetes node referring to [kind](https://kind.sigs.k8s.io/docs/user/quick-start/) or [minikube](https://minikube.sigs.k8s.io/docs/start/)
-- kustomize. Installed by the following command
+- cert-manager. Installation on kubernetes referenced to [cert-manager docs](https://cert-manager.io/docs/installation/kubernetes/). Or you can install by the following command.
 ```bash
-curl -s "https://raw.githubusercontent.com/\
-kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+kubectl create -f ./config/certmanager/cert-manager.yaml
 ```
-### install
-Run the following command in the project root directory.
-```bash
-make deploy
-```
-Since the CustomResourceDefinitions are too long, you will probably find the following error:
-![](docs/images/deploy-failed.png)
 
-Then run the following command will solve the problem:
+### install
+Install `nervex-operator` and `nervex-server` with the following command.
 ```bash
-kustomize build config/crd | kubectl create -f -
+kubectl create -f ./config/nervex-manager.yaml
 ```
 
 `nervex-operator` and `nervex-server` will be installed in `nervex-system` namespace. 

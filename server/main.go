@@ -33,7 +33,11 @@ var (
 func main() {
 	var kubeconfig, serverBindAddress, leaseLockName, leaseLockNamespace string
 	var enableLeaderElection bool
-	flag.StringVar(&kubeconfig, "kubeconfig", "", "The kubeconfig file to access kubernetes cluster. Default to ")
+	if flag.Lookup("kubeconfig") == nil {
+		flag.StringVar(&kubeconfig, "kubeconfig", "", "The kubeconfig file to access kubernetes cluster. ")
+	}
+	kubeconfig = flag.Lookup("kubeconfig").Value.(flag.Getter).Get().(string)
+
 	flag.StringVar(&serverBindAddress, "server-bind-address", ":8080", "The address for server to bind to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+

@@ -1,10 +1,12 @@
 resources:
 - nervex_operator.yaml
-- priority_class.yaml
 - nervex_server.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
-- name: controller
+- name: registry.sensetime.com/cloudnative4ai/nervex-operator
   newName: registry.sensetime.com/cloudnative4ai/nervex-operator
-  newTag: v0.0.1-alpha.0-95609656
+  newTag: v0.0.1-alpha.0
+- name: registry.sensetime.com/cloudnative4ai/nervex-server
+  newName: registry.sensetime.com/cloudnative4ai/nervex-server
+  newTag: v0.0.1-alpha.0

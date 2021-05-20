@@ -26,6 +26,7 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,7 +55,11 @@ const (
 	// duration = 500 * time.Millisecond
 
 	localServingHost = "localhost"
-	localServingPort = 8118
+	port             = 8150
+)
+
+var (
+	localServingPort = port
 )
 
 // var cfg *rest.Config
@@ -134,6 +139,7 @@ var _ = BeforeSuite(func() {
 
 	nervexServer := NewNerveXServer(kubeClient, dynamicClient, logger, dyi)
 
+	localServingPort = port + config.GinkgoConfig.ParallelNode
 	addrPort := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
 	go func() {
 		err := nervexServer.Start(addrPort)

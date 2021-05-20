@@ -59,13 +59,15 @@ type NerveXJobReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("nervexjob", req.NamespacedName)
-	log.Info("reconcile nervexjob", "nervexjob", req.NamespacedName)
+	// log.Info("reconcile nervexjob", "nervexjob", req.NamespacedName)
 
 	// get NerveXJob object
 	nvxJob := &nervexv1alpha1.NerveXJob{}
 	err := r.Get(ctx, req.NamespacedName, nvxJob)
 	if err != nil {
-		log.Error(client.IgnoreNotFound(err), "failed to get NerveXJob", "job", req.NamespacedName)
+		if !errors.IsNotFound(err) {
+			log.Error(err, "failed to get NerveXJob", "job", req.NamespacedName)
+		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -74,14 +76,14 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// list pods of NerveXJob
 	pods, err := nervexutil.ListPods(ctx, r.Client, nvxJob)
 	if err != nil {
-		log.Error(client.IgnoreNotFound(err), "failed to list pods of NerveXJob", "job", req.NamespacedName)
+		log.Error(err, "failed to list pods of NerveXJob", "job", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// list services of NerveXJob
 	services, err := nervexutil.ListServices(ctx, r.Client, nvxJob)
 	if err != nil {
-		log.Error(client.IgnoreNotFound(err), "failed to list services of NerveXJob", "job", req.NamespacedName)
+		log.Error(err, "failed to list services of NerveXJob", "job", req.NamespacedName)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 

@@ -18,11 +18,13 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,7 +46,7 @@ import (
 const (
 	timeout  = 5 * time.Second
 	interval = 250 * time.Millisecond
-	duration = 500 * time.Millisecond
+	duration = 200 * time.Millisecond
 )
 
 // var cfg *rest.Config
@@ -103,8 +105,11 @@ var _ = BeforeSuite(func() {
 	}, timeout, interval).Should(BeTrue())
 
 	// create controller manager
+	metricPort := config.GinkgoConfig.ParallelNode + 8200
+	metricAddress := fmt.Sprintf(":%d", metricPort)
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme: scheme.Scheme,
+		Scheme:             scheme.Scheme,
+		MetricsBindAddress: metricAddress,
 	})
 	Expect(err).NotTo(HaveOccurred())
 

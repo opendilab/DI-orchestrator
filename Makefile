@@ -81,7 +81,7 @@ lint:
 
 .PHONY: test
 test: ## Run tests.
-	go test -v -cover ./... -coverprofile=coverage.out
+	ginkgo -nodes 4 -v -cover -coverprofile=coverage.out ./... 
 
 ##@ Build
 

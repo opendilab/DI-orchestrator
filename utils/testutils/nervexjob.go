@@ -1,8 +1,12 @@
 package testutils
 
 import (
+	"context"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
@@ -100,4 +104,38 @@ func NewAggregatorConfig() *nervexv1alpha1.AggregatorConfig {
 			},
 		},
 	}
+}
+
+func CleanUpJob(ctx context.Context, k8sClient client.Client, job *nervexv1alpha1.NerveXJob, timeout, interval time.Duration) error {
+	err := k8sClient.Delete(ctx, job, &client.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(250 * time.Millisecond)
+
+	pods, err := nervexutil.ListPods(ctx, k8sClient, job)
+	if err != nil {
+		return err
+	}
+
+	for _, pod := range pods {
+		err = k8sClient.Delete(ctx, pod, &client.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+	}
+
+	svcs, err := nervexutil.ListServices(ctx, k8sClient, job)
+	if err != nil {
+		return err
+	}
+
+	for _, svc := range svcs {
+		err = k8sClient.Delete(ctx, svc, &client.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

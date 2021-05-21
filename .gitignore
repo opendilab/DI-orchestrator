@@ -24,3 +24,5 @@ bin
 *~
 
 *.vscode
+
+*.coverprofile

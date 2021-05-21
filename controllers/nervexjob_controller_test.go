@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -91,7 +90,8 @@ var _ = Describe("NerveXJob Controller", func() {
 			}, timeout, interval).Should(Equal(1))
 
 			By("Cleaning up")
-			cleanUpJob(ctx, createdNvxjob.DeepCopy(), jobKey)
+			err = testutil.CleanUpJob(ctx, k8sClient, createdNvxjob.DeepCopy(), timeout, interval)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("NerveXJob status changed with components status", func() {
@@ -165,7 +165,8 @@ var _ = Describe("NerveXJob Controller", func() {
 				}, timeout, interval).Should(Equal(c.expectStatus))
 
 				By("Cleaning up")
-				cleanUpJob(ctx, nervexjob.DeepCopy(), jobKey)
+				err = testutil.CleanUpJob(ctx, k8sClient, nervexjob.DeepCopy(), timeout, interval)
+				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 	})
@@ -227,13 +228,11 @@ var _ = Describe("NerveXJob Controller", func() {
 				By(fmt.Sprintf("ownRefer: %s %s", ownRefer.APIVersion, ownRefer.Kind))
 				colStatus := make([]int, 3)
 				for _, col := range c.collectors {
-					By(fmt.Sprintf("Create pod %s", col.name))
 					createAndUpdatePodPhase(ctx, k8sClient, col.name, nervexjob.Name, col.status, nervexutil.CollectorName, ownRefer, colStatus)
 				}
 
 				lrStatus := make([]int, 3)
 				for _, lr := range c.learners {
-					By(fmt.Sprintf("Create pod %s", lr.name))
 					createAndUpdatePodPhase(ctx, k8sClient, lr.name, nervexjob.Name, lr.status, nervexutil.LearnerName, ownRefer, lrStatus)
 				}
 
@@ -261,7 +260,8 @@ var _ = Describe("NerveXJob Controller", func() {
 					}, timeout, interval).Should(Equal(status))
 				}
 
-				cleanUpJob(ctx, nervexjob.DeepCopy(), jobKey)
+				err = testutil.CleanUpJob(ctx, k8sClient, nervexjob.DeepCopy(), timeout, interval)
+				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 	})
@@ -328,38 +328,5 @@ func createAndUpdatePodPhase(
 		statuses[1]++
 	case corev1.PodSucceeded:
 		statuses[2]++
-	}
-}
-
-func cleanUpJob(ctx context.Context, job *nervexv1alpha1.NerveXJob, key types.NamespacedName) {
-	By("Delete NerveXJob")
-	err := k8sClient.Delete(ctx, job, &client.DeleteOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	By("Checking the NerveXJob is successfully deleted")
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, key, job)
-		if err != nil && errors.IsNotFound(err) {
-			return true
-		}
-		return false
-	}, timeout, interval).Should(BeTrue())
-
-	By("List and delete pods")
-	pods, err := nervexutil.ListPods(ctx, k8sClient, job)
-	Expect(err).NotTo(HaveOccurred())
-
-	for _, pod := range pods {
-		err = k8sClient.Delete(ctx, pod, &client.DeleteOptions{})
-		Expect(err).NotTo(HaveOccurred())
-	}
-
-	By("List and delete services")
-	svcs, err := nervexutil.ListServices(ctx, k8sClient, job)
-	Expect(err).NotTo(HaveOccurred())
-
-	for _, svc := range svcs {
-		err = k8sClient.Delete(ctx, svc, &client.DeleteOptions{})
-		Expect(err).NotTo(HaveOccurred())
 	}
 }

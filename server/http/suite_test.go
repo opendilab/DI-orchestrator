@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package http
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"net"
 	"path/filepath"
 	"testing"
 	"time"
@@ -26,9 +28,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
@@ -36,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
+	serverdynamic "go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
 	testutil "go-sensephoenix.sensetime.com/nervex-operator/utils/testutils"
 	//+kubebuilder:scaffold:imports
 )
@@ -46,18 +52,26 @@ import (
 const (
 	timeout  = 5 * time.Second
 	interval = 250 * time.Millisecond
-	duration = 200 * time.Millisecond
+	// duration = 500 * time.Millisecond
+
+	localServingHost = "localhost"
+	port             = 8150
+)
+
+var (
+	localServingPort = port
 )
 
 // var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+var kubeClient *kubernetes.Clientset
 
-func TestAPIs(t *testing.T) {
+func TestServer(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
+		"Server Suite",
 		[]Reporter{printer.NewlineReporter{}})
 }
 
@@ -66,7 +80,7 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -104,29 +118,46 @@ var _ = BeforeSuite(func() {
 		return true
 	}, timeout, interval).Should(BeTrue())
 
-	// create controller manager
-	metricPort := config.GinkgoConfig.ParallelNode + 8200
-	metricAddress := fmt.Sprintf(":%d", metricPort)
-	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
-		MetricsBindAddress: metricAddress,
-	})
-	Expect(err).NotTo(HaveOccurred())
+	kubeClient = kubernetes.NewForConfigOrDie(cfg)
+	dynamicClient := dynamic.NewForConfigOrDie(cfg)
 
-	err = (&NerveXJobReconciler{
-		Scheme:   k8sManager.GetScheme(),
-		Client:   k8sManager.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("NerveXJob"),
-		AGConfig: key.String(),
-	}).SetupWithManager(k8sManager)
+	dif := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, serverdynamic.ResyncPeriod, corev1.NamespaceAll, nil)
 
-	Expect(err).NotTo(HaveOccurred())
+	dyi := serverdynamic.NewDynamicInformer(dif)
 
-	// starting manager
+	// start dynamic informer
+	stopCh := make(chan struct{})
+	go dif.Start(stopCh)
+
+	opts := zap.Options{
+		Development: true,
+	}
+	opts.BindFlags(flag.CommandLine)
+	flag.Parse()
+
+	logger := zap.New(zap.UseFlagOptions(&opts))
+
+	nervexServer := NewNerveXServer(kubeClient, dynamicClient, logger, dyi)
+
+	localServingPort = port + config.GinkgoConfig.ParallelNode
+	addrPort := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
 	go func() {
-		err = k8sManager.Start(ctrl.SetupSignalHandler())
-		Expect(err).NotTo(HaveOccurred())
+		err := nervexServer.Start(addrPort)
+		fmt.Println(err.Error())
 	}()
+
+	// wait for the server to get ready
+	tcpAddr, err := net.ResolveTCPAddr("tcp", addrPort)
+	Expect(err).NotTo(HaveOccurred())
+
+	Eventually(func() error {
+		conn, err := net.DialTCP("tcp", nil, tcpAddr)
+		if err != nil {
+			return err
+		}
+		conn.Close()
+		return nil
+	}, timeout, interval).Should(Succeed())
 }, 60)
 
 var _ = AfterSuite(func() {

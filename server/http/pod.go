@@ -16,7 +16,7 @@ import (
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
-func (s *NerveXServer) GetPodsByNames(namespace string, names []string) ([]*corev1.Pod, error) {
+func (s *NerveXServer) getPodsByNames(namespace string, names []string) ([]*corev1.Pod, error) {
 	var keys []string
 	var pods []*corev1.Pod
 	for _, name := range names {
@@ -24,17 +24,17 @@ func (s *NerveXServer) GetPodsByNames(namespace string, names []string) ([]*core
 		keys = append(keys, key)
 	}
 
-	pods, err := s.GetPodsByKeys(keys)
+	pods, err := s.getPodsByKeys(keys)
 	if err != nil {
 		return pods, err
 	}
 	return pods, nil
 }
 
-func (s *NerveXServer) GetPodsByKeys(keys []string) ([]*corev1.Pod, error) {
+func (s *NerveXServer) getPodsByKeys(keys []string) ([]*corev1.Pod, error) {
 	var pods []*corev1.Pod
 	for _, key := range keys {
-		pod, err := s.GetPodByKey(key)
+		pod, err := s.getPodByKey(key)
 		if err != nil {
 			return pods, err
 		}
@@ -43,7 +43,7 @@ func (s *NerveXServer) GetPodsByKeys(keys []string) ([]*corev1.Pod, error) {
 	return pods, nil
 }
 
-func (s *NerveXServer) GetPodByKey(key string) (*corev1.Pod, error) {
+func (s *NerveXServer) getPodByKey(key string) (*corev1.Pod, error) {
 	obj, exists, err := s.dyi.PodInformer.Informer().GetIndexer().GetByKey(key)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get pod: %s", err)
@@ -65,7 +65,7 @@ func (s *NerveXServer) GetPodByKey(key string) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
-func (s *NerveXServer) CreatePodAndService(namespace string, pod *corev1.Pod, service *corev1.Service) error {
+func (s *NerveXServer) createPodAndService(namespace string, pod *corev1.Pod, service *corev1.Service) error {
 	// create pod
 	_, err := s.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
 	if err != nil {
@@ -85,7 +85,7 @@ func (s *NerveXServer) CreatePodAndService(namespace string, pod *corev1.Pod, se
 	return nil
 }
 
-func (s *NerveXServer) DeletePodAndService(namespace, name string) error {
+func (s *NerveXServer) deletePodAndService(namespace, name string) error {
 	// delete pods
 	if err := s.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
 		return err
@@ -98,7 +98,7 @@ func (s *NerveXServer) DeletePodAndService(namespace, name string) error {
 	return nil
 }
 
-func (s *NerveXServer) SetPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity, containerName string) {
+func (s *NerveXServer) setPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity, containerName string) {
 	for i := range pod.Spec.Containers {
 		if pod.Spec.Containers[i].Name != containerName {
 			continue
@@ -126,7 +126,7 @@ func (s *NerveXServer) SetPodResources(pod *corev1.Pod, resources servertypes.Re
 	}
 }
 
-func (s *NerveXServer) GetPodResources(pod *corev1.Pod, containerName string) servertypes.ResourceQuantity {
+func (s *NerveXServer) getPodResources(pod *corev1.Pod, containerName string) servertypes.ResourceQuantity {
 	resource := servertypes.ResourceQuantity{
 		CPU:    resource.MustParse("0"),
 		GPU:    resource.MustParse("0"),
@@ -153,10 +153,10 @@ func (s *NerveXServer) GetPodResources(pod *corev1.Pod, containerName string) se
 	return resource
 }
 
-func (s *NerveXServer) ListReplicaPodsWithSelector(namespace string, labelSelector labels.Selector) (
+func (s *NerveXServer) listReplicaPodsWithSelector(namespace string, labelSelector labels.Selector) (
 	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {
 	// list pods that belong to the NerveXJob
-	pods, err := s.ListPodsWithSelector(namespace, labelSelector)
+	pods, err := s.listPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		return
 	}
@@ -172,7 +172,7 @@ func (s *NerveXServer) ListReplicaPodsWithSelector(namespace string, labelSelect
 	return
 }
 
-func (s *NerveXServer) ListPodsWithSelector(namespace string, labelSelector labels.Selector) ([]*corev1.Pod, error) {
+func (s *NerveXServer) listPodsWithSelector(namespace string, labelSelector labels.Selector) ([]*corev1.Pod, error) {
 	ret, err := s.dyi.PodInformer.Lister().ByNamespace(namespace).List(labelSelector)
 	if err != nil {
 		return nil, err

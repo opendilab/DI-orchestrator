@@ -145,7 +145,7 @@ var _ = Describe("NerveXJob Specification", func() {
 							}
 							return len(pods)
 						}, duration, interval).Should(Equal(npods))
-						Consistently(func() int {
+						Eventually(func() int {
 							svcs, err := nervexutil.ListServices(ctx, k8sClient, &nervexjob)
 							if err != nil {
 								return -1
@@ -153,14 +153,14 @@ var _ = Describe("NerveXJob Specification", func() {
 							return len(svcs)
 						}, duration, interval).Should(Equal(0))
 					case nervexv1alpha1.CleanPodPolicyRunning:
-						Consistently(func() int {
+						Eventually(func() int {
 							pods, err := nervexutil.ListPods(ctx, k8sClient, &nervexjob)
 							if err != nil {
 								return -1
 							}
 							return len(pods)
 						}, duration, interval).Should(Equal(npods - c.runnings - 1))
-						Consistently(func() int {
+						Eventually(func() int {
 							svcs, err := nervexutil.ListServices(ctx, k8sClient, &nervexjob)
 							if err != nil {
 								return -1
@@ -170,7 +170,8 @@ var _ = Describe("NerveXJob Specification", func() {
 					}
 
 					By("Clean up pods")
-					cleanUpJob(ctx, nervexjob.DeepCopy(), jobKey)
+					err = testutil.CleanUpJob(ctx, k8sClient, nervexjob.DeepCopy(), timeout, interval)
+					Expect(err).NotTo(HaveOccurred())
 				}
 			}
 		})

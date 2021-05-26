@@ -19,9 +19,14 @@ import (
 )
 
 var (
-	replicasAPI       = "/v1alpha1/replicas"
-	replicasFailedAPI = "/v1alpha1/replicas/failed"
+	apiVersion        = "v1alpha1"
+	replicasAPI       = "/replicas"
+	replicasFailedAPI = "/replicas/failed"
 )
+
+func withAPIVersion(api string) string {
+	return fmt.Sprintf("/%s%s", apiVersion, api)
+}
 
 type NerveXServer struct {
 	KubeClient    *kubernetes.Clientset
@@ -46,8 +51,8 @@ func NewNerveXServer(
 
 func (s *NerveXServer) Start(serverBindAddress string) error {
 	log := s.Log.WithName("NerveXServer")
-	http.HandleFunc(replicasAPI, s.Replicas)
-	http.HandleFunc(replicasFailedAPI, s.ReplicasFailed)
+	http.HandleFunc(withAPIVersion(replicasAPI), s.Replicas)
+	http.HandleFunc(withAPIVersion(replicasFailedAPI), s.ReplicasFailed)
 	http.HandleFunc("/healthz", healthz)
 
 	log.Info("Start listening on", "port", serverBindAddress)

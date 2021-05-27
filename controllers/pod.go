@@ -86,6 +86,8 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 
 func (r *NerveXJobReconciler) checkPodsStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob,
 	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) error {
+	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
+
 	// update replica status
 	updateReplicasStatues(job, collectors, learners, coordinator, aggregator)
 
@@ -97,11 +99,13 @@ func (r *NerveXJobReconciler) checkPodsStatus(ctx context.Context, job *nervexv1
 	} else if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Failed > 0 {
 		job.Status.Phase = nervexv1alpha1.JobFailed
 		msg := fmt.Sprintf("NerveXJob %s failed because coordinator failed", job.Name)
+		log.Info(msg)
 		updateNerveXJobConditions(job, nervexv1alpha1.JobFailed, NerveXJobFailedReason, msg)
 
 	} else if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Succeeded > 0 {
 		job.Status.Phase = nervexv1alpha1.JobSucceeded
 		msg := fmt.Sprintf("NerveXJob %s succeeded because coordinator succeeded", job.Name)
+		log.Info(msg)
 		updateNerveXJobConditions(job, nervexv1alpha1.JobSucceeded, NerveXJobSucceededReason, msg)
 
 	}
@@ -113,14 +117,12 @@ func (r *NerveXJobReconciler) createPodAndService(ctx context.Context, pod *core
 
 	log.Info("create pod ", "pod name:", pod)
 	if err := r.Create(ctx, pod, &client.CreateOptions{}); err != nil {
-		log.Error(err, "failed to create pod", "pod name:", pod)
-		return err
+		return fmt.Errorf("failed to create pod: %v", err)
 	}
 
 	log.Info("create service ", "service name:", svc)
 	if err := r.Create(ctx, svc, &client.CreateOptions{}); err != nil {
-		log.Error(err, "failed to create service", "service name:", svc)
-		return err
+		return fmt.Errorf("failed to create service: %v", err)
 	}
 	return nil
 }

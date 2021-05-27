@@ -69,7 +69,7 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if !errors.IsNotFound(err) {
 			log.Error(err, "failed to get NerveXJob", "job", req.NamespacedName)
 		}
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, nil
 	}
 
 	jobStatus := nvxJob.Status.DeepCopy()
@@ -78,20 +78,20 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	pods, err := nervexutil.ListPods(ctx, r.Client, nvxJob)
 	if err != nil {
 		log.Error(err, "failed to list pods of NerveXJob", "job", req.NamespacedName)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, nil
 	}
 
 	// list services of NerveXJob
 	services, err := nervexutil.ListServices(ctx, r.Client, nvxJob)
 	if err != nil {
 		log.Error(err, "failed to list services of NerveXJob", "job", req.NamespacedName)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, nil
 	}
 
 	// check the phase of NerveXJob
 	if isSucceeded(nvxJob) || isFailed(nvxJob) {
 		if err := r.deletePodsAndServices(ctx, nvxJob, pods, services); err != nil {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
+			return ctrl.Result{}, nil
 		}
 
 		return ctrl.Result{}, nil
@@ -102,7 +102,7 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	if err := r.reconcilePods(ctx, nvxJob, pods); err != nil {
 		log.Error(err, "failed to reconcile pods", "job", req.NamespacedName)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, nil
 	}
 
 	// update status

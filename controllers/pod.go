@@ -86,29 +86,52 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 	return nil
 }
 
+func (r *NerveXJobReconciler) checkPodsStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob,
+	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) error {
+	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
+
+	// update replica status
+	updateReplicasStatues(job, collectors, learners, coordinator, aggregator)
+
+	if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Active > 0 && job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeAggregator].Active > 0 {
+		job.Status.Phase = nervexv1alpha1.JobRunning
+		msg := fmt.Sprintf("coordinator and aggregator of NerveXJob %s are running", job.Name)
+		updateNerveXJobConditions(job, nervexv1alpha1.JobRunning, NerveXJobRunningReason, msg)
+	} else if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Failed > 0 {
+		job.Status.Phase = nervexv1alpha1.JobFailed
+		msg := fmt.Sprintf("NerveXJob %s failed because coordinator failed", job.Name)
+		log.Info(msg)
+		updateNerveXJobConditions(job, nervexv1alpha1.JobFailed, NerveXJobFailedReason, msg)
+
+	} else if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Succeeded > 0 {
+		job.Status.Phase = nervexv1alpha1.JobSucceeded
+		msg := fmt.Sprintf("NerveXJob %s succeeded because coordinator succeeded", job.Name)
+		log.Info(msg)
+		updateNerveXJobConditions(job, nervexv1alpha1.JobSucceeded, NerveXJobSucceededReason, msg)
+	}
+	return nil
+}
+
 func (r *NerveXJobReconciler) createPodAndService(ctx context.Context, job *nervexv1alpha1.NerveXJob, pod *corev1.Pod, svc *corev1.Service) error {
 	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
 
 	log.Info("create pod ", "pod name:", pod)
 	if err := r.createPod(ctx, job, pod); err != nil {
-		log.Error(err, "failed to create pod", "pod name:", pod)
 		return err
 	}
 
 	log.Info("create service ", "service name:", svc)
 	if err := r.createService(ctx, job, svc); err != nil {
-		log.Error(err, "failed to create service", "service name:", svc)
 		return err
 	}
 	return nil
 }
 
 func (r *NerveXJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1.NerveXJob, pod *corev1.Pod) error {
-
 	if err := r.Create(ctx, pod, &client.CreateOptions{}); err != nil {
 		msg := fmt.Sprintf("Failed to create pod: %s error: %v", pod.Name, err)
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, FailedCreateReason, msg)
-		return err
+		return fmt.Errorf("failed to create pod: %v", err)
 	}
 	msg := fmt.Sprintf("Create pod: %s", pod.Name)
 	r.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulCreateReason, msg)
@@ -116,11 +139,10 @@ func (r *NerveXJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 }
 
 func (r *NerveXJobReconciler) createService(ctx context.Context, job *nervexv1alpha1.NerveXJob, service *corev1.Service) error {
-
 	if err := r.Create(ctx, service, &client.CreateOptions{}); err != nil {
 		msg := fmt.Sprintf("Failed to create service: %s error: %v", service.Name, err)
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, FailedCreateReason, msg)
-		return err
+		return fmt.Errorf("failed to create service: %v", err)
 	}
 	msg := fmt.Sprintf("Create service: %s", service.Name)
 	r.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulCreateReason, msg)
@@ -131,7 +153,7 @@ func (r *NerveXJobReconciler) deletePod(ctx context.Context, job *nervexv1alpha1
 	if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		msg := fmt.Sprintf("Failed to delete pod: %s error: %v", pod.Name, err)
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, FailedDeleteReason, msg)
-		return err
+		return fmt.Errorf("failed to delete pod: %v", err)
 	}
 	msg := fmt.Sprintf("Delete pod: %s", pod.Name)
 	r.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulDeleteReason, msg)
@@ -142,7 +164,7 @@ func (r *NerveXJobReconciler) deleteService(ctx context.Context, job *nervexv1al
 	if err := r.Delete(ctx, service, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 		msg := fmt.Sprintf("Failed to delete service: %s error: %v", service.Name, err)
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, FailedDeleteReason, msg)
-		return err
+		return fmt.Errorf("failed to delete service: %v", err)
 	}
 	msg := fmt.Sprintf("Delete service: %s", service.Name)
 	r.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulDeleteReason, msg)

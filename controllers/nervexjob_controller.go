@@ -49,6 +49,7 @@ type NerveXJobReconciler struct {
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/status;aggregatorconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/finalizers;aggregatorconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=pods;services;events,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -70,7 +71,7 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if !errors.IsNotFound(err) {
 			log.Error(err, "failed to get NerveXJob", "job", req.NamespacedName)
 		}
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, nil
 	}
 
 	jobStatus := job.Status.DeepCopy()
@@ -79,20 +80,21 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	pods, err := nervexutil.ListPods(ctx, r.Client, job)
 	if err != nil {
 		log.Error(err, "failed to list pods of NerveXJob", "job", req.NamespacedName)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, nil
 	}
 
 	// list services of NerveXJob
 	services, err := nervexutil.ListServices(ctx, r.Client, job)
 	if err != nil {
 		log.Error(err, "failed to list services of NerveXJob", "job", req.NamespacedName)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, nil
 	}
 
 	// check the phase of NerveXJob
 	if isSucceeded(job) || isFailed(job) {
 		if err := r.deletePodsAndServices(ctx, job, pods, services); err != nil {
-			return ctrl.Result{}, client.IgnoreNotFound(err)
+			log.Error(err, "failed to delete pods and services of NerveXJob", "job", req.NamespacedName)
+			return ctrl.Result{}, nil
 		}
 
 		if isSucceeded(job) {
@@ -109,7 +111,7 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	if err := r.reconcilePods(ctx, job, pods); err != nil {
 		log.Error(err, "failed to reconcile pods", "job", req.NamespacedName)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		return ctrl.Result{}, nil
 	}
 
 	// update status

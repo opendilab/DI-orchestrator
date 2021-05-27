@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
+	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
 const (
@@ -123,6 +124,9 @@ func updateReplicasStatues(job *nervexv1alpha1.NerveXJob,
 }
 
 func updateReplicaStatus(pod *corev1.Pod, job *nervexv1alpha1.NerveXJob, replicaType nervexv1alpha1.ReplicaType) {
+	if nervexutil.IsTerminating(pod) {
+		return
+	}
 	switch pod.Status.Phase {
 	case corev1.PodRunning:
 		job.Status.ReplicaStatus[replicaType].Active++

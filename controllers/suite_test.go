@@ -118,6 +118,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("NerveXJob"),
 		AGConfig: key.String(),
+		Recorder: k8sManager.GetEventRecorderFor("nervex-operator"),
 	}).SetupWithManager(k8sManager)
 
 	Expect(err).NotTo(HaveOccurred())

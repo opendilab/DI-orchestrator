@@ -91,6 +91,7 @@ func main() {
 		Log:      ctrl.Log.WithName("controllers").WithName("NerveXJob"),
 		Scheme:   mgr.GetScheme(),
 		AGConfig: agconfig,
+		Recorder: mgr.GetEventRecorderFor("nervex-operator"),
 	}
 	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NerveXJob")

@@ -25,6 +25,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,12 +42,13 @@ type NerveXJobReconciler struct {
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
 	AGConfig string
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs;aggregatorconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/status;aggregatorconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/finalizers;aggregatorconfigs/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=pods;services,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=pods;services;events,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -63,8 +65,8 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// log.Info("reconcile nervexjob", "nervexjob", req.NamespacedName)
 
 	// get NerveXJob object
-	nvxJob := &nervexv1alpha1.NerveXJob{}
-	err := r.Get(ctx, req.NamespacedName, nvxJob)
+	job := &nervexv1alpha1.NerveXJob{}
+	err := r.Get(ctx, req.NamespacedName, job)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			log.Error(err, "failed to get NerveXJob", "job", req.NamespacedName)
@@ -72,43 +74,50 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, nil
 	}
 
-	jobStatus := nvxJob.Status.DeepCopy()
+	jobStatus := job.Status.DeepCopy()
 
 	// list pods of NerveXJob
-	pods, err := nervexutil.ListPods(ctx, r.Client, nvxJob)
+	pods, err := nervexutil.ListPods(ctx, r.Client, job)
 	if err != nil {
 		log.Error(err, "failed to list pods of NerveXJob", "job", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
 	// list services of NerveXJob
-	services, err := nervexutil.ListServices(ctx, r.Client, nvxJob)
+	services, err := nervexutil.ListServices(ctx, r.Client, job)
 	if err != nil {
 		log.Error(err, "failed to list services of NerveXJob", "job", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
 	// check the phase of NerveXJob
-	if isSucceeded(nvxJob) || isFailed(nvxJob) {
-		if err := r.deletePodsAndServices(ctx, nvxJob, pods, services); err != nil {
+	if isSucceeded(job) || isFailed(job) {
+		if err := r.deletePodsAndServices(ctx, job, pods, services); err != nil {
+			log.Error(err, "failed to delete pods and services of NerveXJob", "job", req.NamespacedName)
 			return ctrl.Result{}, nil
 		}
 
+		if isSucceeded(job) {
+			for rtype := range job.Status.ReplicaStatus {
+				job.Status.ReplicaStatus[rtype].Succeeded += job.Status.ReplicaStatus[rtype].Active
+				job.Status.ReplicaStatus[rtype].Active = 0
+			}
+		}
 		return ctrl.Result{}, nil
 	}
 
 	// initialize NerveXJob status
-	initializeNerveXJobReplicaStatus(nvxJob)
+	initializeNerveXJobReplicaStatus(job)
 
-	if err := r.reconcilePods(ctx, nvxJob, pods); err != nil {
+	if err := r.reconcilePods(ctx, job, pods); err != nil {
 		log.Error(err, "failed to reconcile pods", "job", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
 
 	// update status
 	defer func() {
-		if !apiequality.Semantic.DeepEqual(*jobStatus, nvxJob.Status) {
-			if err := r.updateNerveXJobStatus(ctx, nvxJob); err != nil {
+		if !apiequality.Semantic.DeepEqual(*jobStatus, job.Status) {
+			if err := r.updateNerveXJobStatusInCluster(ctx, job); err != nil {
 				log.Error(err, "failed to update NerveXJobStatus", "job", req.NamespacedName)
 			}
 		}
@@ -124,7 +133,7 @@ func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *ne
 
 	// delete services of NerveXJob
 	for _, svc := range services {
-		if err := r.Delete(ctx, svc, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := r.deleteService(ctx, job, svc); err != nil {
 			return err
 		}
 	}
@@ -159,9 +168,9 @@ func (r *NerveXJobReconciler) deletePodsAndServices(ctx context.Context, job *ne
 			continue
 		}
 
-		msg := fmt.Sprintf("Delete pod %s of job %s/%s, since the CleanPodPolicy is %s", pod.Name, job.Namespace, job.Name, job.Spec.CleanPodPolicy)
+		msg := fmt.Sprintf("Delete pod %s of job %s/%s", pod.Name, job.Namespace, job.Name)
 		log.Info(msg)
-		if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := r.deletePod(ctx, job, pod); err != nil {
 			return err
 		}
 	}

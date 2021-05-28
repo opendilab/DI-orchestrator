@@ -16,7 +16,7 @@ This project is based on [kubebuilder v3](https://github.com/kubernetes-sigs/kub
 ```bash
 kubebuilder init --domain sensetime.com --license apache2 --owner "The SensePhoenix authors"
 
-kubebuilder create api --group nervex --version v1alpha1 --kind NervexJob
+kubebuilder create api --group nervex --version v1alpha1 --kind NerveXJob
 
 kubebuilder create api --group nervex --version v1alpha1 --kind AggregatorConfig
 ```
@@ -44,6 +44,7 @@ Run the following command in the project root directory.
 ```bash
 # build images. If you are not working in Linux, here you should use `make docker-build`
 make dev-images
+make docker-push
 # deploy nervex-operator and server to cluster
 make dev-deploy
 ```

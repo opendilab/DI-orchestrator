@@ -89,9 +89,10 @@ func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 		Controller: func(c bool) *bool { return &c }(true),
 	}
 
+	volumes := job.Spec.Volumes
 	// create collectors
 	collectorTemplate := job.Spec.Collector.Template
-	collectors, err := s.createReplicas(&collectorTemplate, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.CollectorName)
+	collectors, err := s.createReplicas(&collectorTemplate, volumes, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.CollectorName)
 
 	if err != nil {
 		return collectors, nil, err
@@ -99,7 +100,7 @@ func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 
 	// create learners
 	learnerTemplate := job.Spec.Learner.Template
-	learners, err := s.createReplicas(&learnerTemplate, ownRefer, njreq.Learners, njreq.Namespace, nervexutil.LearnerName)
+	learners, err := s.createReplicas(&learnerTemplate, volumes, ownRefer, njreq.Learners, njreq.Namespace, nervexutil.LearnerName)
 
 	if err != nil {
 		return collectors, learners, err
@@ -110,6 +111,7 @@ func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 
 func (s *NerveXServer) createReplicas(
 	template *corev1.PodTemplateSpec,
+	volumes []corev1.Volume,
 	ownRefer metav1.OwnerReference,
 	resources servertypes.ResourceQuantity,
 	namespace string,
@@ -139,6 +141,9 @@ func (s *NerveXServer) createReplicas(
 		}
 		// set pod resources
 		s.setPodResources(pod, resources, containerName)
+
+		// add volumes
+		pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
 
 		// build service
 		svc := nervexutil.BuildService(pod.GetLabels(), port, portName)

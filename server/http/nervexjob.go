@@ -43,6 +43,14 @@ func (s *NerveXServer) getNerveXJob(namespace, coordinatorName string) (*nervexv
 		return nil, err
 	}
 
+	// check if the coordinator is owned by stale NerveXJob
+	for _, ref := range ownRefers {
+		if ref.Kind == nervexv1alpha1.KindNerveXJob && ref.UID != nvxJob.UID {
+			errMsg := fmt.Sprintf("coordinator %s is owned by stale NerveXJob", coordinatorName)
+			return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		}
+	}
+
 	return nvxJob, nil
 }
 

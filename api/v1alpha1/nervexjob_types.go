@@ -38,6 +38,9 @@ type NerveXJobSpec struct {
 	// CleanPodPolicy defines the policy to clean pods after NerveXJob completed
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
 
+	// Volumes defines the shared volumes for nerveX components
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
+
 	Coordinator CoordinatorSpec `json:"coordinator"`
 
 	Collector CollectorSpec `json:"collector,"`

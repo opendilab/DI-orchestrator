@@ -42,7 +42,7 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 		// build aggregator pod
 		template := agconfig.Spec.Aggregator.Template.DeepCopy()
 		agpod, agsvc, agurl, err := buildPodAndServiceForReplica(template, job, nervexutil.AggregatorName,
-			nervexutil.DefaultAggregatorContainerName, nervexutil.DefaultAggregatorPortName, nervexutil.DefaultAggregatorPort)
+			nervexutil.DefaultAggregatorContainerName, nervexutil.DefaultAggregatorPortName, nervexutil.DefaultAggregatorPort, nil)
 		if err != nil {
 			msg := fmt.Sprintf("build aggregator pod for job %s failed", job.Name)
 			log.Error(err, msg)
@@ -50,9 +50,10 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 		}
 
 		// build coordinator pod
+		volumes := job.Spec.Volumes
 		template = job.Spec.Coordinator.Template.DeepCopy()
 		coorpod, coorsvc, coorurl, err := buildPodAndServiceForReplica(template, job, nervexutil.CoordinatorName,
-			nervexutil.DefaultCoordinatorContainerName, nervexutil.DefaultCoordinatorPortName, nervexutil.DefaultCoordinatorPort)
+			nervexutil.DefaultCoordinatorContainerName, nervexutil.DefaultCoordinatorPortName, nervexutil.DefaultCoordinatorPort, volumes)
 		if err != nil {
 			msg := fmt.Sprintf("build coordinator pod for job %s failed", job.Name)
 			log.Error(err, msg)
@@ -172,7 +173,7 @@ func (r *NerveXJobReconciler) deleteService(ctx context.Context, job *nervexv1al
 }
 
 func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *nervexv1alpha1.NerveXJob,
-	replicaType, containerName, portName string, defaultPort int32) (*corev1.Pod, *corev1.Service, string, error) {
+	replicaType, containerName, portName string, defaultPort int32, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, string, error) {
 	if string(job.Spec.PriorityClassName) != "" {
 		template.Spec.PriorityClassName = string(job.Spec.PriorityClassName)
 	}
@@ -203,6 +204,9 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *nervexv
 	envs[nervexutil.PodNamespaceEnv] = pod.Namespace
 	envs[nervexutil.PodNameEnv] = pod.Name
 	nervexutil.SetPodEnv(pod, envs)
+
+	// add volumes
+	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
 
 	// build service
 	svc := nervexutil.BuildService(pod.GetLabels(), port, portName)

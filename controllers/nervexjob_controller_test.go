@@ -211,7 +211,7 @@ var _ = Describe("NerveXJob Controller", func() {
 			}
 			for i := range testCases {
 				c := testCases[i]
-				By("Create a NerveXJob")
+				By(fmt.Sprintf("Create %dth NerveXJob", i+1))
 				var err error
 				ctx := context.Background()
 				jobTmpl := testutil.NewNerveXJob()
@@ -225,7 +225,8 @@ var _ = Describe("NerveXJob Controller", func() {
 					UID:        nervexjob.GetUID(),
 					Controller: func(c bool) *bool { return &c }(true),
 				}
-				By(fmt.Sprintf("ownRefer: %s %s", ownRefer.APIVersion, ownRefer.Kind))
+
+				By(fmt.Sprintf("Create replicas for NerveXJob %s", nervexjob.Name))
 				colStatus := make([]int, 3)
 				for _, col := range c.collectors {
 					createAndUpdatePodPhase(ctx, k8sClient, col.name, nervexjob.Name, col.status, nervexutil.CollectorName, ownRefer, colStatus)
@@ -236,6 +237,7 @@ var _ = Describe("NerveXJob Controller", func() {
 					createAndUpdatePodPhase(ctx, k8sClient, lr.name, nervexjob.Name, lr.status, nervexutil.LearnerName, ownRefer, lrStatus)
 				}
 
+				By("Checking the ReplicaStatus is as expected")
 				for _, rtype := range []nervexv1alpha1.ReplicaType{
 					nervexv1alpha1.ReplicaTypeCollector,
 					nervexv1alpha1.ReplicaTypeLearner,
@@ -246,6 +248,68 @@ var _ = Describe("NerveXJob Controller", func() {
 						status = colStatus
 					case nervexv1alpha1.ReplicaTypeLearner:
 						status = lrStatus
+					}
+					Eventually(func() []int {
+						err = k8sClient.Get(ctx, jobKey, &nervexjob)
+						if err != nil {
+							return nil
+						}
+						result := make([]int, 3)
+						result[0] = int(nervexjob.Status.ReplicaStatus[rtype].Active)
+						result[1] = int(nervexjob.Status.ReplicaStatus[rtype].Failed)
+						result[2] = int(nervexjob.Status.ReplicaStatus[rtype].Succeeded)
+						return result
+					}, timeout, interval).Should(Equal(status))
+				}
+
+				By("Update coordinator and aggregator to Succeeded")
+				for _, replicaName := range []string{
+					nervexutil.ReplicaPodName(nervexjob.Name, "coordinator"),
+					nervexutil.ReplicaPodName(nervexjob.Name, "aggregator"),
+				} {
+					podKey := types.NamespacedName{Namespace: nervexjob.Namespace, Name: replicaName}
+					err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
+					Expect(err).NotTo(HaveOccurred())
+				}
+
+				By("Checking the job is successfully succeeded")
+				Eventually(func() nervexv1alpha1.Phase {
+					err := k8sClient.Get(ctx, jobKey, &nervexjob)
+					if err != nil {
+						return nervexv1alpha1.JobUnknown
+					}
+					return nervexjob.Status.Phase
+				}, timeout, interval).Should(Equal(nervexv1alpha1.JobSucceeded))
+
+				By("Checking the coordinator is succeeded")
+				Eventually(func() int {
+					err := k8sClient.Get(ctx, jobKey, &nervexjob)
+					if err != nil {
+						return -1
+					}
+					return int(nervexjob.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Succeeded)
+				}, timeout, interval).Should(Equal(1))
+
+				colStatus1 := make([]int, 3)
+				lrStatus1 := make([]int, 3)
+				colStatus1[0] = 0
+				colStatus1[1] = colStatus[1]
+				colStatus1[2] = colStatus[0] + colStatus[2]
+				lrStatus1[0] = 0
+				lrStatus1[1] = lrStatus[1]
+				lrStatus1[2] = lrStatus[0] + lrStatus[2]
+
+				By("Checking the ReplicaStatus is as expected")
+				for _, rtype := range []nervexv1alpha1.ReplicaType{
+					nervexv1alpha1.ReplicaTypeCollector,
+					nervexv1alpha1.ReplicaTypeLearner,
+				} {
+					var status []int
+					switch rtype {
+					case nervexv1alpha1.ReplicaTypeCollector:
+						status = colStatus1
+					case nervexv1alpha1.ReplicaTypeLearner:
+						status = lrStatus1
 					}
 					Eventually(func() []int {
 						err = k8sClient.Get(ctx, jobKey, &nervexjob)

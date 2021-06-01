@@ -76,6 +76,15 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	jobStatus := job.Status.DeepCopy()
 
+	// update status
+	defer func() {
+		if !apiequality.Semantic.DeepEqual(*jobStatus, job.Status) {
+			if err := r.updateNerveXJobStatusInCluster(ctx, job); err != nil {
+				log.Error(err, "failed to update NerveXJobStatus", "job", req.NamespacedName)
+			}
+		}
+	}()
+
 	// list pods of NerveXJob
 	pods, err := nervexutil.ListPods(ctx, r.Client, job)
 	if err != nil {
@@ -114,14 +123,6 @@ func (r *NerveXJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, nil
 	}
 
-	// update status
-	defer func() {
-		if !apiequality.Semantic.DeepEqual(*jobStatus, job.Status) {
-			if err := r.updateNerveXJobStatusInCluster(ctx, job); err != nil {
-				log.Error(err, "failed to update NerveXJobStatus", "job", req.NamespacedName)
-			}
-		}
-	}()
 	return ctrl.Result{}, nil
 }
 

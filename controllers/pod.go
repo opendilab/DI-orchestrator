@@ -87,32 +87,6 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 	return nil
 }
 
-func (r *NerveXJobReconciler) checkPodsStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob,
-	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) error {
-	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
-
-	// update replica status
-	updateReplicasStatues(job, collectors, learners, coordinator, aggregator)
-
-	if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Active > 0 && job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeAggregator].Active > 0 {
-		job.Status.Phase = nervexv1alpha1.JobRunning
-		msg := fmt.Sprintf("coordinator and aggregator of NerveXJob %s are running", job.Name)
-		updateNerveXJobConditions(job, nervexv1alpha1.JobRunning, NerveXJobRunningReason, msg)
-	} else if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Failed > 0 {
-		job.Status.Phase = nervexv1alpha1.JobFailed
-		msg := fmt.Sprintf("NerveXJob %s failed because coordinator failed", job.Name)
-		log.Info(msg)
-		updateNerveXJobConditions(job, nervexv1alpha1.JobFailed, NerveXJobFailedReason, msg)
-
-	} else if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Succeeded > 0 {
-		job.Status.Phase = nervexv1alpha1.JobSucceeded
-		msg := fmt.Sprintf("NerveXJob %s succeeded because coordinator succeeded", job.Name)
-		log.Info(msg)
-		updateNerveXJobConditions(job, nervexv1alpha1.JobSucceeded, NerveXJobSucceededReason, msg)
-	}
-	return nil
-}
-
 func (r *NerveXJobReconciler) createPodAndService(ctx context.Context, job *nervexv1alpha1.NerveXJob, pod *corev1.Pod, svc *corev1.Service) error {
 	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
 

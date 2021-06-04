@@ -127,9 +127,32 @@ func updateReplicaStatus(pod *corev1.Pod, job *nervexv1alpha1.NerveXJob, replica
 	if nervexutil.IsTerminating(pod) {
 		return
 	}
+	containerName := ""
+	switch replicaType {
+	case nervexv1alpha1.ReplicaTypeCoordinator:
+		containerName = nervexutil.CoordinatorName
+	case nervexv1alpha1.ReplicaTypeAggregator:
+		containerName = nervexutil.AggregatorName
+	case nervexv1alpha1.ReplicaTypeCollector:
+		containerName = nervexutil.CollectorName
+	case nervexv1alpha1.ReplicaTypeLearner:
+		containerName = nervexutil.LearnerName
+	}
 	switch pod.Status.Phase {
 	case corev1.PodRunning:
-		job.Status.ReplicaStatus[replicaType].Active++
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name == containerName && status.State.Terminated != nil {
+				switch status.State.Terminated.Reason {
+				case "Error":
+					job.Status.ReplicaStatus[replicaType].Failed++
+				case "Completed":
+					job.Status.ReplicaStatus[replicaType].Succeeded++
+				case "Running":
+					job.Status.ReplicaStatus[replicaType].Active++
+				}
+				break
+			}
+		}
 	case corev1.PodFailed:
 		job.Status.ReplicaStatus[replicaType].Failed++
 	case corev1.PodSucceeded:

@@ -37,59 +37,59 @@ var _ = Describe("DIJob Controller", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			var createdNvxjob div1alpha1.DIJob
+			var createdDIjob div1alpha1.DIJob
 			By("Checking the created DIJob has enough coordinator")
 			for _, rtype := range []div1alpha1.ReplicaType{div1alpha1.ReplicaTypeCoordinator} {
 				Eventually(func() int {
-					err := k8sClient.Get(ctx, jobKey, &createdNvxjob)
+					err := k8sClient.Get(ctx, jobKey, &createdDIjob)
 					if err != nil {
 						return -1
 					}
-					if createdNvxjob.Status.ReplicaStatus == nil {
+					if createdDIjob.Status.ReplicaStatus == nil {
 						return -1
 					}
-					return int(createdNvxjob.Status.ReplicaStatus[rtype].Active)
+					return int(createdDIjob.Status.ReplicaStatus[rtype].Active)
 				}, timeout, interval).Should(Equal(1))
 			}
 
 			By("Checking the created DIJob is in Running state")
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, jobKey, &createdNvxjob)
+				err := k8sClient.Get(ctx, jobKey, &createdDIjob)
 				if err != nil {
 					return false
 				}
-				return createdNvxjob.Status.Phase == div1alpha1.JobRunning
+				return createdDIjob.Status.Phase == div1alpha1.JobRunning
 			}, duration, interval).Should(BeTrue())
 
 			By("Update coordinator to Succeeded")
 			for _, replicaName := range []string{
-				diutil.ReplicaPodName(createdNvxjob.Name, "coordinator"),
+				diutil.ReplicaPodName(createdDIjob.Name, "coordinator"),
 			} {
-				podKey := types.NamespacedName{Namespace: createdNvxjob.Namespace, Name: replicaName}
+				podKey := types.NamespacedName{Namespace: createdDIjob.Namespace, Name: replicaName}
 				err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
 				Expect(err).NotTo(HaveOccurred())
 			}
 
 			By("Checking the job is succeeded")
 			Eventually(func() div1alpha1.Phase {
-				err := k8sClient.Get(ctx, jobKey, &createdNvxjob)
+				err := k8sClient.Get(ctx, jobKey, &createdDIjob)
 				if err != nil {
 					return div1alpha1.JobUnknown
 				}
-				return createdNvxjob.Status.Phase
+				return createdDIjob.Status.Phase
 			}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
 
 			By("Checking the coordinator is succeeded")
 			Eventually(func() int {
-				err := k8sClient.Get(ctx, jobKey, &createdNvxjob)
+				err := k8sClient.Get(ctx, jobKey, &createdDIjob)
 				if err != nil {
 					return -1
 				}
-				return int(createdNvxjob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Succeeded)
+				return int(createdDIjob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Succeeded)
 			}, timeout, interval).Should(Equal(1))
 
 			By("Cleaning up")
-			err = testutil.CleanUpJob(ctx, k8sClient, createdNvxjob.DeepCopy(), timeout, interval)
+			err = testutil.CleanUpJob(ctx, k8sClient, createdDIjob.DeepCopy())
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -157,7 +157,7 @@ var _ = Describe("DIJob Controller", func() {
 				}, timeout, interval).Should(Equal(c.expectStatus))
 
 				By("Cleaning up")
-				err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy(), timeout, interval)
+				err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy())
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -315,7 +315,7 @@ var _ = Describe("DIJob Controller", func() {
 					}, timeout, interval).Should(Equal(status))
 				}
 
-				err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy(), timeout, interval)
+				err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy())
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -332,9 +332,9 @@ func createDIJob(ctx context.Context, k8sClient client.Client, dijob *div1alpha1
 
 	By(fmt.Sprintf("Checking the DIJob %s is successfully created", name))
 	key := types.NamespacedName{Namespace: dijob.Namespace, Name: dijob.Name}
-	createdNvxjob := div1alpha1.DIJob{}
+	createdDIjob := div1alpha1.DIJob{}
 	Eventually(func() bool {
-		err := k8sClient.Get(ctx, key, &createdNvxjob)
+		err := k8sClient.Get(ctx, key, &createdDIjob)
 		if err != nil {
 			return false
 		}
@@ -353,7 +353,7 @@ func createDIJob(ctx context.Context, k8sClient client.Client, dijob *div1alpha1
 		return true
 	}, timeout, interval).Should(BeTrue())
 
-	return createdNvxjob, key
+	return createdDIjob, key
 }
 
 func createAndUpdatePodPhase(

@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
@@ -107,7 +108,7 @@ func NewAggregatorConfig() *div1alpha1.AggregatorConfig {
 	}
 }
 
-func CleanUpJob(ctx context.Context, k8sClient client.Client, job *div1alpha1.DIJob, timeout, interval time.Duration) error {
+func CleanUpJob(ctx context.Context, k8sClient client.Client, job *div1alpha1.DIJob) error {
 	err := k8sClient.Delete(ctx, job, &client.DeleteOptions{})
 	if err != nil {
 		return err
@@ -121,7 +122,7 @@ func CleanUpJob(ctx context.Context, k8sClient client.Client, job *div1alpha1.DI
 	}
 
 	for _, pod := range pods {
-		err = k8sClient.Delete(ctx, pod, &client.DeleteOptions{})
+		err = k8sClient.Delete(ctx, pod, &client.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)})
 		if err != nil {
 			return err
 		}
@@ -138,5 +139,31 @@ func CleanUpJob(ctx context.Context, k8sClient client.Client, job *div1alpha1.DI
 			return err
 		}
 	}
+	return nil
+}
+
+func WaitForAllReplicas(ctx context.Context, k8sClient client.Client, job *div1alpha1.DIJob, phase corev1.PodPhase) error {
+	if err := wait.Poll(100*time.Millisecond, 5*time.Minute, func() (bool, error) {
+		pods, err := diutil.ListPods(ctx, k8sClient, job)
+		if err != nil {
+			return false, err
+		}
+
+		// if there are only coordinator and aggregator, skip
+		if len(pods) <= 2 {
+			return false, nil
+		}
+
+		for _, pod := range pods {
+			if pod.Status.Phase != phase {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	}); err != nil {
+		return err
+	}
+
 	return nil
 }

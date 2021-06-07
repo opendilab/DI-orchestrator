@@ -171,7 +171,7 @@ var _ = Describe("DIJob Specification", func() {
 					}
 
 					By("Clean up pods")
-					err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy(), timeout, interval)
+					err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy())
 					Expect(err).NotTo(HaveOccurred())
 				}
 			}

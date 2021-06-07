@@ -122,7 +122,7 @@ var _ = Describe("Server Test", func() {
 			Expect(len(dnjresp.Collectors)).Should(Equal(dcn))
 			Expect(len(dnjresp.Learners)).Should(Equal(dln))
 
-			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy(), timeout, interval)
+			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy())
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -301,7 +301,7 @@ var _ = Describe("Server Test", func() {
 			Expect(len(dnjresp.Collectors)).Should(Equal(dcn))
 			Expect(len(dnjresp.Learners)).Should(Equal(dln))
 
-			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy(), timeout, interval)
+			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy())
 			Expect(err).NotTo(HaveOccurred())
 		})
 

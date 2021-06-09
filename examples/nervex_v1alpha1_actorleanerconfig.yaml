@@ -7,48 +7,35 @@ spec:
   aggregator:
     template:
       spec:
+        # nodeSelector:
+        #   kubernetes.io/hostname: "liqingping-gpu.novalocal"
         containers:
         - name: aggregator
-          image: registry.sensetime.com/cloudnative4ai/nervex-parallel-linklink-migration:v0.10
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.4-torch1.4-cuda10.1-cudnn7-devel-987bacf7
           imagePullPolicy: Always
-          resources:
-            requests:
-              cpu: 2
-              memory: 5Gi
-            limits:
-              cpu: 2
-              memory: 5Gi
           env:
           - name: LC_ALL
             value: "en_US.utf-8"
           - name: LANG
             value: "en_US.utf-8"
-          - name: NCCL_SHM_DISABLE
+          - name: PYTHONUNBUFFERED
             value: "1"
+          resources:
+            requests:
+              cpu: 3
+              memory: "10Gi"
+            limits:
+              cpu: 3
+              memory: "10Gi"
           command: ["/bin/bash", "-c",]
           args:
-          - >
-            until curl $HOSTNAME:22279 &>/dev/null ; do sleep 1 ; done ; echo succeed;
-            until curl $HOSTNAME:22279 &>/dev/null ; do sleep 1 ; done ; echo succeed;
-            cd /data/nervex/test_atari/test3;
-            python3 -u -c 'import os; import nervex.entry.parallel_entry as pe; pe.launch_learner_aggregator(filename="atari_impala_default_config.py.pkl", name="aggregator{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
+          - |
+            # if code has been changed in the mount path, we have to reinstall nervex cli
+            # pip install --no-cache-dir -e .;
+            # pip install --no-cache-dir -e .[common_env]
+            
+            nervex -m dist --module config -p k8s -c app_zoo/atari/config/parallel/qbert_dqn_config_k8s.py -s 0;
+            nervex -m dist --module learner_aggregator -c app_zoo/atari/config/parallel/qbert_dqn_config_k8s.py.pkl -s 0
           ports:
           - name: aggregator
-            containerPort: 22272
-          volumeMounts:
-          - name: config
-            mountPath: /data/nervex
-        volumes:
-        - name: config
-          nfs:
-            path: /data/nfs/nervex
-            server: 10.152.197.14
-status:
-  actors:
-    total: 4
-    active: 3
-    idle: 1
-  learners:
-    total: 5
-    active: 5
-    idle: 0
+            containerPort: 22270

@@ -1,6 +1,7 @@
 # nervex-operator架构
 这里将介绍nerveX on k8s的架构，说明nerveX各个模块在k8s系统上如何被创建、如何相互发现、如何开始训练等。有关nerveX的介绍可参考[nerveX key concepts](https://gitlab.bj.sensetime.com/open-XLab/cell/nerveX/tree/doc/one-week/nervex/docs/source/key_concept)。nervex-operator的架构如下图所示：
-![](images/nervex-arch10.png)
+
+![](images/nervex-arch.png)
 
 整体分为两大模块：`nervex-server`和`nervex-operator`。接下来将首先介绍一个nerveX任务提交到k8s之后nervex-operator如何将nerveX的各个模块（在k8s中就是一个[pod](https://kubernetes.io/docs/concepts/workloads/pods/)）创建并启动，然后将对nervex-server和nervex-operator进行介绍。
 
@@ -122,6 +123,7 @@ nervex-server是一个为nerveX框架定制的http服务器，提供新增、删
 [示意图](https://github.com/kubernetes/sample-controller/blob/master/docs/controller-client-go.md)
 
 ![](images/client-go-controller-interaction.jpeg)
+
 上图中我们只关注上半部分：reflector通过list & watch接受到新的资源实例存在的通知，就将新资源实例放到Delta Fifo queue中，informer从Delta Fifo queue中获取新资源实例并通过Indexer存放到本地cache中。查询操作都可以通过查询本地cache来完成，减少向k8s api server的请求次数。如下命令：
 ```go
 genericInformer.Informer().GetIndexer().GetByKey(key)
@@ -132,7 +134,8 @@ genericInformer.Informer().GetIndexer().GetByKey(key)
 
 ### http接口
 为了支持NerveXJob动态增删collector/learner的需求，nervex-server提供http接口用于对collector/learner进行新增、删除和查询的功能，如下图所示：
-![](images/nervex-api-5.png)
+
+![](images/nervex-api.png)
 
 提供如下接口：
 
@@ -149,4 +152,8 @@ genericInformer.Informer().GetIndexer().GetByKey(key)
 各个接口的请求格式、请求参数、请求body、返回值详见[http接口定义](https://gitlab.bj.sensetime.com/platform/CloudNative4AI/cluster-lifecycle/nervex-operator/issues/6)。
 
 ## nervex-operator优势
-nervex-operator为nerveX框架提供了分布式场景下基于k8s的容器运行方案。
+nervex-operator为nerveX框架提供了分布式场景下基于k8s的容器运行方案。对于用户提交的NerveXJob，nervex-operator负责对nerveX的各个模块进行编排，使得各个模块可以正常运行并执行训练任务。通过调用nervex-server的接口，赋予coordinator新增、删除和查询其所有的collector、learner和aggregator的功能，提升nerveX框架资源动态分配的能力。总结nervex-operator提供了以下优势：
+1. 封装性。依赖nervex-operator的编排能力，部署nerveX分布式RL训练的细节（包括pod创建、服务发现）对用户来说是透明的。根据nerveX框架对分布式RL训练的部署需求，nervex-operator会将coordinator创建出来，然后coordinator再请求nervex-server创建其他模块，nervex-operator会把每个模块的pod的状态记录到NerveXJob的状态中。NerveXJob的生命周期也由nervex-operator维护，向用户展示NerveXJob在不同阶段的状态。
+2. 易用性。用户只需要在NerveXJob的yaml文件中定义好coordinator、collector、learner的配置之后，一键提交到k8s集群即可，nervex-operator将负责完成部署工作，将用户从k8s集群中复杂的分布式RL训练部署中解放出来。
+3. 鲁棒性。依赖k8s的pod重启机制，保证pod在意外退出的情况下能自动重启，coordinator能够迅速响应并重新连接。
+4. 动态扩展。NerveXJob所需的collector/learner/aggregator是动态变化的，因此nervex-server提供了http接口可以动态调整collector/learner的数目，使得NerveXJob可以根据自身需求调整collector和learner的比例，优化吞吐量。

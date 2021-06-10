@@ -114,6 +114,28 @@ coordinator创建之后，nervex-operator将监听pod的状态并修改NerveXJob
 nervex-operator中实现了webhook校验方法，创建MutatingWebhook用于设置NerveXJob的默认值；创建ValidatingWebhook用于校验NerveXJob的正确性。比如对`CleanPodPolicy`字段，我们在MutatingWebhook中设置其默认值为`Running`，表示NerveXJob完成后将Running的pod都删除；我们在ValidatingWebhook中校验`CleanPodPolicy`字段的值，如果用户设置的值不等于`None`、`ALL`、`Running`中的任何一个，则拒绝提交该NerveXJob。
 
 ## nervex-server
+nervex-server是一个为nerveX框架定制的http服务器，提供新增、删除和查询collector、learner、aggregator的功能。通过调用nervex-server的相关接口，nervex-server为NerveXJob提供了动态增删collector和learner的能力。下面将对nervex-server的设计进行简要介绍，包括存储AggregatorConfig、NerveXJob以及NerveXJob所有pod的本地cache；用于动态新增、删除和查询collector、learner和aggregator的http接口设计。
 
+### 本地cache
+为了减少nervex-server与k8s api server之间查询的频率，从而减轻k8s api server的负担，我们利用[client-go](https://github.com/kubernetes/client-go)提供的informer机制将AggregatorConfig、NerveXJob和NerveXJob的所有pod存储在本地cache，如下图所示
+
+[示意图](https://github.com/kubernetes/sample-controller/blob/master/docs/controller-client-go.md)
+![](images/client-go-controller-interaction.jpeg)
+上图中我们只关注上半部分：reflector通过list & watch接受到新的资源实例存在的通知，就将新资源实例放到Delta Fifo queue中，informer从Delta Fifo queue中获取新资源实例并通过Indexer存放到本地cache中。查询操作都可以通过查询本地cache来完成，减少向k8s api server的请求次数。如下命令：
+```go
+genericInformer.Informer().GetIndexer().GetByKey(key)
+```
+
+当资源对象有变更时，reflector同样会接受到通知并更新本地cache；另外，informer也会定期向api server同步本地cache，与k8s集群中的资源对象保持一致。
+
+
+### http接口
+为了
+
+#### 请求格式
+
+#### 请求接口
+
+#### 响应接口
 
 ## nervex-k8s优势

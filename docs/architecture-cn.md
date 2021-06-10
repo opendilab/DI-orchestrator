@@ -1,8 +1,8 @@
-# nerveX-k8s架构
-这里将介绍nerveX on k8s的架构，说明nerveX各个模块在k8s系统上如何被创建、如何相互发现、如何开始训练等。有关nerveX的介绍可参考[nerveX key concepts](https://gitlab.bj.sensetime.com/open-XLab/cell/nerveX/tree/doc/one-week/nervex/docs/source/key_concept)。nerveX-k8s的架构如下图所示：
+# nervex-operator架构
+这里将介绍nerveX on k8s的架构，说明nerveX各个模块在k8s系统上如何被创建、如何相互发现、如何开始训练等。有关nerveX的介绍可参考[nerveX key concepts](https://gitlab.bj.sensetime.com/open-XLab/cell/nerveX/tree/doc/one-week/nervex/docs/source/key_concept)。nervex-operator的架构如下图所示：
 ![](images/nervex-arch10.png)
 
-整体分为两大模块：`nervex-server`和`nervex-operator`。接下来将首先介绍一个nerveX任务提交到k8s之后nervex-k8s如何将nerveX的各个模块（在k8s中就是一个[pod](https://kubernetes.io/docs/concepts/workloads/pods/)）创建并启动，然后将对nervex-server和nervex-operator进行介绍。
+整体分为两大模块：`nervex-server`和`nervex-operator`。接下来将首先介绍一个nerveX任务提交到k8s之后nervex-operator如何将nerveX的各个模块（在k8s中就是一个[pod](https://kubernetes.io/docs/concepts/workloads/pods/)）创建并启动，然后将对nervex-server和nervex-operator进行介绍。
 
 ## 任务创建流程
 这里介绍任务创建流程，说明一个nerveX任务在k8s中从创建到执行完成的一整个生命周期
@@ -120,6 +120,7 @@ nervex-server是一个为nerveX框架定制的http服务器，提供新增、删
 为了减少nervex-server与k8s api server之间查询的频率，从而减轻k8s api server的负担，我们利用[client-go](https://github.com/kubernetes/client-go)提供的informer机制将AggregatorConfig、NerveXJob和NerveXJob的所有pod存储在本地cache，如下图所示
 
 [示意图](https://github.com/kubernetes/sample-controller/blob/master/docs/controller-client-go.md)
+
 ![](images/client-go-controller-interaction.jpeg)
 上图中我们只关注上半部分：reflector通过list & watch接受到新的资源实例存在的通知，就将新资源实例放到Delta Fifo queue中，informer从Delta Fifo queue中获取新资源实例并通过Indexer存放到本地cache中。查询操作都可以通过查询本地cache来完成，减少向k8s api server的请求次数。如下命令：
 ```go
@@ -130,12 +131,22 @@ genericInformer.Informer().GetIndexer().GetByKey(key)
 
 
 ### http接口
-为了
+为了支持NerveXJob动态增删collector/learner的需求，nervex-server提供http接口用于对collector/learner进行新增、删除和查询的功能，如下图所示：
+![](images/nervex-api-5.png)
 
-#### 请求格式
+提供如下接口：
 
-#### 请求接口
+| method  |  path |  description |
+|---|---|---|
+| GET  | /v1alpha1/replicas  |  list all collectors and learners |
+| GET  | /v1alpha1/replicas?namespace=xxx  | list all collectors and learners in namespace  |
+| GET  | /v1alpha1/replicas?namespace=xxx&coordinator=xxx  | list all replicas belongs to coordinator  |
+| GET  | /v1alpha1/replicas?namespace=xxx&aggregator=xxx  | get learners belongs to aggregator  |
+| DELETE  | /v1alpha1/replicas  | delete some replicas. put data in request body  |
+| POST  | /v1alpha1/replicas  | create replicas. put data in request body  |
+| POST  | /v1alpha1/replicas/failed  | post failed replicas and request for recreation. put data in request body  |
 
-#### 响应接口
+各个接口的请求格式、请求参数、请求body、返回值详见[http接口定义](https://gitlab.bj.sensetime.com/platform/CloudNative4AI/cluster-lifecycle/nervex-operator/issues/6)。
 
-## nervex-k8s优势
+## nervex-operator优势
+nervex-operator为nerveX框架提供了分布式场景下基于k8s的容器运行方案。

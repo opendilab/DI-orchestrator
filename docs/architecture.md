@@ -10,7 +10,8 @@ In order to provide running support for nerveX in Kubernetes (K8s), we designed 
 
 ![](images/nervex-arch.png)
 
-There are two main modules that is `nervex-server` and `nervex-operator`. In the following pages, we will first introduce how `NerveX Orchestrator` creates and starts each module of nerveX after a nerveX job is submitted to K8s, and then introduces the architecture of nervex-server and `nervex-operator`.
+There are two main modules that is `nervex-server` and `nervex-operator`. 
+`DDPL` represents ddp learner, `Lm` represents logic learner, `Cn` represents collector, and `Aggregator+DDPL` constructs a logic learner. In the following pages, we will first introduce how `NerveX Orchestrator` creates and starts each module of nerveX after a nerveX job is submitted to K8s, and then introduces the architecture of nervex-server and `nervex-operator`.
 
 ## Job creation process
 Here is a description of the job creation process, illustrating the entire life cycle of a nerveX job from creation to execution in K8s.

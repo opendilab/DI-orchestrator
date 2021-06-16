@@ -10,7 +10,7 @@ nerveX框架分为3个重要的模块，分别是coordinator、collector和learn
 
 ![](images/nervex-arch.png)
 
-整体分为两大模块：`nervex-server`和`nervex-operator`。接下来将首先介绍一个nerveX任务提交到K8s之后NerveX Orchestrator如何将nerveX的各个模块（在K8s中就是一个[pod](https://kubernetes.io/docs/concepts/workloads/pods/)）创建并启动，然后将对nervex-server和nervex-operator进行介绍。
+整体分为两大模块：`nervex-server`和`nervex-operator`，`DDPL`指ddp learner，`Lm`指Learner，`Cn`指Collector，`Aggregator+DDPL`构成一个logic learner。接下来将首先介绍一个nerveX任务提交到K8s之后NerveX Orchestrator如何将nerveX的各个模块（在K8s中就是一个[pod](https://kubernetes.io/docs/concepts/workloads/pods/)）创建并启动，然后将对nervex-server和nervex-operator进行介绍。
 
 ## 任务创建流程
 这里介绍任务创建流程，说明一个nerveX任务在K8s中从创建到执行完成的一整个生命周期

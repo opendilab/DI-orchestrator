@@ -1,9 +1,16 @@
 # NerveX Operator architecture
-Here we will introduce the architecture of `nervex-operator`, explaining how nerveX's modules are created on Kubernetes (K8s), how to implement service discovery, how to start training, etc. For the introduction of nerveX, please refer to [nerveX key concepts](https://gitlab.bj.sensetime.com/open-XLab/cell/nerveX/tree/doc/one-week/nervex/docs/source/key_concept). The architecture of `nervex-operator` is shown in the figure below:
+NerveX framework consists of 3 important modules, namely coordinator, collector and learner. In general, a nerveX training job has only one coordinator, and the number of learners and collectors can vary. The roles of the three modules are:
+- Coordinator. Maintain connections with collectors and learners, accept meta-infos requests and posts from collectors and learners, and send tasks to collectors and learners.
+- Collector. Request path to RL model stored in storage middleware from coordinator, load the RL model, and then generate data frames according to the RL model's steps from environment. Store the data frames back to the storage middleware, and report meta-infos (the storage path, size, etc.) of the data frames to coordinator.
+- Learner: Request data frames storage path from coordinator and load the data frames from storage middleware to start training the RL model. After the training is completed, store the model into the storage middleware, and report model meta-infos (storage path, size, etc.) to coordinator. Because we often need to use distributed mechanism of data parallel training, to avoid confusion, we call the module interacting with coordinator the logic learner, which is the basic unit for coordinator to issue tasks. And the single learner process in the data parallel training is called ddp learner, and multiple ddp learner processes provide data parallel services. One logic learner can correspond to one ddp learner (single-gpu) or multiple ddp learners (multi-gpu). In addition, to provide data parallel training services, an additional aggregator module needs to be introduced. The aggregator is responsible for summarizing the training results of multiple ddp learners and sending them to coordinator. That is, the aggregator and multiple ddp learners form a logic learner, and coordinator will only interact with logic learners.
+
+For the introduction of nerveX, please refer to [nerveX developer tutorial](http://open-xlab.pages.gitlab.bj.sensetime.com/cell/nerveX/tutorial_dev/index.html).
+
+In order to provide running support for nerveX in Kubernetes (K8s), we designed `NerveX Orchestrator`. This article will explain how to use NerveX Orchestrator, how each module of nerveX is created on K8s and discovers each other, how to start training, etc. The architecture of NerveX Orchestrator is shown in the figure below:
 
 ![](images/nervex-arch.png)
 
-There are two main modules that is `nervex-server` and `nervex-operator`. In the following pages, we will first introduce how `nervex-operator` creates and starts each module of nerveX after a nerveX job is submitted to K8s, and then introduces the architecture of nervex-server and `nervex-operator`.
+There are two main modules that is `nervex-server` and `nervex-operator`. In the following pages, we will first introduce how `NerveX Orchestrator` creates and starts each module of nerveX after a nerveX job is submitted to K8s, and then introduces the architecture of nervex-server and `nervex-operator`.
 
 ## Job creation process
 Here is a description of the job creation process, illustrating the entire life cycle of a nerveX job from creation to execution in K8s.
@@ -20,7 +27,7 @@ Here is a description of the job creation process, illustrating the entire life 
 Nervex-operator is a component responsible for orchestrating NerveXJob in K8s. It uses K8s [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) to monitor the status of NerveXJob objects in K8s cluster through the control loop in [controller pattern](https://kubernetes.io/docs/concepts/architecture/controller/), and to update the status of NerveXJob when necessary. The status is modified so that the actual status of NerveXJob is as consistent as possible with our predefined status.
 
 ### API definition
-The nerveX framework consists of 3 important modules, namely coordinator, collector and learner (aggregator is treated as a logic learner). According to the characteristics of each module, we have defined two Custom Resources, namely NerveXJob and AggregatorConfig. The former is used to define the prerequisites for coordinator, collector and learner to start running, including docker images, startup commands, computing and storage resources, environment variables, etc. The latter is used to define the prerequisites for aggregator.
+According to the characteristics of each module, we have defined two Custom Resources, namely NerveXJob and AggregatorConfig. The former is used to define the prerequisites for coordinator, collector and learner to start running, including docker images, startup commands, computing and storage resources, environment variables, etc. The latter is used to define the prerequisites for aggregator.
 
 NerveXJob definition is described as below:
 ```go
@@ -53,7 +60,7 @@ type AggregatorConfigSpec struct {
 ```
 
 > **Why should aggregator be defined alone?**
-    Aggregator is common module for all RL training jobs using nerveX framework, so we define the aggregator as a global and shared resource named AggregatorConfig. After RL jobs are submitted, nervex-operator will read the global AggregatorConfig in K8s cluster to create aggregators for these RL jobs. In addition, aggregator is only for most common data parallel training. You need to define a new Custom Resource if other parallel training methods are used.
+    Aggregator is common module for all RL training jobs using nerveX framework, so we define the aggregator as a global and shared resource named AggregatorConfig. After RL jobs are submitted, nervex-server will read the global AggregatorConfig in K8s cluster to create aggregators for these RL jobs. In addition, aggregator is only for most common data parallel training. You need to define a new Custom Resource if other parallel training methods are used.
 ### Status definition
 After NerveXJob is submitted, nervex-operator takes over the management of the life cycle of the NerveXJob. In order to facilitate the user to have a better view of the NerveXJob's status, we define the following phases:
 
@@ -153,8 +160,8 @@ In order to support dynamic scaling of collectors/learners for NerveXJobs, nerve
 
 For the request format, request parameters, request body, and return value of each interface, please refer to [http interface definition](https://gitlab.bj.sensetime.com/platform/CloudNative4AI/cluster-lifecycle/nervex-operator/issues/6)。
 
-## Advantages of NerveX Operator
-Nervex-operator provides a K8s-based container-orchestration solution for the nerveX framework in a distributed scenario. For a NerveXJob, nervex-operator is responsible for arranging the various modules of nerveX so that each module can run normally and perform training tasks. By calling nervex-server’s HTTP interface, coordinator is given the ability to add, delete, and query all its collectors, learners, aggregators and improve the dynamic allocation of nerveX framework resources. In summary, nervex-operator provides the following advantages:
+## Advantages of NerveX Orchestrator
+NerveX Orchestrator provides a K8s-based container-orchestration solution for the nerveX framework in a distributed scenario. For a NerveXJob, nervex-operator is responsible for arranging the various modules of nerveX so that each module can run normally and perform training tasks. By calling nervex-server’s HTTP interface, coordinator is given the ability to add, delete, and query all its collectors, learners, aggregators and improve the dynamic allocation of nerveX framework resources. In summary, NerveX Orchestrator provides the following advantages:
 1. Encapsulation. Relying on the orchestration capabilities of nervex-operator, deploying nerveX distributed RL training (including pod creation and service discovery) are transparent to us. According to the deployment requirements of the nerveX framework for distributed RL training, nervex-operator will create coordinator, and then the coordinator will request nervex-server to create other modules. Nervex-operator will record the status of the pod of each module into the status of the NerveXJob. The life cycle of NerveXJob is also maintained by nervex-operator, providing us with status of NerveXJob in different stages.
 2. Ease of use. We only need to define the configuration of coordinator, collector, and learner in the yaml file of NerveXJob, and submit them to K8s cluster with one click. Nervex-operator will be responsible for deploying nerveX RL trainings and liberating us from the complex distributed RL deployments in K8s cluster.
 3. Robustness. Relying on the pod restart mechanism of K8s, it ensures that pods can automatically restart in the event of an unexpected exit, and the coordinator can respond quickly and reconnect.

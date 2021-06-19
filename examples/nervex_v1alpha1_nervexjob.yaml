@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: coordinator
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.1-torch1.4-cuda10.1-cudnn7-devel-9472640d 
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.4-torch1.4-cuda10.1-cudnn7-devel-987bacf7
           imagePullPolicy: Always
           env:
           - name: LC_ALL
@@ -162,7 +162,7 @@ spec:
       spec:
         containers:
         - name: collector
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.1-torch1.4-cuda10.1-cudnn7-devel-9472640d 
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.4-torch1.4-cuda10.1-cudnn7-devel-987bacf7
           imagePullPolicy: Always
           env:
           - name: LC_ALL
@@ -304,7 +304,7 @@ spec:
       spec:
         containers:
         - name: learner
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.1-torch1.4-cuda10.1-cudnn7-devel-9472640d 
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.4-torch1.4-cuda10.1-cudnn7-devel-987bacf7
           imagePullPolicy: Always
           env:
           - name: LC_ALL

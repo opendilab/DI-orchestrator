@@ -30,6 +30,15 @@ type ResourceQuantity struct {
 	Memory   resource.Quantity `json:"memory"`
 }
 
+func (in *ResourceQuantity) DeepCopy() *ResourceQuantity {
+	out := &ResourceQuantity{}
+	out.Replicas = in.Replicas
+	out.CPU = in.CPU.DeepCopy()
+	out.GPU = in.GPU.DeepCopy()
+	out.Memory = in.Memory.DeepCopy()
+	return out
+}
+
 type Response struct {
 	Success bool        `json:"success"`
 	Code    int         `json:"code"`

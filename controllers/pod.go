@@ -16,42 +16,21 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
 
 	// classify pods
-	collectors, learners, coordinator, ag, err := nervexutil.ClassifyPods(pods)
+	collectors, learners, coordinator, ags, err := nervexutil.ClassifyPods(pods)
 	if err != nil {
 		log.Error(err, "unable to classify pods")
 		return err
 	}
 
 	// update NerveXJob status if coordinator and aggregator are created
-	if coordinator != nil && ag != nil {
-		if err := r.updateNerveXJobStatus(ctx, job, collectors, learners, coordinator, ag); err != nil {
+	if coordinator != nil {
+		if err := r.updateNerveXJobStatus(ctx, job, collectors, learners, coordinator, ags); err != nil {
 			return err
 		}
 	} else {
-		// get agconfig to fetch aggregator definition
-		agconfig := nervexv1alpha1.AggregatorConfig{}
-		nsn, err := nervexutil.SplitNamespaceName(r.AGConfig)
-		if err != nil {
-			return err
-		}
-		err = r.Get(ctx, nsn, &agconfig)
-		if err != nil {
-			return err
-		}
-
-		// build aggregator pod
-		template := agconfig.Spec.Aggregator.Template.DeepCopy()
-		agpod, agsvc, agurl, err := buildPodAndServiceForReplica(template, job, nervexutil.AggregatorName,
-			nervexutil.DefaultAggregatorContainerName, nervexutil.DefaultAggregatorPortName, nervexutil.DefaultAggregatorPort, nil)
-		if err != nil {
-			msg := fmt.Sprintf("build aggregator pod for job %s failed", job.Name)
-			log.Error(err, msg)
-			return err
-		}
-
 		// build coordinator pod
 		volumes := job.Spec.Volumes
-		template = job.Spec.Coordinator.Template.DeepCopy()
+		template := job.Spec.Coordinator.Template.DeepCopy()
 		coorpod, coorsvc, coorurl, err := buildPodAndServiceForReplica(template, job, nervexutil.CoordinatorName,
 			nervexutil.DefaultCoordinatorContainerName, nervexutil.DefaultCoordinatorPortName, nervexutil.DefaultCoordinatorPort, volumes)
 		if err != nil {
@@ -61,19 +40,11 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 		}
 		// add env
 		envs := make(map[string]string)
-		envs[nervexutil.AggregatorURLEnv] = agurl
 		envs[nervexutil.CoordinatorURLEnv] = coorurl
 		nervexutil.SetPodEnv(coorpod, envs)
-		nervexutil.SetPodEnv(agpod, envs)
 
 		if coordinator == nil {
 			if err := r.createPodAndService(ctx, job, coorpod, coorsvc); err != nil {
-				return err
-			}
-		}
-
-		if ag == nil {
-			if err := r.createPodAndService(ctx, job, agpod, agsvc); err != nil {
 				return err
 			}
 		}
@@ -167,7 +138,7 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *nervexv
 	}
 
 	// build pod
-	pod, port, err := nervexutil.BuildPodFromTemplate(template, ownRefer, job.Namespace, replicaType,
+	pod, port, err := nervexutil.BuildPodFromTemplate(template, ownRefer, job.Name, job.Namespace, replicaType,
 		containerName, portName, defaultPort)
 	if err != nil {
 		return nil, nil, "", err
@@ -177,6 +148,7 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *nervexv
 	envs := make(map[string]string)
 	envs[nervexutil.PodNamespaceEnv] = pod.Namespace
 	envs[nervexutil.PodNameEnv] = pod.Name
+	envs[nervexutil.ServerURLEnv] = nervexutil.DefaultServerURL
 	nervexutil.SetPodEnv(pod, envs)
 
 	// add volumes

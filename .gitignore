@@ -26,3 +26,4 @@ bin
 *.vscode
 
 *.coverprofile
+coverage.out.*

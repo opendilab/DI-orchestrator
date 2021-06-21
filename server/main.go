@@ -21,30 +21,41 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	nervexcommon "go-sensephoenix.sensetime.com/nervex-operator/common"
 	serverdynamic "go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
 	serverhttp "go-sensephoenix.sensetime.com/nervex-operator/server/http"
+	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
 var (
 	DefaultLeaseLockNamespace = "nervex-system"
 	DefaultLeaseLockName      = "nervex-server"
+
+	DefaultAGConfigNamespace = "nervex-system"
+	DefaultAGConfigName      = "aggregator-config"
 )
 
 func main() {
-	var kubeconfig, serverBindAddress, leaseLockName, leaseLockNamespace string
+	var kubeconfig, serverBindAddress, leaseLockName, leaseLockNamespace, agconfigNamespace, agconfigName string
+	var gpuAllocPolicy, serverAddr string
 	var enableLeaderElection bool
 	if flag.Lookup("kubeconfig") == nil {
 		flag.StringVar(&kubeconfig, "kubeconfig", "", "The kubeconfig file to access kubernetes cluster. ")
 	}
-	kubeconfig = flag.Lookup("kubeconfig").Value.(flag.Getter).Get().(string)
 
 	flag.StringVar(&serverBindAddress, "server-bind-address", ":8080", "The address for server to bind to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", DefaultLeaseLockNamespace, "the lease lock resource namespace")
-	flag.StringVar(&leaseLockName, "lease-lock-name", DefaultLeaseLockName, "the lease lock resource name")
+	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", DefaultLeaseLockNamespace, "The lease lock resource namespace")
+	flag.StringVar(&leaseLockName, "lease-lock-name", DefaultLeaseLockName, "The lease lock resource name")
+	flag.StringVar(&agconfigNamespace, "agconfig-namespace", DefaultAGConfigNamespace, "The AggregatorConfig namespace to manage actors and learners.")
+	flag.StringVar(&agconfigName, "agconfig-name", DefaultAGConfigName, "The AggregatorConfig name to manage actors and learners.")
+	flag.StringVar(&gpuAllocPolicy, "gpu-alloc-policy", nervexcommon.SimpleGPUAllocPolicy, "The policy for server to allocate gpus to pods.")
+	flag.StringVar(&serverAddr, "server-address", nervexutil.DefaultServerURL, "The address to connect to nervex server.")
 	flag.Parse()
+
+	kubeconfig = flag.Lookup("kubeconfig").Value.String()
 
 	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
@@ -70,7 +81,9 @@ func main() {
 
 	logger := zap.New(zap.UseFlagOptions(&opts))
 
-	nervexServer := serverhttp.NewNerveXServer(kubeClient, dynamicClient, logger, dyi)
+	agconfig := fmt.Sprintf("%s/%s", agconfigNamespace, agconfigName)
+	nervexServer := serverhttp.NewNerveXServer(kubeClient, dynamicClient, logger, agconfig, dyi, gpuAllocPolicy)
+	nervexutil.DefaultServerURL = serverAddr
 
 	if !enableLeaderElection {
 		if err := nervexServer.Start(serverBindAddress); err != nil {

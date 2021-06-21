@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: coordinator
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.1-torch1.4-cuda10.1-cudnn7-devel-9472640d 
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
@@ -125,14 +125,10 @@ spec:
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
-                                "cpu": "3",
-                                "memory": "4Gi",
                                 "replicas": 2,
                             },
                             learners={
-                                "cpu": "3",
-                                "memory": "4Gi",
-                                "gpu": "0",
+                                "gpu": "4",
                                 "replicas": 1,
                             },
                         ),
@@ -144,6 +140,7 @@ spec:
                 path_policy='/data/nfs/nervex/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
+                learner_gpu_num=4
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config
@@ -162,7 +159,7 @@ spec:
       spec:
         containers:
         - name: collector
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.1-torch1.4-cuda10.1-cudnn7-devel-9472640d 
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
@@ -268,13 +265,9 @@ spec:
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
-                                "cpu": "3",
-                                "memory": "4Gi",
                                 "replicas": 2,
                             },
                             learners={
-                                "cpu": "3",
-                                "memory": "4Gi",
                                 "gpu": "0",
                                 "replicas": 1,
                             },
@@ -287,6 +280,7 @@ spec:
                 path_policy='/data/nfs/nervex/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
+                learner_gpu_num=4
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config
@@ -304,7 +298,7 @@ spec:
       spec:
         containers:
         - name: learner
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.1-torch1.4-cuda10.1-cudnn7-devel-9472640d 
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
@@ -410,13 +404,9 @@ spec:
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
-                                "cpu": "3",
-                                "memory": "4Gi",
                                 "replicas": 2,
                             },
                             learners={
-                                "cpu": "3",
-                                "memory": "4Gi",
                                 "gpu": "0",
                                 "replicas": 1,
                             },
@@ -429,6 +419,7 @@ spec:
                 path_policy='/data/nfs/nervex/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
+                learner_gpu_num=4
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config

@@ -19,9 +19,10 @@ var (
 )
 
 type Informers struct {
-	NJInformer  informers.GenericInformer
-	AGInformer  informers.GenericInformer
-	PodInformer informers.GenericInformer
+	NJInformer   informers.GenericInformer
+	AGInformer   informers.GenericInformer
+	PodInformer  informers.GenericInformer
+	NodeInformer informers.GenericInformer
 }
 
 func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Informers {
@@ -45,10 +46,19 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 		Version:  corev1.SchemeGroupVersion.Version,
 		Resource: "pods",
 	}
+
+	// add node infomer
+	nodeGVR := schema.GroupVersionResource{
+		Group:    corev1.SchemeGroupVersion.Group,
+		Version:  corev1.SchemeGroupVersion.Version,
+		Resource: "nodes",
+	}
+
 	dyi := Informers{
-		NJInformer:  dif.ForResource(njGVR),
-		AGInformer:  dif.ForResource(aggregatorGVR),
-		PodInformer: dif.ForResource(podGVR),
+		NJInformer:   dif.ForResource(njGVR),
+		AGInformer:   dif.ForResource(aggregatorGVR),
+		PodInformer:  dif.ForResource(podGVR),
+		NodeInformer: dif.ForResource(nodeGVR),
 	}
 
 	dyi.NJInformer.Informer().AddEventHandler(
@@ -88,6 +98,16 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 			DeleteFunc: func(obj interface{}) {
 				// on delete object
 			},
+		},
+	)
+
+	dyi.NodeInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				log.Printf("new Node: %s", obj.(*unstructured.Unstructured).GetName())
+			},
+			UpdateFunc: func(old, new interface{}) {},
+			DeleteFunc: func(obj interface{}) {},
 		},
 	)
 

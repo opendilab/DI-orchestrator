@@ -30,13 +30,12 @@ const (
 )
 
 func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob,
-	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) error {
+	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregators []*corev1.Pod) error {
 	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
 	// update replica status
-	updateReplicasStatues(job, collectors, learners, coordinator, aggregator)
+	updateReplicasStatues(job, collectors, learners, coordinator, aggregators)
 
-	if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Active > 0 &&
-		job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeAggregator].Active > 0 {
+	if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Active > 0 {
 		msg := fmt.Sprintf("coordinator and aggregator of NerveXJob %s are running", job.Name)
 		if err := r.updateJobPhase(ctx, job, nervexv1alpha1.JobRunning, NerveXJobRunningReason, msg); err != nil {
 			return err
@@ -107,7 +106,7 @@ func initializeNerveXJobReplicaStatus(job *nervexv1alpha1.NerveXJob) {
 }
 
 func updateReplicasStatues(job *nervexv1alpha1.NerveXJob,
-	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) {
+	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregators []*corev1.Pod) {
 	// update collector status
 	for _, collector := range collectors {
 		updateReplicaStatus(collector, job, nervexv1alpha1.ReplicaTypeCollector)
@@ -119,7 +118,9 @@ func updateReplicasStatues(job *nervexv1alpha1.NerveXJob,
 	}
 
 	// update aggregator
-	updateReplicaStatus(aggregator, job, nervexv1alpha1.ReplicaTypeAggregator)
+	for _, aggregator := range aggregators {
+		updateReplicaStatus(aggregator, job, nervexv1alpha1.ReplicaTypeAggregator)
+	}
 
 	// update coordinator
 	updateReplicaStatus(coordinator, job, nervexv1alpha1.ReplicaTypeCoordinator)

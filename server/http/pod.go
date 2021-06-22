@@ -209,7 +209,8 @@ func (s *NerveXServer) getPodResources(pod *corev1.Pod, containerName string) se
 }
 
 func (s *NerveXServer) listReplicaPodsWithSelector(namespace string, labelSelector labels.Selector) (
-	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregators []*corev1.Pod, err error) {
+	collectors []*corev1.Pod, learners []*corev1.Pod,
+	coordinator *corev1.Pod, aggregators []*corev1.Pod, DDPLearners []*corev1.Pod, err error) {
 	// list pods that belong to the NerveXJob
 	pods, err := s.listPodsWithSelector(namespace, labelSelector)
 	if err != nil {
@@ -220,7 +221,7 @@ func (s *NerveXServer) listReplicaPodsWithSelector(namespace string, labelSelect
 	pods = nervexutil.FilterOutTerminatingPods(pods)
 
 	// classify pods
-	collectors, learners, coordinator, aggregators, err = nervexutil.ClassifyPods(pods)
+	collectors, learners, coordinator, aggregators, DDPLearners, err = nervexutil.ClassifyPods(pods)
 	if err != nil {
 		return
 	}

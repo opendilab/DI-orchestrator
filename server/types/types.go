@@ -8,12 +8,14 @@ type NerveXJobRequestParams struct {
 	Namespace   []string `json:"namespace"`
 	Coordinator []string `json:"coordinator"`
 	Name        []string `json:"name"`
+	Aggregator  []string `json:"aggregator"`
 }
 
 const (
 	RequestParamTypeNamespace   string = "namespace"
 	RequestParamTypeCoordinator string = "coordinator"
 	RequestParamTypeName        string = "name"
+	RequestParamTypeAggregator  string = "aggregator"
 )
 
 type NerveXJobRequest struct {

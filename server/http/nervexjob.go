@@ -15,16 +15,16 @@ import (
 	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
-func (s *NerveXServer) getNerveXJob(namespace, coordinatorName string) (*nervexv1alpha1.NerveXJob, error) {
-	// get coordinator
-	coorKey := nervexutil.NamespacedName(namespace, coordinatorName)
-	coordinator, err := s.getPodByKey(coorKey)
+func (s *NerveXServer) getNerveXJob(namespace, modulePodName string) (*nervexv1alpha1.NerveXJob, error) {
+	// get module
+	podKey := nervexutil.NamespacedName(namespace, modulePodName)
+	modulePod, err := s.getPodByKey(podKey)
 	if err != nil {
 		return nil, err
 	}
 
 	var ownRefer metav1.OwnerReference
-	ownRefers := coordinator.GetOwnerReferences()
+	ownRefers := modulePod.GetOwnerReferences()
 	ownByNerveX := false
 	for _, ref := range ownRefers {
 		if ref.Kind == nervexv1alpha1.KindNerveXJob {
@@ -33,7 +33,7 @@ func (s *NerveXServer) getNerveXJob(namespace, coordinatorName string) (*nervexv
 		}
 	}
 	if !ownByNerveX {
-		errMsg := fmt.Sprintf("coordinator %s is not owned by any NerveXJob", coordinatorName)
+		errMsg := fmt.Sprintf("module %s is not owned by any NerveXJob", modulePodName)
 		return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
 	}
 
@@ -47,7 +47,7 @@ func (s *NerveXServer) getNerveXJob(namespace, coordinatorName string) (*nervexv
 	// check if the coordinator is owned by stale NerveXJob
 	for _, ref := range ownRefers {
 		if ref.Kind == nervexv1alpha1.KindNerveXJob && ref.UID != nvxJob.UID {
-			errMsg := fmt.Sprintf("coordinator %s is owned by stale NerveXJob", coordinatorName)
+			errMsg := fmt.Sprintf("coordinator %s is owned by stale NerveXJob", modulePodName)
 			return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
 		}
 	}
@@ -331,18 +331,18 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 	jobName, namespace, replicaType, containerName, portName string,
 	defaultPort int32, resources servertypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, error) {
 
-	pod, svc, port, err := s.buildPodAndService(template.DeepCopy(), ownRefer, jobName,
+	pod, svc, port, err := s.buildPodAndService(template.DeepCopy(), aggOwnRefer, jobName,
 		namespace, nervexutil.DDPLearnerName, containerName, portName, defaultPort, resources, volumes)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// set owner reference to aggregator
-	pod.OwnerReferences = append(pod.OwnerReferences, aggOwnRefer)
+	// set owner reference of NerveXJob to aggregator
+	pod.OwnerReferences = append(pod.OwnerReferences, ownRefer)
 
 	// create port for all the GPU processes
 	for j := 1; j < int(resources.GPU.Value()); j++ {
-		pname := fmt.Sprintf("gpu-%d", j)
+		pname := fmt.Sprintf("%s-%d", nervexutil.DDPLearnerPortPrefix, j)
 		pport := port + int32(j)
 		lsport := corev1.ServicePort{
 			Name: pname,

@@ -269,7 +269,8 @@ func ListServices(ctx context.Context, cli client.Client, job *nervexv1alpha1.Ne
 	return svcs, nil
 }
 
-func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregators []*corev1.Pod, err error) {
+func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*corev1.Pod,
+	coordinator *corev1.Pod, aggregators []*corev1.Pod, DDPLearners []*corev1.Pod, err error) {
 	// filter out collectors
 	collectors, err = filterReplicaPods(pods, CollectorName)
 	if err != nil {
@@ -290,6 +291,11 @@ func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*cor
 
 	// filter aggregator pod
 	aggregators, err = filterReplicaPods(pods, AggregatorName)
+	if err != nil {
+		return
+	}
+
+	DDPLearners, err = filterReplicaPods(pods, DDPLearnerName)
 	if err != nil {
 		return
 	}

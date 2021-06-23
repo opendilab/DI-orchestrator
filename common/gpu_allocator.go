@@ -109,32 +109,22 @@ func ValueOccursMostFrequentInList(list []int) (int, int) {
 	}
 
 	// map the occurrence frequency of each value
+	maxCount := 0
+	maxCountValue := 0
 	valuesMap := make(map[int]int)
+
 	for _, v := range list {
 		if valuesMap[v] != 0 {
 			valuesMap[v]++
 		} else {
 			valuesMap[v] = 1
 		}
-	}
 
-	// get the most frequent occurrence count
-	maxCount := 0
-	for _, count := range valuesMap {
-		if maxCount < count {
-			maxCount = count
-		}
-	}
-
-	// get the most frequent occurrence value
-	maxCountValue := 0
-	for value, count := range valuesMap {
-		if count == maxCount {
-			if maxCountValue == 0 {
-				maxCountValue = value
-			} else if maxCountValue < value {
-				maxCountValue = value
-			}
+		if maxCount < valuesMap[v] {
+			maxCount = valuesMap[v]
+			maxCountValue = v
+		} else if maxCount == valuesMap[v] && maxCountValue < v {
+			maxCountValue = v
 		}
 	}
 

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -29,6 +30,8 @@ import (
 	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -97,6 +100,22 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	var nodes []*corev1.Node
+	nodes = append(nodes, newNode(fmt.Sprintf("server-test-%d", 0), 8), newNode(fmt.Sprintf("server-test-%d", 1), 8))
+	nodes = append(nodes, newNode(fmt.Sprintf("server-test-%d", 2), 0), newNode(fmt.Sprintf("server-test-%d", 3), 4))
+
+	for _, node := range nodes {
+		err := k8sClient.Create(context.Background(), node, &client.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	var nodeList corev1.NodeList
+	err = k8sClient.List(context.Background(), &nodeList, &client.ListOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	for _, node := range nodeList.Items {
+		fmt.Printf("node: %s added to cluster\n", node.Name)
+	}
+
 	By("Apply AggregatorConfig")
 	ctx := context.Background()
 	agconfig := testutil.NewAggregatorConfig()
@@ -137,7 +156,9 @@ var _ = BeforeSuite(func() {
 
 	logger := zap.New(zap.UseFlagOptions(&opts))
 
-	nervexServer := NewNerveXServer(kubeClient, dynamicClient, logger, dyi)
+	agconfigstr := "nervex-system/aggregator-config"
+	gpuAllocPolicy := "simple"
+	nervexServer := NewNerveXServer(kubeClient, dynamicClient, logger, agconfigstr, dyi, gpuAllocPolicy)
 
 	localServingPort = port + config.GinkgoConfig.ParallelNode
 	addrPort := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
@@ -165,3 +186,22 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func newNode(name string, gpus int) *corev1.Node {
+	return &corev1.Node{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Node",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Status: corev1.NodeStatus{
+			Allocatable: corev1.ResourceList{
+				"nvidia.com/gpu":      resource.MustParse(strconv.Itoa(gpus)),
+				corev1.ResourceCPU:    resource.MustParse("32"),
+				corev1.ResourceMemory: resource.MustParse("128Gi"),
+			},
+		},
+	}
+}

@@ -16,7 +16,7 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
 
 	// classify pods
-	collectors, learners, coordinator, ags, err := nervexutil.ClassifyPods(pods)
+	collectors, learners, coordinator, ags, _, err := nervexutil.ClassifyPods(pods)
 	if err != nil {
 		log.Error(err, "unable to classify pods")
 		return err

@@ -53,6 +53,7 @@ spec:
                     nstep=3,
                     discount_factor=0.97,
                     learn=dict(
+                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.001,
                         learner=dict(
@@ -128,7 +129,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpu": "4",
+                                "gpu": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -140,12 +141,11 @@ spec:
                 path_policy='/data/nfs/nervex/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
-                learner_gpu_num=4
+                learner_gpu_num=2
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config
             EOF
-            cat nervex/entry/dist_entry.py;
             nervex -m dist --module config -p k8s -c cartpole_dqn_config.py -s 0;
             nervex -m dist --module coordinator -p k8s -c cartpole_dqn_config.py.pkl -s 0 --disable_flask_log 0
           ports:
@@ -193,6 +193,7 @@ spec:
                     nstep=3,
                     discount_factor=0.97,
                     learn=dict(
+                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.001,
                         learner=dict(
@@ -268,7 +269,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpu": "0",
+                                "gpu": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -280,7 +281,7 @@ spec:
                 path_policy='/data/nfs/nervex/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
-                learner_gpu_num=4
+                learner_gpu_num=2
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config
@@ -307,6 +308,8 @@ spec:
             value: "en_US.utf-8"
           - name: PYTHONUNBUFFERED
             value: "1"
+          - name: ENABLE_LINKLINK
+            value: "true"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -332,6 +335,7 @@ spec:
                     nstep=3,
                     discount_factor=0.97,
                     learn=dict(
+                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.001,
                         learner=dict(
@@ -407,7 +411,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpu": "0",
+                                "gpu": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -419,7 +423,7 @@ spec:
                 path_policy='/data/nfs/nervex/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
-                learner_gpu_num=4
+                learner_gpu_num=2
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config

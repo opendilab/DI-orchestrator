@@ -95,16 +95,12 @@ var _ = Describe("NerveXJob Controller", func() {
 		It("NerveXJob status changed with components status", func() {
 			type testCase struct {
 				coorStatus   corev1.PodPhase
-				agStatus     corev1.PodPhase
 				expectStatus nervexv1alpha1.Phase
 			}
 			testCases := []testCase{
-				{coorStatus: corev1.PodRunning, agStatus: corev1.PodFailed, expectStatus: nervexv1alpha1.JobCreated},
-				{coorStatus: corev1.PodRunning, agStatus: corev1.PodRunning, expectStatus: nervexv1alpha1.JobRunning},
-				{coorStatus: corev1.PodFailed, agStatus: corev1.PodFailed, expectStatus: nervexv1alpha1.JobFailed},
-				{coorStatus: corev1.PodSucceeded, agStatus: corev1.PodSucceeded, expectStatus: nervexv1alpha1.JobSucceeded},
-				{coorStatus: corev1.PodSucceeded, agStatus: corev1.PodFailed, expectStatus: nervexv1alpha1.JobSucceeded},
-				{coorStatus: corev1.PodRunning, agStatus: corev1.PodSucceeded, expectStatus: nervexv1alpha1.JobCreated},
+				{coorStatus: corev1.PodRunning, expectStatus: nervexv1alpha1.JobRunning},
+				{coorStatus: corev1.PodFailed, expectStatus: nervexv1alpha1.JobFailed},
+				{coorStatus: corev1.PodSucceeded, expectStatus: nervexv1alpha1.JobSucceeded},
 			}
 			for i := range testCases {
 				c := testCases[i]
@@ -118,13 +114,10 @@ var _ = Describe("NerveXJob Controller", func() {
 				By("Update coordinator status")
 				for _, replicaName := range []string{
 					nervexutil.ReplicaPodName(nervexjob.Name, "coordinator"),
-					nervexutil.ReplicaPodName(nervexjob.Name, "aggregator"),
 				} {
 					podKey := types.NamespacedName{Namespace: nervexjob.Namespace, Name: replicaName}
 					if strings.HasSuffix(replicaName, "coordinator") {
 						err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, c.coorStatus)
-					} else {
-						err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, c.agStatus)
 					}
 					Expect(err).NotTo(HaveOccurred())
 				}
@@ -263,7 +256,6 @@ var _ = Describe("NerveXJob Controller", func() {
 				By("Update coordinator to Succeeded")
 				for _, replicaName := range []string{
 					nervexutil.ReplicaPodName(nervexjob.Name, "coordinator"),
-					nervexutil.ReplicaPodName(nervexjob.Name, "aggregator"),
 				} {
 					podKey := types.NamespacedName{Namespace: nervexjob.Namespace, Name: replicaName}
 					err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)

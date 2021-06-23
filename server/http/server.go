@@ -281,6 +281,7 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinator
 		Learners:    learnerURLs,
 	}
 
+	log.Info("get replicas", "collectors", collectorURLs, "learners", learnerURLs)
 	return rep, nil
 }
 
@@ -408,7 +409,7 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	collectors, learners, _, _, _, err := s.listReplicaPodsWithSelector(njreq.Namespace, labelSelector)
+	collectors, learners, _, aggs, _, err := s.listReplicaPodsWithSelector(njreq.Namespace, labelSelector)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
@@ -423,6 +424,15 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	delLearners, err := s.deleteSpecifiedReplicas(learners, njreq.Namespace, njreq.Learners.Replicas, nervexutil.LearnerName)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
+	}
+
+	// aggregator is also considered a learner
+	if len(delLearners) <= 0 {
+		delAggs, err := s.deleteSpecifiedReplicas(aggs, njreq.Namespace, njreq.Learners.Replicas, nervexutil.AggregatorName)
+		if err != nil {
+			return servertypes.NerveXJobResponse{}, err
+		}
+		delLearners = append(delLearners, delAggs...)
 	}
 
 	log.Info("delete replicas", "collectors", delCollectors, "learners", delLearners)

@@ -377,6 +377,10 @@ func (s *NerveXServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace str
 		containerName = nervexutil.DefaultLearnerContainerName
 		portName = nervexutil.DefaultLearnerPortName
 		defaultPort = nervexutil.DefaultLearnerPort
+	case nervexutil.AggregatorName:
+		containerName = nervexutil.DefaultAggregatorContainerName
+		portName = nervexutil.DefaultAggregatorPortName
+		defaultPort = nervexutil.DefaultAggregatorPort
 	default:
 
 	}

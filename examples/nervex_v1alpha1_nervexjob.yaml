@@ -53,6 +53,7 @@ spec:
                     nstep=3,
                     discount_factor=0.97,
                     learn=dict(
+                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.001,
                         learner=dict(
@@ -192,6 +193,7 @@ spec:
                     nstep=3,
                     discount_factor=0.97,
                     learn=dict(
+                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.001,
                         learner=dict(
@@ -333,6 +335,7 @@ spec:
                     nstep=3,
                     discount_factor=0.97,
                     learn=dict(
+                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.001,
                         learner=dict(

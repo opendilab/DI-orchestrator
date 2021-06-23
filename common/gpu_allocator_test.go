@@ -33,6 +33,10 @@ var _ = Describe("Test SimpleGPUAllocator", func() {
 				[]int{1, 2, 3, 4, 5, 2, 2, 4, 6, 2, 3, 3, 1, 3},
 				3, 4,
 			},
+			"Multi max value second": {
+				[]int{1, 3, 3, 4, 5, 2, 2, 4, 6, 2, 3, 2, 1, 3},
+				3, 4,
+			},
 		}
 		for _, test := range testCases {
 			maxValue, maxCount := ValueOccursMostFrequentInList(test.list)

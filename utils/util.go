@@ -96,10 +96,10 @@ func AddLabelsToPod(pod *corev1.Pod, labels map[string]string) {
 func BuildPodFromTemplate(
 	template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
+	jobName string,
 	ns, replicaType, containerName, portName string,
 	defaultPort int32) (*corev1.Pod, int32, error) {
 	// generate name is the NerveXJob name
-	jobName := ownRefer.Name
 	portEnv := ""
 	podName := ReplicaPodName(jobName, replicaType)
 	switch replicaType {
@@ -109,8 +109,12 @@ func BuildPodFromTemplate(
 	case LearnerName:
 		portEnv = "LEARNER_PORT"
 		podName = GenerateName(podName)
+	case DDPLearnerName:
+		portEnv = "LEARNER_PORT"
+		podName = GenerateName(podName)
 	case AggregatorName:
 		portEnv = "AGGREGATOR_PORT"
+		podName = GenerateName(podName)
 	case CoordinatorName:
 		portEnv = "COORDINATOR_PORT"
 	default:
@@ -265,7 +269,8 @@ func ListServices(ctx context.Context, cli client.Client, job *nervexv1alpha1.Ne
 	return svcs, nil
 }
 
-func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod, err error) {
+func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*corev1.Pod,
+	coordinator *corev1.Pod, aggregators []*corev1.Pod, DDPLearners []*corev1.Pod, err error) {
 	// filter out collectors
 	collectors, err = filterReplicaPods(pods, CollectorName)
 	if err != nil {
@@ -285,7 +290,12 @@ func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*cor
 	}
 
 	// filter aggregator pod
-	aggregators, err := filterReplicaPods(pods, AggregatorName)
+	aggregators, err = filterReplicaPods(pods, AggregatorName)
+	if err != nil {
+		return
+	}
+
+	DDPLearners, err = filterReplicaPods(pods, DDPLearnerName)
 	if err != nil {
 		return
 	}
@@ -298,15 +308,6 @@ func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*cor
 		return
 	}
 	coordinator = coordinators[0]
-
-	if len(aggregators) > 1 {
-		err = fmt.Errorf("there must be only one coordinator")
-		return
-	}
-	if len(aggregators) < 1 {
-		return
-	}
-	aggregator = aggregators[0]
 	return
 }
 

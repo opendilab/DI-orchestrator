@@ -49,7 +49,7 @@ type NerveXJobReconciler struct {
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/status;aggregatorconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nervex.sensetime.com,resources=nervexjobs/finalizers;aggregatorconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=pods;services;events,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list
+//+kubebuilder:rbac:groups="",resources=namespaces;nodes,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

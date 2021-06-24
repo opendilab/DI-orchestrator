@@ -11,7 +11,7 @@ spec:
         #   kubernetes.io/hostname: "liqingping-gpu.novalocal"
         containers:
         - name: aggregator
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.4-torch1.4-cuda10.1-cudnn7-devel-987bacf7
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
@@ -34,8 +34,7 @@ spec:
             # pip install --no-cache-dir -e .;
             # pip install --no-cache-dir -e .[common_env]
             
-            nervex -m dist --module config -p k8s -c app_zoo/atari/config/parallel/qbert_dqn_config_k8s.py -s 0;
-            nervex -m dist --module learner_aggregator -c app_zoo/atari/config/parallel/qbert_dqn_config_k8s.py.pkl -s 0
+            nervex -m dist --module learner_aggregator
           ports:
           - name: aggregator
             containerPort: 22270

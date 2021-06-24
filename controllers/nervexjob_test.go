@@ -110,7 +110,7 @@ var _ = Describe("NerveXJob Specification", func() {
 						Expect(err).NotTo(HaveOccurred())
 					}
 
-					By("Checking the job is successfully succeeded")
+					By("Checking the job is succeeded")
 					Eventually(func() nervexv1alpha1.Phase {
 						err := k8sClient.Get(ctx, jobKey, &nervexjob)
 						if err != nil {
@@ -159,7 +159,7 @@ var _ = Describe("NerveXJob Specification", func() {
 								return -1
 							}
 							return len(pods)
-						}, duration, interval).Should(Equal(npods - c.runnings - 1))
+						}, duration, interval).Should(Equal(npods - c.runnings))
 						Eventually(func() int {
 							svcs, err := nervexutil.ListServices(ctx, k8sClient, &nervexjob)
 							if err != nil {

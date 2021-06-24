@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: coordinator
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.4-torch1.4-cuda10.1-cudnn7-devel-987bacf7
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
@@ -53,6 +53,7 @@ spec:
                     nstep=3,
                     discount_factor=0.97,
                     learn=dict(
+                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.001,
                         learner=dict(
@@ -125,14 +126,10 @@ spec:
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
-                                "cpu": "3",
-                                "memory": "4Gi",
                                 "replicas": 2,
                             },
                             learners={
-                                "cpu": "3",
-                                "memory": "4Gi",
-                                "gpu": "0",
+                                "gpu": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -144,11 +141,11 @@ spec:
                 path_policy='/data/nfs/nervex/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
+                learner_gpu_num=2
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config
             EOF
-            cat nervex/entry/dist_entry.py;
             nervex -m dist --module config -p k8s -c cartpole_dqn_config.py -s 0;
             nervex -m dist --module coordinator -p k8s -c cartpole_dqn_config.py.pkl -s 0 --disable_flask_log 0
           ports:
@@ -162,7 +159,7 @@ spec:
       spec:
         containers:
         - name: collector
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.4-torch1.4-cuda10.1-cudnn7-devel-987bacf7
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
@@ -196,6 +193,7 @@ spec:
                     nstep=3,
                     discount_factor=0.97,
                     learn=dict(
+                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.001,
                         learner=dict(
@@ -268,14 +266,10 @@ spec:
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
-                                "cpu": "3",
-                                "memory": "4Gi",
                                 "replicas": 2,
                             },
                             learners={
-                                "cpu": "3",
-                                "memory": "4Gi",
-                                "gpu": "0",
+                                "gpu": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -287,6 +281,7 @@ spec:
                 path_policy='/data/nfs/nervex/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
+                learner_gpu_num=2
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config
@@ -304,7 +299,7 @@ spec:
       spec:
         containers:
         - name: learner
-          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.4-torch1.4-cuda10.1-cudnn7-devel-987bacf7
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
@@ -313,6 +308,8 @@ spec:
             value: "en_US.utf-8"
           - name: PYTHONUNBUFFERED
             value: "1"
+          - name: ENABLE_LINKLINK
+            value: "true"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -338,6 +335,7 @@ spec:
                     nstep=3,
                     discount_factor=0.97,
                     learn=dict(
+                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.001,
                         learner=dict(
@@ -410,14 +408,10 @@ spec:
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
-                                "cpu": "3",
-                                "memory": "4Gi",
                                 "replicas": 2,
                             },
                             learners={
-                                "cpu": "3",
-                                "memory": "4Gi",
-                                "gpu": "0",
+                                "gpu": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -429,6 +423,7 @@ spec:
                 path_policy='/data/nfs/nervex/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
+                learner_gpu_num=2
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config

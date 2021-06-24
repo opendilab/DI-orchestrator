@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -265,6 +268,125 @@ var _ = Describe("Server Test", func() {
 
 			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy(), timeout, interval)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Should have right replicas created when request gpu for learner", func() {
+			addr := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
+
+			type testCase struct {
+				ln                   int
+				gpus                 int
+				expectedAgg          int
+				expectedLearner      int
+				expectedDDPL         int
+				expectedDDPLSvcPorts int
+			}
+			testCases := []testCase{
+				// learner requests 1 gpu, so no agg or ddpl is created.
+				{ln: 1, gpus: 1, expectedAgg: 0, expectedLearner: 1, expectedDDPL: 0, expectedDDPLSvcPorts: 0},
+				// learner requests 2 gpus, so we need to create an agg and a ddpl.
+				{ln: 1, gpus: 2, expectedAgg: 1, expectedLearner: 0, expectedDDPL: 1, expectedDDPLSvcPorts: 2},
+				// learner requests 10 gpus, so we need to create an agg and 2 ddpl, one ddpl with 8 gpus and the other ddpl with 2 gpus.
+				{ln: 1, gpus: 10, expectedAgg: 1, expectedLearner: 0, expectedDDPL: 2, expectedDDPLSvcPorts: 10},
+				// learner requests 2 gpus, so we need to create an agg and a ddpl.
+				{ln: 2, gpus: 2, expectedAgg: 2, expectedLearner: 0, expectedDDPL: 2, expectedDDPLSvcPorts: 4},
+			}
+			for i := range testCases {
+				c := testCases[i]
+				job := testutil.NewNerveXJob()
+				name := nervexutil.GenerateName(job.Name)
+				job.SetName(name)
+
+				By(fmt.Sprintf("Create %dth NerveXJob", i+1))
+				var err error
+				ctx := context.Background()
+				err = creatNerveXJob(ctx, job)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Send request on POST /v1alpha1/replicas")
+				coorname := nervexutil.ReplicaPodName(job.Name, "coordinator")
+				rurl := fmt.Sprintf("http://%s/v1alpha1/replicas", addr)
+				var ln int = c.ln
+				req := servertypes.NerveXJobRequest{
+					Namespace:   job.Namespace,
+					Coordinator: coorname,
+					Learners: servertypes.ResourceQuantity{
+						Replicas: ln,
+						GPU:      resource.MustParse(strconv.Itoa(c.gpus)),
+					},
+				}
+				rbody, err := json.Marshal(req)
+				Expect(err).NotTo(HaveOccurred())
+
+				njresp, err := sendRequest(http.MethodPost, rbody, rurl, http.StatusOK, true)
+				Expect(err).NotTo(HaveOccurred())
+
+				// # of learners must be as expected
+				Expect(len(njresp.Learners)).Should(Equal(ln))
+
+				// # of ddp learners must as expected
+				var ddpLearners corev1.PodList
+				err = k8sClient.List(ctx, &ddpLearners, client.MatchingLabels{nervexutil.ReplicaTypeLabel: nervexutil.DDPLearnerName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(ddpLearners.Items)).Should(Equal(c.expectedDDPL))
+
+				// # of aggregators must be as expected
+				var aggs corev1.PodList
+				err = k8sClient.List(ctx, &aggs, client.MatchingLabels{nervexutil.ReplicaTypeLabel: nervexutil.AggregatorName})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(aggs.Items)).Should(Equal(c.expectedAgg))
+
+				// # of ddp learner service ports must be as expected
+				var svcs corev1.ServiceList
+				err = k8sClient.List(ctx, &svcs, client.MatchingLabels{nervexutil.ReplicaTypeLabel: nervexutil.DDPLearnerName})
+				Expect(err).NotTo(HaveOccurred())
+				portCount := 0
+				for _, svc := range svcs.Items {
+					portCount += len(svc.Spec.Ports)
+				}
+				Expect(portCount).Should(Equal(c.expectedDDPLSvcPorts))
+
+				By("Send request on GET /v1alpha1/replicas with namespace and coordinator")
+				gurl := fmt.Sprintf("%s?namespace=%s&coordinator=%s", rurl, job.Namespace, coorname)
+				resp, err := http.Get(gurl)
+				Expect(err).NotTo(HaveOccurred())
+				gnjresp, err := parseResponse(resp, http.StatusOK, true)
+				Expect(err).NotTo(HaveOccurred())
+				// expect # of learners to be equal to learner+aggregator
+				Expect(len(gnjresp.Learners)).Should(Equal(c.expectedLearner + c.expectedAgg))
+
+				if len(aggs.Items) > 0 {
+					By("Send request on GET /v1alpha1/replicas with namespace and aggregator")
+					agg := aggs.Items[0]
+					aurl := fmt.Sprintf("%s?namespace=%s&aggregator=%s", rurl, job.Namespace, agg.Name)
+					aresp, err := http.Get(aurl)
+					Expect(err).NotTo(HaveOccurred())
+					anjresp, err := parseResponse(aresp, http.StatusOK, true)
+					Expect(err).NotTo(HaveOccurred())
+					// expect # of learners to be equal to ddp learners
+					expectedDDPLs := c.expectedDDPLSvcPorts / c.ln
+					Expect(len(anjresp.Learners)).Should(Equal(expectedDDPLs))
+				}
+
+				By("Send request on DELETE /v1alpha1/replicas")
+				var dln int = 1
+				dreq := servertypes.NerveXJobRequest{
+					Namespace:   job.Namespace,
+					Coordinator: coorname,
+					Learners: servertypes.ResourceQuantity{
+						Replicas: dln,
+					},
+				}
+				drbody, err := json.Marshal(dreq)
+				Expect(err).NotTo(HaveOccurred())
+
+				dnjresp, err := sendRequest(http.MethodDelete, drbody, rurl, http.StatusOK, true)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(len(dnjresp.Learners)).Should(Equal(dln))
+
+				err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy(), timeout, interval)
+				Expect(err).NotTo(HaveOccurred())
+			}
 		})
 	})
 })

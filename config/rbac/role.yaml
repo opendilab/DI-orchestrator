@@ -24,6 +24,7 @@ rules:
   - ""
   resources:
   - namespaces
+  - nodes
   verbs:
   - get
   - list

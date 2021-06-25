@@ -10,7 +10,7 @@ spec:
         # nodeSelector:
         #   kubernetes.io/hostname: "liqingping-gpu.novalocal"
         containers:
-        - name: aggregator
+        - name: nervex-container
           image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
@@ -36,5 +36,5 @@ spec:
             
             nervex -m dist --module learner_aggregator
           ports:
-          - name: aggregator
+          - name: nervex-port
             containerPort: 22270

@@ -45,13 +45,13 @@ func GetObjectFromUnstructured(obj interface{}, dest interface{}) error {
 	return nil
 }
 
-func GetPortFromPod(pod *corev1.Pod, containerName, portName string) (int32, bool) {
+func GetPortFromPod(pod *corev1.Pod) (int32, bool) {
 	for _, c := range pod.Spec.Containers {
-		if c.Name != containerName {
+		if c.Name != DefaultContainerName {
 			continue
 		}
 		for _, port := range c.Ports {
-			if port.Name == portName {
+			if port.Name == DefaultPortName {
 				return port.ContainerPort, true
 			}
 		}
@@ -59,16 +59,16 @@ func GetPortFromPod(pod *corev1.Pod, containerName, portName string) (int32, boo
 	return -1, false
 }
 
-func SetPortForPod(pod *corev1.Pod, containerName, portName string, port int32) {
+func SetPortForPod(pod *corev1.Pod, port int32) {
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name != containerName {
+		if pod.Spec.Containers[i].Name != DefaultContainerName {
 			continue
 		}
 		if pod.Spec.Containers[i].Ports == nil {
 			pod.Spec.Containers[i].Ports = []corev1.ContainerPort{}
 		}
 		portObj := corev1.ContainerPort{
-			Name:          portName,
+			Name:          DefaultPortName,
 			ContainerPort: port,
 		}
 		pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, portObj)
@@ -97,7 +97,7 @@ func BuildPodFromTemplate(
 	template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	jobName string,
-	ns, replicaType, containerName, portName string,
+	ns, replicaType string,
 	defaultPort int32) (*corev1.Pod, int32, error) {
 	// generate name is the NerveXJob name
 	portEnv := ""
@@ -142,11 +142,11 @@ func BuildPodFromTemplate(
 	AddLabelsToPod(pod, labels)
 
 	// get pod port
-	port, ok := GetPortFromPod(pod, containerName, portName)
+	port, ok := GetPortFromPod(pod)
 	if !ok {
 		port = defaultPort
-		logrus.Infof("no port found, use default port for container %s port %d", containerName, port)
-		SetPortForPod(pod, containerName, portName, port)
+		logrus.Infof("no port found, use default port for container %s port %d", DefaultContainerName, port)
+		SetPortForPod(pod, port)
 	}
 
 	// add env
@@ -176,7 +176,7 @@ func SetPodEnv(pod *corev1.Pod, envs map[string]string) {
 	}
 }
 
-func BuildService(labels map[string]string, port int32, portName string) *corev1.Service {
+func BuildService(labels map[string]string, port int32) *corev1.Service {
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: labels,
@@ -188,7 +188,7 @@ func BuildService(labels map[string]string, port int32, portName string) *corev1
 			Ports: []corev1.ServicePort{
 				{
 					Port: port,
-					Name: portName,
+					Name: DefaultPortName,
 				},
 			},
 		},
@@ -213,12 +213,23 @@ func ConcatURL(name, ns string, port int32) string {
 	return fmt.Sprintf("%s.%s:%d", name, ns, port)
 }
 
-func GetPodAccessURL(pod *corev1.Pod, namespace, containerName, portName string, defaultPort int32) string {
-	port, found := GetPortFromPod(pod, containerName, portName)
+func GetPodAccessURL(pod *corev1.Pod, defaultPort int32) string {
+	port, found := GetPortFromPod(pod)
 	if !found {
 		port = defaultPort
 	}
-	return ConcatURL(pod.Name, namespace, port)
+	return ConcatURL(pod.Name, pod.Namespace, port)
+}
+
+func GetServiceAccessURL(service *corev1.Service) string {
+	url := ""
+	for _, port := range service.Spec.Ports {
+		if port.Name == DefaultPortName {
+			url = ConcatURL(service.Name, service.Namespace, port.Port)
+			break
+		}
+	}
+	return url
 }
 
 func ListPods(ctx context.Context, cli client.Client, job *nervexv1alpha1.NerveXJob) ([]*corev1.Pod, error) {
@@ -344,4 +355,64 @@ func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 // IsTerminating returns true if pod's DeletionTimestamp has been set
 func IsTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
+}
+
+func ClassifyServices(services []*corev1.Service) (collectors []*corev1.Service, learners []*corev1.Service,
+	coordinator *corev1.Service, aggregators []*corev1.Service, DDPLearners []*corev1.Service, err error) {
+	// filter out collectors
+	collectors, err = filterReplicaServices(services, CollectorName)
+	if err != nil {
+		return
+	}
+
+	// filter out leader services
+	learners, err = filterReplicaServices(services, LearnerName)
+	if err != nil {
+		return
+	}
+
+	// filter out coordinator service
+	coordinators, err := filterReplicaServices(services, CoordinatorName)
+	if err != nil {
+		return
+	}
+
+	// filter aggregator service
+	aggregators, err = filterReplicaServices(services, AggregatorName)
+	if err != nil {
+		return
+	}
+
+	DDPLearners, err = filterReplicaServices(services, DDPLearnerName)
+	if err != nil {
+		return
+	}
+
+	if len(coordinators) > 1 {
+		err = fmt.Errorf("there must be only one coordinator")
+		return
+	}
+	if len(coordinators) < 1 {
+		return
+	}
+	coordinator = coordinators[0]
+	return
+}
+
+func filterReplicaServices(services []*corev1.Service, replicaType string) ([]*corev1.Service, error) {
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{ReplicaTypeLabel: replicaType},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := []*corev1.Service{}
+	for _, service := range services {
+		if !selector.Matches(labels.Set(service.Labels)) {
+			continue
+		}
+		result = append(result, service)
+	}
+	return result, nil
 }

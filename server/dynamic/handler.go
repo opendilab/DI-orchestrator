@@ -3,10 +3,10 @@ package dynamic
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -18,34 +18,34 @@ func GetPodFromObject(obj interface{}) (*corev1.Pod, error) {
 		log.Printf("failed to convert pod %v", err)
 		return nil, err
 	}
-	owner := metav1.GetControllerOf(&pod)
-	if owner == nil || owner.Kind != nervexv1alpha1.KindNerveXJob {
-		return nil, fmt.Errorf("pod %s not belong to NerveXJob", pod.Name)
+	owners := pod.GetOwnerReferences()
+	for _, owner := range owners {
+		if owner.Kind == nervexv1alpha1.KindNerveXJob {
+			return &pod, nil
+		}
 	}
-
-	return &pod, nil
+	return nil, fmt.Errorf("pod %s not belong to NerveXJob", pod.Name)
 }
 
-// func GetRestartCountFromPod(pod *corev1.Pod) int {
-
-// }
-
-func addPodHandler(obj interface{}) {
-	// on add object
-	pod, err := GetPodFromObject(obj)
-	if err != nil {
-		return
+func GetServiceFromObject(obj interface{}) (*corev1.Service, error) {
+	svcUn := obj.(*unstructured.Unstructured)
+	var service corev1.Service
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(svcUn.UnstructuredContent(), &service); err != nil {
+		log.Printf("failed to convert service %v", err)
+		return nil, err
 	}
-	log.Printf("new pod: %s/%s", pod.GetNamespace(), pod.GetName())
+	owners := service.GetOwnerReferences()
+	for _, owner := range owners {
+		if owner.Kind == nervexv1alpha1.KindNerveXJob {
+			return &service, nil
+		}
+	}
+	return nil, fmt.Errorf("service %s not belong to NerveXJob", service.Name)
 }
 
-func updatePodHandler(old, new interface{}) {
-	// // on update object
-	// newpod, err := GetPodFromObject(new)
-	// if err != nil {
-	// 	log.Printf("failed to get pod: %v", err)
-	// 	return
-	// }
-
-	// restartcount := newpod.Status.ContainerStatuses
+func isNotBelongToNerveXJobError(err error) bool {
+	if strings.Contains(err.Error(), "not belong to NerveXJob") {
+		return true
+	}
+	return false
 }

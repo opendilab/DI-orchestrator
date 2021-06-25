@@ -151,16 +151,11 @@ func (s *NerveXServer) createReplicas(
 	replicaType string,
 	agtemplate *corev1.PodTemplateSpec) ([]string, error) {
 
-	var containerName, portName string
 	var defaultPort int32
 	switch replicaType {
 	case nervexutil.CollectorName:
-		containerName = nervexutil.DefaultCollectorContainerName
-		portName = nervexutil.DefaultCollectorPortName
 		defaultPort = nervexutil.DefaultCollectorPort
 	case nervexutil.LearnerName:
-		containerName = nervexutil.DefaultLearnerContainerName
-		portName = nervexutil.DefaultLearnerPortName
 		defaultPort = nervexutil.DefaultLearnerPort
 	default:
 
@@ -212,7 +207,7 @@ func (s *NerveXServer) createReplicas(
 
 				// build ddp learner pod
 				pod, svc, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
-					jobName, namespace, replicaType, containerName, portName, defaultPort, *replicaResource, volumes)
+					jobName, namespace, replicaType, defaultPort, *replicaResource, volumes)
 				if err != nil {
 					return results, err
 				}
@@ -228,7 +223,7 @@ func (s *NerveXServer) createReplicas(
 
 			// build collector/learner pod
 			pod, svc, port, err = s.buildPodAndService(template.DeepCopy(), ownRefer, jobName,
-				namespace, replicaType, containerName, portName, defaultPort, resources, volumes)
+				namespace, replicaType, defaultPort, resources, volumes)
 			if err != nil {
 				return results, err
 			}
@@ -260,7 +255,7 @@ func (s *NerveXServer) createReplicas(
 
 				// build ddp learner pod
 				pod, svc, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
-					jobName, namespace, replicaType, containerName, portName, defaultPort, resources, volumes)
+					jobName, namespace, replicaType, defaultPort, resources, volumes)
 				if err != nil {
 					return results, err
 				}
@@ -309,8 +304,7 @@ func (s *NerveXServer) buildAggregatorPod(
 	// create aggregator
 	aresource := servertypes.ResourceQuantity{}
 	pod, svc, port, err := s.buildPodAndService(template, ownRefer, jobName, namespace,
-		nervexutil.AggregatorName, nervexutil.DefaultAggregatorContainerName,
-		nervexutil.DefaultAggregatorPortName, nervexutil.DefaultAggregatorPort, aresource, nil)
+		nervexutil.AggregatorName, nervexutil.DefaultAggregatorPort, aresource, nil)
 	if err != nil {
 		return nil, nil, -1, err
 	}
@@ -328,17 +322,18 @@ func (s *NerveXServer) buildAggregatorPod(
 func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	aggOwnRefer metav1.OwnerReference,
-	jobName, namespace, replicaType, containerName, portName string,
+	jobName, namespace, replicaType string,
 	defaultPort int32, resources servertypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, error) {
 
 	pod, svc, port, err := s.buildPodAndService(template.DeepCopy(), aggOwnRefer, jobName,
-		namespace, nervexutil.DDPLearnerName, containerName, portName, defaultPort, resources, volumes)
+		namespace, nervexutil.DDPLearnerName, defaultPort, resources, volumes)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// set owner reference of NerveXJob to aggregator
 	pod.OwnerReferences = append(pod.OwnerReferences, ownRefer)
+	svc.OwnerReferences = append(svc.OwnerReferences, ownRefer)
 
 	// create port for all the GPU processes
 	for j := 1; j < int(resources.GPU.Value()); j++ {
@@ -355,7 +350,7 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 			ContainerPort: pport,
 		}
 		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name != containerName {
+			if pod.Spec.Containers[i].Name != nervexutil.DefaultContainerName {
 				continue
 			}
 			pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, lcport)
@@ -365,21 +360,14 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 }
 
 func (s *NerveXServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
-	var containerName, portName string
 	var defaultPort int32
 
 	switch replicaType {
 	case nervexutil.CollectorName:
-		containerName = nervexutil.DefaultCollectorContainerName
-		portName = nervexutil.DefaultCollectorPortName
 		defaultPort = nervexutil.DefaultCollectorPort
 	case nervexutil.LearnerName:
-		containerName = nervexutil.DefaultLearnerContainerName
-		portName = nervexutil.DefaultLearnerPortName
 		defaultPort = nervexutil.DefaultLearnerPort
 	case nervexutil.AggregatorName:
-		containerName = nervexutil.DefaultAggregatorContainerName
-		portName = nervexutil.DefaultAggregatorPortName
 		defaultPort = nervexutil.DefaultAggregatorPort
 	default:
 
@@ -397,7 +385,7 @@ func (s *NerveXServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace str
 			return results, err
 		}
 
-		result := nervexutil.GetPodAccessURL(pod, namespace, containerName, portName, defaultPort)
+		result := nervexutil.GetPodAccessURL(pod, defaultPort)
 		results = append(results, result)
 	}
 
@@ -405,16 +393,11 @@ func (s *NerveXServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace str
 }
 
 func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, namespace, replicaType string) ([]string, error) {
-	var containerName, portName string
 	var defaultPort int32
 	switch replicaType {
 	case nervexutil.CollectorName:
-		containerName = nervexutil.DefaultCollectorContainerName
-		portName = nervexutil.DefaultCollectorPortName
 		defaultPort = nervexutil.DefaultCollectorPort
 	case nervexutil.LearnerName:
-		containerName = nervexutil.DefaultLearnerContainerName
-		portName = nervexutil.DefaultLearnerPortName
 		defaultPort = nervexutil.DefaultLearnerPort
 	default:
 
@@ -444,11 +427,11 @@ func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, namespace, replicaTy
 		nervexutil.AddLabelsToPod(pod, labels)
 
 		// build service
-		port, ok := nervexutil.GetPortFromPod(pod, containerName, portName)
+		port, ok := nervexutil.GetPortFromPod(pod)
 		if !ok {
 			port = defaultPort
 		}
-		svc := nervexutil.BuildService(pod.GetLabels(), port, portName)
+		svc := nervexutil.BuildService(pod.GetLabels(), port)
 		svc.SetOwnerReferences(pod.GetOwnerReferences())
 		svc.Name = pod.Name
 

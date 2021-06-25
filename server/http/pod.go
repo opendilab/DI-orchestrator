@@ -69,23 +69,23 @@ func (s *NerveXServer) buildPodAndService(
 	template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	jobName string,
-	namespace, replicaType, containerName, portName string,
+	namespace, replicaType string,
 	port int32,
 	resources servertypes.ResourceQuantity,
 	volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
 	// build pod
-	pod, port, err := nervexutil.BuildPodFromTemplate(template, ownRefer, jobName, namespace, replicaType, containerName, portName, port)
+	pod, port, err := nervexutil.BuildPodFromTemplate(template, ownRefer, jobName, namespace, replicaType, port)
 	if err != nil {
 		return nil, nil, -1, err
 	}
 	// set pod resources
-	s.setPodResources(pod, resources, containerName)
+	s.setPodResources(pod, resources)
 
 	// add volumes
 	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
 
 	// build service
-	svc := nervexutil.BuildService(pod.GetLabels(), port, portName)
+	svc := nervexutil.BuildService(pod.GetLabels(), port)
 	svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
 	svc.Name = pod.Name
 	return pod, svc, port, nil
@@ -153,9 +153,9 @@ func (s *NerveXServer) deleteService(namespace, name string) error {
 	return nil
 }
 
-func (s *NerveXServer) setPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity, containerName string) {
+func (s *NerveXServer) setPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity) {
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name != containerName {
+		if pod.Spec.Containers[i].Name != nervexutil.DefaultContainerName {
 			continue
 		}
 		if pod.Spec.Containers[i].Resources.Limits == nil {
@@ -245,4 +245,40 @@ func (s *NerveXServer) listPodsWithSelector(namespace string, labelSelector labe
 	}
 
 	return pods, nil
+}
+
+func (s *NerveXServer) listReplicaServicesWithSelector(namespace string, labelSelector labels.Selector) (
+	collectors []*corev1.Service, learners []*corev1.Service,
+	coordinator *corev1.Service, aggregators []*corev1.Service, DDPLearners []*corev1.Service, err error) {
+	// list services that belong to the NerveXJob
+	services, err := s.listServicesWithSelector(namespace, labelSelector)
+	if err != nil {
+		return
+	}
+
+	// classify services
+	collectors, learners, coordinator, aggregators, DDPLearners, err = nervexutil.ClassifyServices(services)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (s *NerveXServer) listServicesWithSelector(namespace string, labelSelector labels.Selector) ([]*corev1.Service, error) {
+	ret, err := s.dyi.ServiceInformer.Lister().ByNamespace(namespace).List(labelSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	services := []*corev1.Service{}
+	for _, obj := range ret {
+		serviceUn := obj.(*unstructured.Unstructured)
+		var service corev1.Service
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(serviceUn.UnstructuredContent(), &service); err != nil {
+			return nil, err
+		}
+		services = append(services, &service)
+	}
+
+	return services, nil
 }

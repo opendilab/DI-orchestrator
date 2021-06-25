@@ -19,10 +19,11 @@ var (
 )
 
 type Informers struct {
-	NJInformer   informers.GenericInformer
-	AGInformer   informers.GenericInformer
-	PodInformer  informers.GenericInformer
-	NodeInformer informers.GenericInformer
+	NJInformer      informers.GenericInformer
+	AGInformer      informers.GenericInformer
+	PodInformer     informers.GenericInformer
+	NodeInformer    informers.GenericInformer
+	ServiceInformer informers.GenericInformer
 }
 
 func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Informers {
@@ -54,11 +55,19 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 		Resource: "nodes",
 	}
 
+	// add service informer
+	svcGVR := schema.GroupVersionResource{
+		Group:    corev1.SchemeGroupVersion.Group,
+		Version:  corev1.SchemeGroupVersion.Version,
+		Resource: "services",
+	}
+
 	dyi := Informers{
-		NJInformer:   dif.ForResource(njGVR),
-		AGInformer:   dif.ForResource(aggregatorGVR),
-		PodInformer:  dif.ForResource(podGVR),
-		NodeInformer: dif.ForResource(nodeGVR),
+		NJInformer:      dif.ForResource(njGVR),
+		AGInformer:      dif.ForResource(aggregatorGVR),
+		PodInformer:     dif.ForResource(podGVR),
+		NodeInformer:    dif.ForResource(nodeGVR),
+		ServiceInformer: dif.ForResource(svcGVR),
 	}
 
 	dyi.NJInformer.Informer().AddEventHandler(
@@ -93,8 +102,18 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 
 	dyi.PodInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    addPodHandler,
-			UpdateFunc: updatePodHandler,
+			AddFunc: func(obj interface{}) {
+				// on add object
+				pod, err := GetPodFromObject(obj)
+				if err != nil {
+					if isNotBelongToNerveXJobError(err) {
+						dyi.PodInformer.Informer().GetIndexer().Delete(obj)
+					}
+					return
+				}
+				log.Printf("new pod: %s/%s", pod.GetNamespace(), pod.GetName())
+			},
+			UpdateFunc: func(old, new interface{}) {},
 			DeleteFunc: func(obj interface{}) {
 				// on delete object
 			},
@@ -103,8 +122,24 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 
 	dyi.NodeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
+			AddFunc:    func(obj interface{}) {},
+			UpdateFunc: func(old, new interface{}) {},
+			DeleteFunc: func(obj interface{}) {},
+		},
+	)
+
+	dyi.ServiceInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				log.Printf("new Node: %s", obj.(*unstructured.Unstructured).GetName())
+				// on add object
+				service, err := GetServiceFromObject(obj)
+				if err != nil {
+					if isNotBelongToNerveXJobError(err) {
+						dyi.ServiceInformer.Informer().GetIndexer().Delete(obj)
+					}
+					return
+				}
+				log.Printf("new service: %s/%s", service.GetNamespace(), service.GetName())
 			},
 			UpdateFunc: func(old, new interface{}) {},
 			DeleteFunc: func(obj interface{}) {},

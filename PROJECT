@@ -1,5 +1,6 @@
 domain: sensetime.com
-layout: go.kubebuilder.io/v3
+layout:
+- go.kubebuilder.io/v3
 projectName: nervex
 repo: go-sensephoenix.sensetime.com/nervex-operator
 resources:
@@ -9,15 +10,19 @@ resources:
   controller: true
   domain: sensetime.com
   group: nervex
-  kind: NervexJob
+  kind: NerveXJob
   path: go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1
   version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true
   domain: sensetime.com
   group: nervex
-  kind: ActorLeanerConfig
+  kind: AggregatorConfig
   path: go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

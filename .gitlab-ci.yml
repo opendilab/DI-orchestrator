@@ -28,6 +28,7 @@ stages:
   - lint
   - test
   - build
+  - release
 
 
 lint:
@@ -71,3 +72,41 @@ build-manual:
   after_script:
     - docker image prune -f
 
+build-release:
+  stage: build
+  image: registry.sensetime.com/cloudnative4ai/golang-build-kit:v1.14
+  tags: 
+    - cloudnative4ai-group-runner-phoenix
+  allow_failure: false
+  services:
+    - registry.sensetime.com/cloudnative4ai/docker:19.03.8-dind
+  dependencies:
+    - unit-test
+  only:
+    - master
+    - develop
+    - /^release.*$/
+  script:
+    - make dev-images
+    - make docker-push
+  after_script:
+    - docker image prune -f
+
+tag:
+  stage: release
+  image: registry.sensetime.com/cloudnative4ai/golang-build-kit:v1.14
+  tags:
+    - cloudnative4ai-group-runner-phoenix
+  services:
+    - registry.sensetime.com/cloudnative4ai/docker:19.03.8-dind
+  allow_failure: false
+  dependencies:
+    - build-release
+  only:
+    - master
+    - /^release.*$/
+  script:
+    - make dev-images
+    - make docker-release
+  after_script:
+    - docker image prune -f

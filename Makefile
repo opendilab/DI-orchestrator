@@ -16,8 +16,14 @@ VERSION := $(MASTER_VERSION)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG ?= registry.sensetime.com/cloudnative4ai/nervex-operator:${VERSION}
-SERVER_IMG ?= registry.sensetime.com/cloudnative4ai/nervex-server:${VERSION}
+IMG_BASE ?= registry.sensetime.com/cloudnative4ai/nervex-operator
+SERVER_IMG_BASE ?= registry.sensetime.com/cloudnative4ai/nervex-server
+
+IMG ?= ${IMG_BASE}:${VERSION}
+MASTER_IMG ?= ${IMG_BASE}:${MASTER_VERSION}
+
+SERVER_IMG ?= ${SERVER_IMG_BASE}:${VERSION}
+MASTER_SERVER_IMG ?= ${SERVER_IMG_BASE}:${MASTER_VERSION}
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
@@ -50,14 +56,14 @@ help: ## Display this help.
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=nervex-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
+	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG} ${SERVER_IMG_BASE}=${MASTER_SERVER_IMG}
 	./hack/update-version.sh ${MASTER_VERSION}
 
 # dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
 # used `make manifests` when commited git
 dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=nervex-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	./hack/update-image-tags.sh config/manager ${VERSION}
+	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG} ${SERVER_IMG_BASE}=${SERVER_IMG}
 	./hack/update-version.sh ${VERSION}
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -73,11 +79,9 @@ vet: ## Run go vet against code.
 lint:
 	golangci-lint run -v --timeout=5m
 
-ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
-test: manifests generate fmt vet ## Run tests.
-	mkdir -p ${ENVTEST_ASSETS_DIR}
-	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
-	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); go test ./... -coverprofile cover.out
+.PHONY: test
+test: ginkgo ## Run tests.
+	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./... 
 
 ##@ Build
 
@@ -100,6 +104,12 @@ docker-push: ## Push docker image with the nervex-operator.
 	docker push ${IMG}
 	docker push ${SERVER_IMG}
 
+docker-release: ## Release docker image with the nervex-operator.
+	docker tag ${IMG} ${MASTER_IMG}
+	docker tag ${SERVER_IMG} ${MASTER_SERVER_IMG}
+	docker push ${MASTER_IMG} 
+	docker push ${MASTER_SERVER_IMG}
+
 ##@ Deployment
 
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
@@ -109,12 +119,13 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 dev-deploy: dev-manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
+
+installer-gen: manifests kustomize ## generate nervex-manager.yaml
+	$(KUSTOMIZE) build config/default > config/nervex-manager.yaml
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
@@ -129,6 +140,10 @@ controller-gen: ## Download controller-gen locally if necessary.
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
+
+GINKGO = $(shell pwd)/bin/ginkgo
+ginkgo: ## Download ginkgo locally if necessary.
+	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/ginkgo@v1.14.1)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

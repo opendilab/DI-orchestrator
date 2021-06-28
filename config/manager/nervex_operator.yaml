@@ -26,9 +26,7 @@ spec:
       - command:
         - /nervex-operator
         args:
-        - "--health-probe-bind-address=:8081"
-        - "--metrics-bind-address=:8080"
-        - "--leader-elect"
+        - "--server-address=http://nervex-server.nervex-system:8080"
         image: registry.sensetime.com/cloudnative4ai/nervex-operator:v0.0.1-alpha.0
         imagePullPolicy: Always
         name: manager
@@ -49,8 +47,8 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 30Mi
+            memory: 500Mi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 500Mi
       terminationGracePeriodSeconds: 10

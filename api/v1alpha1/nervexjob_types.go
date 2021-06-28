@@ -29,11 +29,17 @@ type NerveXJobSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Group is a collection of nervex jobs
+	// Group is a collection of NerveXJobs
 	Group string `json:"group,omitempty"`
 
-	//Priority labels the priority of nervex job
+	//Priority labels the priority of NerveXJob
 	PriorityClassName PriorityClassName `json:"priorityClassName,omitempty"`
+
+	// CleanPodPolicy defines the policy to clean pods after NerveXJob completed
+	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
+
+	// Volumes defines the shared volumes for nerveX components
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	Coordinator CoordinatorSpec `json:"coordinator"`
 
@@ -42,7 +48,7 @@ type NerveXJobSpec struct {
 	Learner LearnerSpec `json:"learner,"`
 }
 
-// Priority defines the priority of nervex job
+// Priority defines the priority of NerveXJob
 type PriorityClassName string
 
 const (
@@ -51,6 +57,19 @@ const (
 
 	// HighPriority is high priority
 	HighPriority PriorityClassName = "high"
+)
+
+type CleanPodPolicy string
+
+const (
+	// CleanPodPolicyRunning means deleting all running pods of the job after completed
+	CleanPodPolicyRunning CleanPodPolicy = "Running"
+
+	// CleanPodPolicyALL means deleting all pods of the job after completed
+	CleanPodPolicyALL CleanPodPolicy = "ALL"
+
+	// CleanPodPolicyNone means never deleting any pods of the job after completed
+	CleanPodPolicyNone CleanPodPolicy = "None"
 )
 
 // CoordinatorSpec defines the desired state of coordinators

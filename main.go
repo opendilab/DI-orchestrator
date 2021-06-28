@@ -18,7 +18,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -34,17 +33,13 @@ import (
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
 	"go-sensephoenix.sensetime.com/nervex-operator/controllers"
+	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 	//+kubebuilder:scaffold:imports
 )
 
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
-)
-
-var (
-	DefaultAGConfigNamespace = "nervex-system"
-	DefaultAGConfigName      = "aggregator-config"
 )
 
 func init() {
@@ -55,15 +50,15 @@ func init() {
 }
 
 func main() {
-	var metricsAddr, probeAddr, agconfigNamespace, agconfigName string
+	var metricsAddr, probeAddr, serverAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&agconfigNamespace, "agconfig-namespace", DefaultAGConfigNamespace, "The AggregatorConfig namespace to manage actors and learners.")
-	flag.StringVar(&agconfigName, "agconfig-name", DefaultAGConfigName, "The AggregatorConfig name to manage actors and learners.")
+	flag.StringVar(&serverAddr, "server-address", nervexutil.DefaultServerURL, "The address to access nervex server.")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -85,18 +80,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	agconfig := fmt.Sprintf("%s/%s", agconfigNamespace, agconfigName)
+	// set DefaultNerveXServerURL
+	nervexutil.DefaultServerURL = serverAddr
+
 	reconciler := &controllers.NerveXJobReconciler{
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("NerveXJob"),
 		Scheme:   mgr.GetScheme(),
-		AGConfig: agconfig,
+		Recorder: mgr.GetEventRecorderFor("nervex-operator"),
 	}
 	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NerveXJob")
 		os.Exit(1)
 	}
 
+	if err = (&nervexv1alpha1.NerveXJob{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "NerveXJob")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

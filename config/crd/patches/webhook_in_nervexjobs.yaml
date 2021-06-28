@@ -9,6 +9,9 @@ spec:
     webhook:
       clientConfig:
         service:
-          namespace: system
-          name: webhook-service
-          path: /convert
+          namespace: $(SERVICE_NAMESPACE)
+          name: $(SERVICE_NAME)
+          path: /mutate-nervex-sensetime-com-v1alpha1-nervexjob
+      conversionReviewVersions:
+      - "v1"
+      - "v1beta1"

@@ -13,7 +13,7 @@ class SoloCommander(BaseCommander):
 
     def __init__(self, cfg: dict) -> None:
         self._cfg = cfg
-        self._actor_task_space = LimitedSpaceContainer(0, cfg.actor_task_space)
+        self._collector_task_space = LimitedSpaceContainer(0, cfg.collector_task_space)
         self._learner_task_space = LimitedSpaceContainer(0, cfg.learner_task_space)
         self._learner_info = [{'learner_step': 0}]
         self._evaluator_info = []
@@ -22,30 +22,30 @@ class SoloCommander(BaseCommander):
         self._last_eval_time = 0
         self._policy = None #create_policy(self._cfg.policy, enable_field=['command']).command_mode
 
-    def get_actor_task(self) -> Union[None, dict]:
-        if self._actor_task_space.acquire_space():
-            # print("Have actor space, {}".format(self._actor_task_space.max_val))
+    def get_collector_task(self) -> Union[None, dict]:
+        if self._collector_task_space.acquire_space():
+            # print("Have collector space, {}".format(self._collector_task_space.max_val))
             if self._current_buffer_id is None or self._current_policy_id is None:
-                self._actor_task_space.release_space()
+                self._collector_task_space.release_space()
                 return None
             cur_time = time.time()
             if cur_time - self._last_eval_time > self._cfg.eval_interval:
                 eval_flag = True
             else:
                 eval_flag = False
-            actor_cfg = self._cfg.actor_cfg
-            actor_cfg.collect_setting = {}
-            actor_cfg.policy_update_path = self._current_policy_id
-            actor_cfg.eval_flag = eval_flag
+            collector_cfg = self._cfg.collector_cfg
+            collector_cfg.collect_setting = {}
+            collector_cfg.policy_update_path = self._current_policy_id
+            collector_cfg.eval_flag = eval_flag
             return {
-                'task_id': 'actor_task_{}'.format(get_task_uid()),
+                'task_id': 'collector_task_{}'.format(get_task_uid()),
                 'buffer_id': self._current_buffer_id,
-                'actor_cfg': actor_cfg,
+                'collector_cfg': collector_cfg,
                 'policy': self._cfg.policy,
                 'target': random.randint(1, 5),
             }
         else:
-            # print("No actor space")
+            # print("No collector space")
             return None
 
     def get_learner_task(self) -> Union[None, dict]:
@@ -63,14 +63,14 @@ class SoloCommander(BaseCommander):
         else:
             return None
 
-    def finish_actor_task(self, task_id: str, finished_task: dict) -> bool:
-        self._actor_task_space.release_space()
+    def finish_collector_task(self, task_id: str, finished_task: dict) -> bool:
+        self._collector_task_space.release_space()
         if finished_task['eval_flag']:
             self._last_eval_time = time.time()
             self._evaluator_info.append(finished_task)
-            if random.random() <= self._cfg.actor_cfg.env_kwargs.eval_stop_ptg:
+            if random.random() <= self._cfg.collector_cfg.env_kwargs.eval_stop_ptg:
                 return True
-            # eval_stop_val = self._cfg.actor_cfg.env_kwargs.eval_stop_val
+            # eval_stop_val = self._cfg.collector_cfg.env_kwargs.eval_stop_val
             # if eval_stop_val is not None and finished_task['reward_mean'] >= eval_stop_val:
             #     return True
         return False
@@ -85,11 +85,11 @@ class SoloCommander(BaseCommander):
         self._last_eval_time = 0
         return buffer_id
 
-    def decrease_actor_task_space(self):
-        self._actor_task_space.decrease_space()
+    def decrease_collector_task_space(self):
+        self._collector_task_space.decrease_space()
 
-    def increase_actor_task_space(self):
-        self._actor_task_space.increase_space()
+    def increase_collector_task_space(self):
+        self._collector_task_space.increase_space()
 
     def decrease_learner_task_space(self):
         self._learner_task_space.decrease_space()
@@ -97,8 +97,8 @@ class SoloCommander(BaseCommander):
     def increase_learner_task_space(self):
         self._learner_task_space.increase_space()
 
-    def notify_fail_actor_task(self, task: dict) -> None:
-        self._actor_task_space.release_space()
+    def notify_fail_collector_task(self, task: dict) -> None:
+        self._collector_task_space.release_space()
 
     def notify_fail_learner_task(self, task: dict) -> None:
         self._learner_task_space.release_space()

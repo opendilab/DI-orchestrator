@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -9,20 +11,54 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-)
-
-var (
-	statusUpdateRetries = 3
+	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
 )
 
 const (
+	SuccessfulDeleteReason = "SuccessfulDelete"
+	FailedDeleteReason     = "FailedDelete"
+	SuccessfulCreateReason = "SuccessfulCreate"
+	FailedCreateReason     = "FailedCreate"
+
 	NerveXJobCreatedReason   = "NerveXJobCreated"
 	NerveXJobRunningReason   = "NerveXJobRunning"
 	NerveXJobFailedReason    = "NerveXJobFailed"
 	NerveXJobSucceededReason = "NerveXJobSucceeded"
+
+	statusUpdateRetries        = 3
+	statusUpdatedPauseDuration = 50 * time.Millisecond
 )
 
-func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
+func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *nervexv1alpha1.NerveXJob,
+	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregators []*corev1.Pod) error {
+	log := r.Log.WithValues("nervexjob", nervexutil.NamespacedName(job.Namespace, job.Name))
+	// update replica status
+	updateReplicasStatues(job, collectors, learners, coordinator, aggregators)
+
+	if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Active > 0 {
+		msg := fmt.Sprintf("coordinator and aggregator of NerveXJob %s are running", job.Name)
+		if err := r.updateJobPhase(ctx, job, nervexv1alpha1.JobRunning, NerveXJobRunningReason, msg); err != nil {
+			return err
+		}
+
+	} else if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Failed > 0 {
+		msg := fmt.Sprintf("NerveXJob %s failed because coordinator failed", job.Name)
+		log.Info(msg)
+		if err := r.updateJobPhase(ctx, job, nervexv1alpha1.JobFailed, NerveXJobFailedReason, msg); err != nil {
+			return err
+		}
+
+	} else if job.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Succeeded > 0 {
+		msg := fmt.Sprintf("NerveXJob %s succeeded because coordinator succeeded", job.Name)
+		log.Info(msg)
+		if err := r.updateJobPhase(ctx, job, nervexv1alpha1.JobSucceeded, NerveXJobSucceededReason, msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *NerveXJobReconciler) updateNerveXJobStatusInCluster(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
 	var err error
 	for i := 0; i < statusUpdateRetries; i++ {
 		newJob := &nervexv1alpha1.NerveXJob{}
@@ -32,10 +68,30 @@ func (r *NerveXJobReconciler) updateNerveXJobStatus(ctx context.Context, job *ne
 		}
 		newJob.Status = job.Status
 		if err := r.Status().Update(ctx, newJob, &client.UpdateOptions{}); err == nil {
+			time.Sleep(statusUpdatedPauseDuration)
 			break
 		}
 	}
 	return err
+}
+
+func (r *NerveXJobReconciler) updateJobPhase(
+	ctx context.Context, job *nervexv1alpha1.NerveXJob, phase nervexv1alpha1.Phase, reason string, msg string) error {
+	job.Status.Phase = phase
+	updateNerveXJobConditions(job, phase, reason, msg)
+
+	switch phase {
+	case nervexv1alpha1.JobCreated, nervexv1alpha1.JobRunning:
+		// ignore events when job are created or running
+	case nervexv1alpha1.JobFailed:
+		r.Recorder.Eventf(job, corev1.EventTypeWarning, reason, msg)
+	case nervexv1alpha1.JobSucceeded:
+		r.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
+	default:
+		r.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
+	}
+
+	return nil
 }
 
 func initializeNerveXJobReplicaStatus(job *nervexv1alpha1.NerveXJob) {
@@ -50,7 +106,7 @@ func initializeNerveXJobReplicaStatus(job *nervexv1alpha1.NerveXJob) {
 }
 
 func updateReplicasStatues(job *nervexv1alpha1.NerveXJob,
-	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregator *corev1.Pod) {
+	collectors []*corev1.Pod, learners []*corev1.Pod, coordinator *corev1.Pod, aggregators []*corev1.Pod) {
 	// update collector status
 	for _, collector := range collectors {
 		updateReplicaStatus(collector, job, nervexv1alpha1.ReplicaTypeCollector)
@@ -62,7 +118,9 @@ func updateReplicasStatues(job *nervexv1alpha1.NerveXJob,
 	}
 
 	// update aggregator
-	updateReplicaStatus(aggregator, job, nervexv1alpha1.ReplicaTypeAggregator)
+	for _, aggregator := range aggregators {
+		updateReplicaStatus(aggregator, job, nervexv1alpha1.ReplicaTypeAggregator)
+	}
 
 	// update coordinator
 	updateReplicaStatus(coordinator, job, nervexv1alpha1.ReplicaTypeCoordinator)
@@ -70,9 +128,38 @@ func updateReplicasStatues(job *nervexv1alpha1.NerveXJob,
 }
 
 func updateReplicaStatus(pod *corev1.Pod, job *nervexv1alpha1.NerveXJob, replicaType nervexv1alpha1.ReplicaType) {
+	if nervexutil.IsTerminating(pod) {
+		return
+	}
+	containerName := ""
+	switch replicaType {
+	case nervexv1alpha1.ReplicaTypeCoordinator:
+		containerName = nervexutil.CoordinatorName
+	case nervexv1alpha1.ReplicaTypeAggregator:
+		containerName = nervexutil.AggregatorName
+	case nervexv1alpha1.ReplicaTypeCollector:
+		containerName = nervexutil.CollectorName
+	case nervexv1alpha1.ReplicaTypeLearner:
+		containerName = nervexutil.LearnerName
+	}
 	switch pod.Status.Phase {
 	case corev1.PodRunning:
-		job.Status.ReplicaStatus[replicaType].Active++
+		terminated := false
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name == containerName && status.State.Terminated != nil {
+				terminated = true
+				switch status.State.Terminated.Reason {
+				case "Error":
+					job.Status.ReplicaStatus[replicaType].Failed++
+				case "Completed":
+					job.Status.ReplicaStatus[replicaType].Succeeded++
+				}
+				break
+			}
+		}
+		if !terminated {
+			job.Status.ReplicaStatus[replicaType].Active++
+		}
 	case corev1.PodFailed:
 		job.Status.ReplicaStatus[replicaType].Failed++
 	case corev1.PodSucceeded:

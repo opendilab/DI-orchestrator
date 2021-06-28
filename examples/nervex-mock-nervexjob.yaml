@@ -1,15 +1,16 @@
 apiVersion: nervex.sensetime.com/v1alpha1
 kind: NerveXJob
 metadata:
-  name: nervexjob-example-1
+  name: nervexjob-example
 spec:
   group: xxx
-  priorityClassName: default
+  priorityClassName: ""
+  cleanPodPolicy: "Running"
   coordinator:
     template:
       spec:
         containers:
-        - name: coordinator
+        - name: nervex-container
           image: registry.sensetime.com/cloudnative4ai/nervex-mock:v0.0.5
           imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
@@ -19,23 +20,23 @@ spec:
     template:
       spec:
         containers:
-        - name: collector
+        - name: nervex-container
           image: registry.sensetime.com/cloudnative4ai/nervex-mock:v0.0.5
           imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
           args: ["until ping -c 1 $HOSTNAME.default ; do sleep 1 ; done ; sleep 10; python3 -u main.py collector -l $HOSTNAME.default -p $COLLECTOR_PORT"]
           ports:
-          - name: collector
+          - name: nervex-port
             containerPort: 80
   learner:
     template:
       spec:
         containers:
-        - name: learner
+        - name: nervex-container
           image: registry.sensetime.com/cloudnative4ai/nervex-mock:v0.0.5
           imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
           args: ["until ping -c 1 $HOSTNAME.default ; do sleep 1 ; done ; sleep 10; python3 -u main.py learner -l $HOSTNAME.default -p $LEARNER_PORT"]
           ports:
-          - name: learner
+          - name: nervex-port
             containerPort: 80

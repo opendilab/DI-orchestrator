@@ -8,12 +8,14 @@ type NerveXJobRequestParams struct {
 	Namespace   []string `json:"namespace"`
 	Coordinator []string `json:"coordinator"`
 	Name        []string `json:"name"`
+	Aggregator  []string `json:"aggregator"`
 }
 
 const (
 	RequestParamTypeNamespace   string = "namespace"
 	RequestParamTypeCoordinator string = "coordinator"
 	RequestParamTypeName        string = "name"
+	RequestParamTypeAggregator  string = "aggregator"
 )
 
 type NerveXJobRequest struct {
@@ -28,6 +30,15 @@ type ResourceQuantity struct {
 	CPU      resource.Quantity `json:"cpus"`
 	GPU      resource.Quantity `json:"gpus"`
 	Memory   resource.Quantity `json:"memory"`
+}
+
+func (in *ResourceQuantity) DeepCopy() *ResourceQuantity {
+	out := &ResourceQuantity{}
+	out.Replicas = in.Replicas
+	out.CPU = in.CPU.DeepCopy()
+	out.GPU = in.GPU.DeepCopy()
+	out.Memory = in.Memory.DeepCopy()
+	return out
 }
 
 type Response struct {

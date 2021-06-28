@@ -1,33 +1,42 @@
 import time
 import argparse
-from threading import Thread
+from threading import Thread, Event
+import logging
 
-from worker import MockCoordinator, MockActor, MockLearner, MockLearnerAggregator
+from worker import MockCoordinator, MockCollector, MockLearner, MockLearnerAggregator
 
 def info(args):
     print("====")
 
 def start_cooridnator(args):
+    if args.disable_flask_log == True:
+        log = logging.getLogger('werkzeug')
+        log.disabled = True
+
     host, port      = args.listen, args.port
     nervex_server   = args.server
 
     coordinator = MockCoordinator(host, port, nervex_server)
+    coordinator.start()
+    system_shutdown_event = Event()
+
     def shutdown_monitor():
         while True:
             time.sleep(3)
             if coordinator.system_shutdown_flag:
                 coordinator.close()
+                system_shutdown_event.set()
                 break
 
     shutdown_monitor_thread = Thread(target=shutdown_monitor, args=(), daemon=True, name='shutdown_monitor')
     shutdown_monitor_thread.start()
+    system_shutdown_event.wait()
+    print("[nerveX parallel pipeline]Your RL agent is converged, you can refer to 'log' and 'tensorboard' for details")
 
-    coordinator.start()
-
-def start_actor(args):
+def start_collector(args):
     host, port = args.listen, args.port
-    actor = MockActor(host, port)
-    actor.start()
+    collector = MockCollector(host, port)
+    collector.start()
 
 def start_learner(args):
     host, port = args.listen, args.port
@@ -50,13 +59,14 @@ def parse_args():
     parser_coordinator.add_argument("--server", type=str, default='http://nervex-server.nervex-system:8080', help="ip address")
     parser_coordinator.add_argument("-l", "--listen", default="localhost", help="Specify the IP address on which the server listens")
     parser_coordinator.add_argument("-p", "--port", type=int, default=8000, help="Specify the port on which the server listens")
+    parser_coordinator.add_argument('--disable_flask_log', default=True, type=bool, help='whether disable flask log')
     parser_coordinator.set_defaults(func=start_cooridnator)
 
-    # Actor
-    parser_actor = subparsers.add_parser("actor", help="start a new actor")
-    parser_actor.add_argument("-l", "--listen", default="localhost", help="Specify the IP address on which the server listens")
-    parser_actor.add_argument("-p", "--port", type=int, default=13339, help="Specify the port on which the server listens")
-    parser_actor.set_defaults(func=start_actor)
+    # Collector
+    parser_collector = subparsers.add_parser("collector", help="start a new collector")
+    parser_collector.add_argument("-l", "--listen", default="localhost", help="Specify the IP address on which the server listens")
+    parser_collector.add_argument("-p", "--port", type=int, default=13339, help="Specify the port on which the server listens")
+    parser_collector.set_defaults(func=start_collector)
 
     # Learner
     parser_learner = subparsers.add_parser("learner", help="start a new learner")

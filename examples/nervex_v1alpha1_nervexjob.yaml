@@ -4,125 +4,438 @@ metadata:
   name: nervexjob-example
 spec:
   group: xxx
-  priorityClassName: default
+  priorityClassName: ""
+  cleanPodPolicy: "Running"
+  volumes:
+  - name: data-dir
+    hostPath:
+      path: /data/nfs/nervex/cartpole
+  - name: cache-volume
+    emptyDir:
+      medium: Memory
+      sizeLimit: 128Mi
   coordinator:
     template:
       spec:
         containers:
-        - name: coordinator
-          image: registry.sensetime.com/cloudnative4ai/nervex-parallel-linklink-migration:v0.10
+        - name: nervex-container
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
             value: "en_US.utf-8"
           - name: LANG
             value: "en_US.utf-8"
-          - name: NCCL_SHM_DISABLE
+          - name: PYTHONUNBUFFERED
             value: "1"
           command: ["/bin/bash", "-c",]
           args:
-          - >
-            cd /nfs/lijianwen/test_atari/test3;
-            python3 -u -c 'import nervex.entry.parallel_entry as pe; pe.launch_coordinator(filename="atari_impala_default_config.py.pkl")';
-            while true; do sleep 30; done;
+          - |
+            cat <<EOF > cartpole_dqn_config.py 
+            from easydict import EasyDict
+
+            cartpole_dqn_config = dict(
+                env=dict(
+                    collector_env_num=8,
+                    collector_episode_num=2,
+                    evaluator_env_num=5,
+                    evaluator_episode_num=1,
+                    stop_value=195,
+                ),
+                policy=dict(
+                    cuda=False,
+                    model=dict(
+                        obs_shape=4,
+                        action_shape=2,
+                        hidden_size_list=[128, 128, 64],
+                        dueling=True,
+                    ),
+                    nstep=3,
+                    discount_factor=0.97,
+                    learn=dict(
+                        multi_gpu=True,
+                        batch_size=32,
+                        learning_rate=0.001,
+                        learner=dict(
+                            learner_num=1,
+                            send_policy_freq=1,
+                        ),
+                    ),
+                    collect=dict(
+                        n_sample=16,
+                        collector=dict(
+                            collector_num=2,
+                            update_policy_second=3,
+                        ),
+                    ),
+                    eval=dict(evaluator=dict(eval_freq=50, )),
+                    other=dict(
+                        eps=dict(
+                            type='exp',
+                            start=0.95,
+                            end=0.1,
+                            decay=100000,
+                        ),
+                        replay_buffer=dict(
+                            replay_buffer_size=100000,
+                            enable_track_used_data=False,
+                        ),
+                        commander=dict(
+                            collector_task_space=2,
+                            learner_task_space=1,
+                            eval_interval=5,
+                        ),
+                    ),
+                ),
+            )
+            cartpole_dqn_config = EasyDict(cartpole_dqn_config)
+            main_config = cartpole_dqn_config
+
+            cartpole_dqn_create_config = dict(
+                env=dict(
+                    type='cartpole',
+                    import_names=['app_zoo.classic_control.cartpole.envs.cartpole_env'],
+                ),
+                env_manager=dict(type='base'),
+                policy=dict(type='dqn_command'),
+                learner=dict(type='base', import_names=['nervex.worker.learner.base_learner']),
+                collector=dict(
+                    type='zergling',
+                    import_names=['nervex.worker.collector.zergling_collector'],
+                ),
+                commander=dict(
+                    type='solo',
+                    import_names=['nervex.worker.coordinator.solo_parallel_commander'],
+                ),
+                comm_learner=dict(
+                    type='flask_fs',
+                    import_names=['nervex.worker.learner.comm.flask_fs_learner'],
+                ),
+                comm_collector=dict(
+                    type='flask_fs',
+                    import_names=['nervex.worker.collector.comm.flask_fs_collector'],
+                ),
+            )
+            cartpole_dqn_create_config = EasyDict(cartpole_dqn_create_config)
+            create_config = cartpole_dqn_create_config
+
+            cartpole_dqn_system_config = dict(
+                coordinator=dict(
+                    operator_server=dict(
+                        system_addr='nervex-server.nervex-system:8080',
+                        api_version='/v1alpha1',
+                        init_replicas_request=dict(
+                            collectors={
+                                "replicas": 2,
+                            },
+                            learners={
+                                "gpu": "2",
+                                "replicas": 1,
+                            },
+                        ),
+                        collector_target_num=2,
+                        learner_target_num=1,
+                    ),
+                ),
+                path_data='/data/nfs/nervex/cartpole/data',
+                path_policy='/data/nfs/nervex/cartpole/policy',
+                communication_mode='auto',
+                learner_multi_gpu=False,
+                learner_gpu_num=2
+            )
+            cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
+            system_config = cartpole_dqn_system_config
+            EOF
+            nervex -m dist --module config -p k8s -c cartpole_dqn_config.py -s 0;
+            nervex -m dist --module coordinator -p k8s -c cartpole_dqn_config.py.pkl -s 0 --disable_flask_log 0
           ports:
-          - name: coordinator
-            containerPort: 22273
-          resources:
-            requests:
-              cpu: 2
-              memory: 5Gi
-            limits:
-              cpu: 2
-              memory: 5Gi
+          - name: nervex-port
+            containerPort: 22270
           volumeMounts:
-          - name: config
-            mountPath: /data/nervex
-        volumes:
-        - name: config
-          nfs:
-            path: /data/nfs/nervex
-            server: 10.152.197.14
+          - name: data-dir
+            mountPath: /data/nfs/nervex/cartpole
   collector:
     template:
       spec:
         containers:
-        - name: collector
-          image: registry.sensetime.com/cloudnative4ai/nervex-parallel-linklink-migration:v0.10
+        - name: nervex-container
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
             value: "en_US.utf-8"
           - name: LANG
             value: "en_US.utf-8"
-          - name: NCCL_SHM_DISABLE
+          - name: PYTHONUNBUFFERED
             value: "1"
           command: ["/bin/bash", "-c",]
           args:
-          - >
-            until ping -c 1 $HOSTNAME &>/dev/null ; do sleep 1 ; done ;
-            cd $EXECTIONPATH;
-            python3 -u -c 'import os; import nervex.entry.parallel_entry as pe; pe.launch_actor(filename="$REALFILENAME", name="actor{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
+          - |
+            cat <<EOF > cartpole_dqn_config.py 
+            from easydict import EasyDict
+
+            cartpole_dqn_config = dict(
+                env=dict(
+                    collector_env_num=8,
+                    collector_episode_num=2,
+                    evaluator_env_num=5,
+                    evaluator_episode_num=1,
+                    stop_value=195,
+                ),
+                policy=dict(
+                    cuda=False,
+                    model=dict(
+                        obs_shape=4,
+                        action_shape=2,
+                        hidden_size_list=[128, 128, 64],
+                        dueling=True,
+                    ),
+                    nstep=3,
+                    discount_factor=0.97,
+                    learn=dict(
+                        multi_gpu=True,
+                        batch_size=32,
+                        learning_rate=0.001,
+                        learner=dict(
+                            learner_num=1,
+                            send_policy_freq=1,
+                        ),
+                    ),
+                    collect=dict(
+                        n_sample=16,
+                        collector=dict(
+                            collector_num=2,
+                            update_policy_second=3,
+                        ),
+                    ),
+                    eval=dict(evaluator=dict(eval_freq=50, )),
+                    other=dict(
+                        eps=dict(
+                            type='exp',
+                            start=0.95,
+                            end=0.1,
+                            decay=100000,
+                        ),
+                        replay_buffer=dict(
+                            replay_buffer_size=100000,
+                            enable_track_used_data=False,
+                        ),
+                        commander=dict(
+                            collector_task_space=2,
+                            learner_task_space=1,
+                            eval_interval=5,
+                        ),
+                    ),
+                ),
+            )
+            cartpole_dqn_config = EasyDict(cartpole_dqn_config)
+            main_config = cartpole_dqn_config
+
+            cartpole_dqn_create_config = dict(
+                env=dict(
+                    type='cartpole',
+                    import_names=['app_zoo.classic_control.cartpole.envs.cartpole_env'],
+                ),
+                env_manager=dict(type='base'),
+                policy=dict(type='dqn_command'),
+                learner=dict(type='base', import_names=['nervex.worker.learner.base_learner']),
+                collector=dict(
+                    type='zergling',
+                    import_names=['nervex.worker.collector.zergling_collector'],
+                ),
+                commander=dict(
+                    type='solo',
+                    import_names=['nervex.worker.coordinator.solo_parallel_commander'],
+                ),
+                comm_learner=dict(
+                    type='flask_fs',
+                    import_names=['nervex.worker.learner.comm.flask_fs_learner'],
+                ),
+                comm_collector=dict(
+                    type='flask_fs',
+                    import_names=['nervex.worker.collector.comm.flask_fs_collector'],
+                ),
+            )
+            cartpole_dqn_create_config = EasyDict(cartpole_dqn_create_config)
+            create_config = cartpole_dqn_create_config
+
+            cartpole_dqn_system_config = dict(
+                coordinator=dict(
+                    operator_server=dict(
+                        system_addr='nervex-server.nervex-system:8080',
+                        api_version='/v1alpha1',
+                        init_replicas_request=dict(
+                            collectors={
+                                "replicas": 2,
+                            },
+                            learners={
+                                "gpu": "2",
+                                "replicas": 1,
+                            },
+                        ),
+                        collector_target_num=2,
+                        learner_target_num=1,
+                    ),
+                ),
+                path_data='/data/nfs/nervex/cartpole/data',
+                path_policy='/data/nfs/nervex/cartpole/policy',
+                communication_mode='auto',
+                learner_multi_gpu=False,
+                learner_gpu_num=2
+            )
+            cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
+            system_config = cartpole_dqn_system_config
+            EOF
+            nervex -m dist --module config -p k8s -c cartpole_dqn_config.py -s 0;
+            nervex -m dist --module collector -c cartpole_dqn_config.py.pkl -s 0
           ports:
-          - name: collector
+          - name: nervex-port
             containerPort: 22270
-          resources:
-            requests:
-              cpu: 2
-              memory: 5Gi
-            limits:
-              cpu: 2
-              memory: 5Gi
           volumeMounts:
-          - name: config
-            mountPath: /data/nervex
-        volumes:
-        - name: config
-          nfs:
-            path: /data/nfs/nervex
-            server: 10.152.197.14
+          - name: data-dir
+            mountPath: /data/nfs/nervex/cartpole
   learner:
     template:
       spec:
         containers:
-        - name: learner
-          image: registry.sensetime.com/cloudnative4ai/nervex-parallel-linklink-migration:v0.10
+        - name: nervex-container
+          image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
           - name: LC_ALL
             value: "en_US.utf-8"
           - name: LANG
             value: "en_US.utf-8"
-          - name: NCCL_SHM_DISABLE
+          - name: PYTHONUNBUFFERED
             value: "1"
+          - name: ENABLE_LINKLINK
+            value: "true"
           command: ["/bin/bash", "-c",]
           args:
-          - >
-            until ping -c 1 $HOSTNAME &>/dev/null ; do sleep 1 ; done ;
-            cd $EXECTIONPATH;
-            mpirun -np $REPEATNUM python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
-            python3 -u -c 'import os; import pickle; import nervex.entry.parallel_entry as pe; pe.launch_learner(filename="$REALFILENAME", name="learner{}".format(os.environ["HOSTNAME"].split("-")[-1]) )';
+          - |
+            cat <<EOF > cartpole_dqn_config.py 
+            from easydict import EasyDict
+
+            cartpole_dqn_config = dict(
+                env=dict(
+                    collector_env_num=8,
+                    collector_episode_num=2,
+                    evaluator_env_num=5,
+                    evaluator_episode_num=1,
+                    stop_value=195,
+                ),
+                policy=dict(
+                    cuda=False,
+                    model=dict(
+                        obs_shape=4,
+                        action_shape=2,
+                        hidden_size_list=[128, 128, 64],
+                        dueling=True,
+                    ),
+                    nstep=3,
+                    discount_factor=0.97,
+                    learn=dict(
+                        multi_gpu=True,
+                        batch_size=32,
+                        learning_rate=0.001,
+                        learner=dict(
+                            learner_num=1,
+                            send_policy_freq=1,
+                        ),
+                    ),
+                    collect=dict(
+                        n_sample=16,
+                        collector=dict(
+                            collector_num=2,
+                            update_policy_second=3,
+                        ),
+                    ),
+                    eval=dict(evaluator=dict(eval_freq=50, )),
+                    other=dict(
+                        eps=dict(
+                            type='exp',
+                            start=0.95,
+                            end=0.1,
+                            decay=100000,
+                        ),
+                        replay_buffer=dict(
+                            replay_buffer_size=100000,
+                            enable_track_used_data=False,
+                        ),
+                        commander=dict(
+                            collector_task_space=2,
+                            learner_task_space=1,
+                            eval_interval=5,
+                        ),
+                    ),
+                ),
+            )
+            cartpole_dqn_config = EasyDict(cartpole_dqn_config)
+            main_config = cartpole_dqn_config
+
+            cartpole_dqn_create_config = dict(
+                env=dict(
+                    type='cartpole',
+                    import_names=['app_zoo.classic_control.cartpole.envs.cartpole_env'],
+                ),
+                env_manager=dict(type='base'),
+                policy=dict(type='dqn_command'),
+                learner=dict(type='base', import_names=['nervex.worker.learner.base_learner']),
+                collector=dict(
+                    type='zergling',
+                    import_names=['nervex.worker.collector.zergling_collector'],
+                ),
+                commander=dict(
+                    type='solo',
+                    import_names=['nervex.worker.coordinator.solo_parallel_commander'],
+                ),
+                comm_learner=dict(
+                    type='flask_fs',
+                    import_names=['nervex.worker.learner.comm.flask_fs_learner'],
+                ),
+                comm_collector=dict(
+                    type='flask_fs',
+                    import_names=['nervex.worker.collector.comm.flask_fs_collector'],
+                ),
+            )
+            cartpole_dqn_create_config = EasyDict(cartpole_dqn_create_config)
+            create_config = cartpole_dqn_create_config
+
+            cartpole_dqn_system_config = dict(
+                coordinator=dict(
+                    operator_server=dict(
+                        system_addr='nervex-server.nervex-system:8080',
+                        api_version='/v1alpha1',
+                        init_replicas_request=dict(
+                            collectors={
+                                "replicas": 2,
+                            },
+                            learners={
+                                "gpu": "2",
+                                "replicas": 1,
+                            },
+                        ),
+                        collector_target_num=2,
+                        learner_target_num=1,
+                    ),
+                ),
+                path_data='/data/nfs/nervex/cartpole/data',
+                path_policy='/data/nfs/nervex/cartpole/policy',
+                communication_mode='auto',
+                learner_multi_gpu=False,
+                learner_gpu_num=2
+            )
+            cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
+            system_config = cartpole_dqn_system_config
+            EOF
+            nervex -m dist --module config -p k8s -c cartpole_dqn_config.py -s 0;
+            nervex -m dist --module learner -c cartpole_dqn_config.py.pkl -s 0
           ports:
-          - name: learner
-            containerPort: 22271
-          resources:
-            requests:
-              cpu: 2
-              memory: 5Gi
-            limits:
-              cpu: 2
-              memory: 5Gi
+          - name: nervex-port
+            containerPort: 22270
           volumeMounts:
-          - name: config
-            mountPath: /data/nervex
           - name: cache-volume
             mountPath: /dev/shm
-        volumes:
-        - name: config
-          nfs:
-            path: /data/nfs/nervex
-            server: 10.152.197.14
-        - name: cache-volume
-          emptyDir:
-            medium: Memory
-            sizeLimit: 128Mi
+          - name: data-dir
+            mountPath: /data/nfs/nervex/cartpole
+    

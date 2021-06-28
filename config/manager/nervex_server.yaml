@@ -37,38 +37,8 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 30Mi
+            memory: 500Mi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 500Mi
       terminationGracePeriodSeconds: 10
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: nervex-server
-  namespace: nervex-system
-spec:
-  selector:
-    control-plane: nervex-server
-  ports:
-    - protocol: TCP
-      port: 8080
-      targetPort: 8080
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: nervex-server-nodeport
-  namespace: nervex-system
-spec:
-  selector:
-    control-plane: nervex-server
-  type: NodePort
-  ports:
-    - protocol: TCP
-      port: 8080
-      targetPort: 8080
-      nodePort: 32270

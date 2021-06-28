@@ -9,6 +9,7 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - events
   - pods
   - services
   verbs:
@@ -19,6 +20,14 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - nodes
+  verbs:
+  - get
+  - list
 - apiGroups:
   - nervex.sensetime.com
   resources:

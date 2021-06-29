@@ -125,7 +125,6 @@ func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 	// create collectors
 	collectorTemplate := job.Spec.Collector.Template
 	collectors, err := s.createReplicas(&collectorTemplate, volumes, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.CollectorName, nil)
-
 	if err != nil {
 		return collectors, nil, err
 	}
@@ -133,7 +132,6 @@ func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 	// create learners
 	learnerTemplate := job.Spec.Learner.Template
 	learners, err := s.createReplicas(&learnerTemplate, volumes, ownRefer, njreq.Learners, njreq.Namespace, nervexutil.LearnerName, agtemplate)
-
 	if err != nil {
 		return collectors, learners, err
 	}
@@ -412,7 +410,7 @@ func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.S
 			defaultPort = nervexutil.DefaultAggregatorPort
 			needDDPLearner = true
 		default:
-			return nil, fmt.Errorf("unknown replica type")
+			return results, fmt.Errorf("unknown replica type")
 		}
 
 		// build new ddp learners
@@ -423,13 +421,13 @@ func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.S
 			aggregatorName := oldPod.Name
 			ddppods, ddpsvcs, err = s.rebuildDDPLearners(namespace, aggregatorName)
 			if err != nil {
-				return nil, err
+				return results, err
 			}
 		}
 
 		// delete pods and services
 		if err := s.deletePodAndService(namespace, oldPod.Name); err != nil {
-			return nil, err
+			return results, err
 		}
 
 		oldService := services[i]

@@ -3,7 +3,9 @@ package http
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	mapset "github.com/deckarep/golang-set"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -17,10 +19,17 @@ import (
 )
 
 func (s *NerveXServer) getPodsByNames(namespace string, names []string) ([]*corev1.Pod, error) {
+	// use set to filter out duplicate items
+	nameSlice := []interface{}{}
+	for _, name := range names {
+		nameSlice = append(nameSlice, name)
+	}
+	nameSet := mapset.NewSetFromSlice(nameSlice)
+
 	var keys []string
 	var pods []*corev1.Pod
-	for _, name := range names {
-		key := nervexutil.NamespacedName(namespace, name)
+	for name := range nameSet.Iterator().C {
+		key := nervexutil.NamespacedName(namespace, name.(string))
 		keys = append(keys, key)
 	}
 
@@ -65,6 +74,54 @@ func (s *NerveXServer) getPodByKey(key string) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
+func (s *NerveXServer) getServicesByNames(namespace string, names []string) ([]*corev1.Service, error) {
+	var keys []string
+	var services []*corev1.Service
+	for _, name := range names {
+		key := nervexutil.NamespacedName(namespace, name)
+		keys = append(keys, key)
+	}
+
+	services, err := s.getServicesByKeys(keys)
+	if err != nil {
+		return services, err
+	}
+	return services, nil
+}
+
+func (s *NerveXServer) getServicesByKeys(keys []string) ([]*corev1.Service, error) {
+	var services []*corev1.Service
+	for _, key := range keys {
+		svc, err := s.getServiceByKey(key)
+		if err != nil {
+			return services, err
+		}
+		services = append(services, svc)
+	}
+	return services, nil
+}
+
+func (s *NerveXServer) getServiceByKey(key string) (*corev1.Service, error) {
+	obj, exists, err := s.dyi.ServiceInformer.Informer().GetIndexer().GetByKey(key)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to get service: %s", err)
+		return nil, fmt.Errorf(errMsg)
+	}
+	if !exists {
+		errMsg := fmt.Sprintf("service: %s not exists in cache", key)
+		return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
+	}
+
+	serviceUn := obj.(*unstructured.Unstructured)
+	var service corev1.Service
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(serviceUn.UnstructuredContent(), &service)
+	if err != nil {
+		errMsg := fmt.Sprintf("failed to convert unstructured: %s", serviceUn.UnstructuredContent())
+		return nil, fmt.Errorf(errMsg)
+	}
+	return &service, nil
+}
+
 func (s *NerveXServer) buildPodAndService(
 	template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
@@ -97,6 +154,20 @@ func (s *NerveXServer) createPodAndService(namespace string, pod *corev1.Pod, se
 	if err != nil {
 		return nil, err
 	}
+
+	// make sure newpod is the controller of service
+	for i := range service.OwnerReferences {
+		service.OwnerReferences[i].Controller = func(c bool) *bool { return &c }(false)
+	}
+	ownRefer := metav1.OwnerReference{
+		APIVersion: corev1.SchemeGroupVersion.Version,
+		Kind:       "Pod",
+		Name:       newpod.Name,
+		UID:        newpod.UID,
+		Controller: func(c bool) *bool { return &c }(true),
+	}
+	service.OwnerReferences = append(service.OwnerReferences, ownRefer)
+
 	// create service
 	if err := s.createService(namespace, service); err != nil {
 		return newpod, err
@@ -140,14 +211,16 @@ func (s *NerveXServer) deletePodAndService(namespace, name string) error {
 }
 
 func (s *NerveXServer) deletePod(namespace, name string) error {
-	if err := s.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
+	if err := s.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), name,
+		metav1.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	}
 	return nil
 }
 
 func (s *NerveXServer) deleteService(namespace, name string) error {
-	if err := s.KubeClient.CoreV1().Services(namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil && !k8serrors.IsNotFound(err) {
+	if err := s.KubeClient.CoreV1().Services(namespace).Delete(context.Background(), name,
+		metav1.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	}
 	return nil
@@ -281,4 +354,41 @@ func (s *NerveXServer) listServicesWithSelector(namespace string, labelSelector 
 	}
 
 	return services, nil
+}
+
+func rebuildPodAndService(oldPod *corev1.Pod, oldSvc *corev1.Service) (*corev1.Pod, *corev1.Service) {
+	var pod *corev1.Pod = &corev1.Pod{}
+	parts := strings.Split(oldPod.Name, "-")
+	generateName := strings.Join(parts[:len(parts)-1], "-")
+	name := nervexutil.GenerateName(generateName)
+
+	pod.SetName(name)
+	pod.SetOwnerReferences(oldPod.GetOwnerReferences())
+	pod.Spec = oldPod.DeepCopy().Spec
+	pod.Spec.NodeName = ""
+
+	labels := oldPod.GetLabels()
+	labels[nervexutil.PodNameLabel] = name
+	nervexutil.AddLabelsToPod(pod, labels)
+
+	// update pod env
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name != nervexutil.DefaultContainerName {
+			continue
+		}
+		for j := range pod.Spec.Containers[i].Env {
+			if pod.Spec.Containers[i].Env[j].Name == nervexutil.PodNameEnv {
+				pod.Spec.Containers[i].Env[j].Value = pod.Name
+			}
+		}
+	}
+
+	// build service
+	var svc *corev1.Service = &corev1.Service{}
+	svc.SetName(name)
+	svc.SetOwnerReferences(oldSvc.GetOwnerReferences())
+	svc.Spec = oldSvc.DeepCopy().Spec
+	svc.SetLabels(labels)
+
+	return pod, svc
 }

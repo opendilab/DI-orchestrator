@@ -471,13 +471,19 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
 		return servertypes.NerveXJobResponse{}, &servertypes.NerveXError{Type: servertypes.ErrorBadRequest, Message: errMsg}
 	}
-	log.Info("failed request body: ", "request", njreq)
+	log.Info("failed replicas request body: ", "request", njreq)
 
+	// get collector pods and services
 	cpods, err := s.getPodsByNames(njreq.Namespace, njreq.Collectors)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	collectors, err := s.recreateReplicas(cpods, njreq.Namespace, nervexutil.CollectorName)
+	csvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Collectors)
+	if err != nil {
+		return servertypes.NerveXJobResponse{}, err
+	}
+
+	collectors, err := s.recreateReplicas(cpods, csvcs, njreq.Namespace)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
@@ -486,7 +492,12 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	learners, err := s.recreateReplicas(lpods, njreq.Namespace, nervexutil.LearnerName)
+	lsvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Learners)
+	if err != nil {
+		return servertypes.NerveXJobResponse{}, err
+	}
+
+	learners, err := s.recreateReplicas(lpods, lsvcs, njreq.Namespace)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}

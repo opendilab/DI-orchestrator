@@ -14,15 +14,9 @@ const (
 	AggregatorName  = "aggregator"
 	CoordinatorName = "coordinator"
 
-	DefaultCollectorContainerName   = "collector"
-	DefaultLearnerContainerName     = "learner"
-	DefaultAggregatorContainerName  = "aggregator"
-	DefaultCoordinatorContainerName = "coordinator"
+	DefaultContainerName = "nervex-container"
 
-	DefaultCollectorPortName   = "collector"
-	DefaultLearnerPortName     = "learner"
-	DefaultAggregatorPortName  = "aggregator"
-	DefaultCoordinatorPortName = "coordinator"
+	DefaultPortName = "nervex-port"
 
 	DefaultCollectorPort   = 22270
 	DefaultLearnerPort     = 22271

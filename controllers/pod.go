@@ -32,7 +32,7 @@ func (r *NerveXJobReconciler) reconcilePods(ctx context.Context, job *nervexv1al
 		volumes := job.Spec.Volumes
 		template := job.Spec.Coordinator.Template.DeepCopy()
 		coorpod, coorsvc, coorurl, err := buildPodAndServiceForReplica(template, job, nervexutil.CoordinatorName,
-			nervexutil.DefaultCoordinatorContainerName, nervexutil.DefaultCoordinatorPortName, nervexutil.DefaultCoordinatorPort, volumes)
+			nervexutil.DefaultCoordinatorPort, volumes)
 		if err != nil {
 			msg := fmt.Sprintf("build coordinator pod for job %s failed", job.Name)
 			log.Error(err, msg)
@@ -118,7 +118,7 @@ func (r *NerveXJobReconciler) deleteService(ctx context.Context, job *nervexv1al
 }
 
 func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *nervexv1alpha1.NerveXJob,
-	replicaType, containerName, portName string, defaultPort int32, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, string, error) {
+	replicaType string, defaultPort int32, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, string, error) {
 	if string(job.Spec.PriorityClassName) != "" {
 		template.Spec.PriorityClassName = string(job.Spec.PriorityClassName)
 	}
@@ -138,8 +138,7 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *nervexv
 	}
 
 	// build pod
-	pod, port, err := nervexutil.BuildPodFromTemplate(template, ownRefer, job.Name, job.Namespace, replicaType,
-		containerName, portName, defaultPort)
+	pod, port, err := nervexutil.BuildPodFromTemplate(template, ownRefer, job.Name, job.Namespace, replicaType, defaultPort)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -155,13 +154,13 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *nervexv
 	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
 
 	// build service
-	svc := nervexutil.BuildService(pod.GetLabels(), port, portName)
+	svc := nervexutil.BuildService(pod.GetLabels(), port)
 	svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
 	svc.Name = pod.Name
 	svc.Namespace = pod.Namespace
 
 	// access url
-	url := nervexutil.ConcatURL(pod.Name, pod.Namespace, port)
+	url := nervexutil.ConcatURL(svc.Name, svc.Namespace, port)
 
 	return pod, svc, url, nil
 }

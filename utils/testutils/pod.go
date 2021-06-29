@@ -24,7 +24,7 @@ func NewPod(name, jobName string, ownRefer metav1.OwnerReference) *corev1.Pod {
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:    nervexutil.DefaultCoordinatorContainerName,
+					Name:    nervexutil.DefaultContainerName,
 					Image:   NerveXJobImage,
 					Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 				},

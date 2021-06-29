@@ -28,7 +28,7 @@ func NewNerveXJob() *nervexv1alpha1.NerveXJob {
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    nervexutil.DefaultCoordinatorContainerName,
+								Name:    nervexutil.DefaultContainerName,
 								Image:   NerveXJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
@@ -41,7 +41,7 @@ func NewNerveXJob() *nervexv1alpha1.NerveXJob {
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    nervexutil.DefaultCollectorContainerName,
+								Name:    nervexutil.DefaultContainerName,
 								Image:   NerveXJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
@@ -54,7 +54,7 @@ func NewNerveXJob() *nervexv1alpha1.NerveXJob {
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    nervexutil.DefaultLearnerContainerName,
+								Name:    nervexutil.DefaultContainerName,
 								Image:   NerveXJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
@@ -94,7 +94,7 @@ func NewAggregatorConfig() *nervexv1alpha1.AggregatorConfig {
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    nervexutil.DefaultAggregatorContainerName,
+								Name:    nervexutil.DefaultContainerName,
 								Image:   NerveXJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},

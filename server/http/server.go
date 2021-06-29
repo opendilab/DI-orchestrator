@@ -247,7 +247,7 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinator
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	collectors, learners, _, aggregators, _, err := s.listReplicaPodsWithSelector(namespace, labelSelector)
+	collectors, learners, _, aggregators, _, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
 		return servertypes.NerveXJobResponse{}, err
@@ -256,21 +256,18 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinator
 	// get access urls
 	collectorURLs := []string{}
 	learnerURLs := []string{}
-	for _, pod := range collectors {
-		url := nervexutil.GetPodAccessURL(pod, namespace,
-			nervexutil.DefaultCollectorContainerName, nervexutil.DefaultCollectorPortName, nervexutil.DefaultCollectorPort)
+	for _, svc := range collectors {
+		url := nervexutil.GetServiceAccessURL(svc)
 		collectorURLs = append(collectorURLs, url)
 	}
-	for _, pod := range learners {
-		url := nervexutil.GetPodAccessURL(pod, namespace,
-			nervexutil.DefaultLearnerContainerName, nervexutil.DefaultLearnerPortName, nervexutil.DefaultLearnerPort)
+	for _, svc := range learners {
+		url := nervexutil.GetServiceAccessURL(svc)
 		learnerURLs = append(learnerURLs, url)
 	}
 
 	// aggregators are also considered to be learners in view of coordinator
-	for _, pod := range aggregators {
-		url := nervexutil.GetPodAccessURL(pod, namespace,
-			nervexutil.DefaultAggregatorContainerName, nervexutil.DefaultAggregatorPortName, nervexutil.DefaultAggregatorPort)
+	for _, svc := range aggregators {
+		url := nervexutil.GetServiceAccessURL(svc)
 		learnerURLs = append(learnerURLs, url)
 	}
 
@@ -302,7 +299,7 @@ func (s *NerveXServer) getNamespacedDDPLearnersByAggregator(namespace, aggregato
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	_, _, _, _, DDPLearners, err := s.listReplicaPodsWithSelector(namespace, labelSelector)
+	_, _, _, _, DDPLearners, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
 		return servertypes.NerveXJobResponse{}, err
@@ -310,8 +307,8 @@ func (s *NerveXServer) getNamespacedDDPLearnersByAggregator(namespace, aggregato
 
 	// get access urls
 	ddpLearnerURLs := []string{}
-	for _, pod := range DDPLearners {
-		owners := pod.GetOwnerReferences()
+	for _, svc := range DDPLearners {
+		owners := svc.GetOwnerReferences()
 		owns := false
 		for _, owner := range owners {
 			if owner.Name == aggregatorName {
@@ -324,22 +321,16 @@ func (s *NerveXServer) getNamespacedDDPLearnersByAggregator(namespace, aggregato
 		}
 
 		// build access urls to ddp learners
-		url := nervexutil.GetPodAccessURL(pod, namespace,
-			nervexutil.DefaultLearnerContainerName, nervexutil.DefaultLearnerPortName, nervexutil.DefaultLearnerPort)
+		url := nervexutil.GetServiceAccessURL(svc)
 		ddpLearnerURLs = append(ddpLearnerURLs, url)
 
 		// append all gpu process access urls to response
-		for _, c := range pod.Spec.Containers {
-			if c.Name != nervexutil.DefaultLearnerContainerName {
+		for _, port := range svc.Spec.Ports {
+			if !strings.HasPrefix(port.Name, nervexutil.DDPLearnerPortPrefix) {
 				continue
 			}
-			for _, port := range c.Ports {
-				if !strings.HasPrefix(port.Name, nervexutil.DDPLearnerPortPrefix) {
-					continue
-				}
-				url := nervexutil.ConcatURL(pod.Name, namespace, port.ContainerPort)
-				ddpLearnerURLs = append(ddpLearnerURLs, url)
-			}
+			url := nervexutil.ConcatURL(svc.Name, namespace, port.Port)
+			ddpLearnerURLs = append(ddpLearnerURLs, url)
 		}
 	}
 

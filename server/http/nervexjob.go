@@ -217,10 +217,14 @@ func (s *NerveXServer) createReplicas(
 
 				// add ddp envs to ddp learner
 				masterAddr := svcList[0].Name
+				masterPort, ok := nervexutil.GetPortFromPod(podList[0])
+				if !ok {
+					masterPort = nervexutil.DefaultLearnerPort
+				}
 				if j == 0 {
 					masterAddr = "localhost"
 				}
-				addDDPEnvsToDDPLearner(pod, masterAddr, int(port),
+				addDDPEnvsToDDPLearner(pod, masterAddr, int(masterPort),
 					int(resources.GPU.Value()), gpus, startRank)
 				startRank += gpus
 			}
@@ -270,8 +274,12 @@ func (s *NerveXServer) createReplicas(
 
 				// add ddp envs to ddp learner pod
 				masterAddr := "localhost"
+				masterPort, ok := nervexutil.GetPortFromPod(pod)
+				if !ok {
+					masterPort = nervexutil.DefaultLearnerPort
+				}
 				worldSize := int(resources.GPU.Value())
-				addDDPEnvsToDDPLearner(pod, masterAddr, int(port),
+				addDDPEnvsToDDPLearner(pod, masterAddr, int(masterPort),
 					worldSize, worldSize, 0)
 			}
 

@@ -2,6 +2,7 @@ package http
 
 import (
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -198,12 +199,13 @@ func (s *NerveXServer) createReplicas(
 
 			// allocate gpus
 			gpuSlice := s.gpuAllocator.Allocate(int(resources.GPU.Value()))
-			for _, gpus := range gpuSlice {
+			startRank := 0
+			for j, gpus := range gpuSlice {
 				replicaResource := resources.DeepCopy()
 				replicaResource.GPU = resource.MustParse(fmt.Sprintf("%d", gpus))
 
 				// build ddp learner pod
-				pod, svc, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+				pod, svc, port, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
 					jobName, namespace, replicaType, defaultPort, *replicaResource, volumes)
 				if err != nil {
 					return results, err
@@ -212,6 +214,15 @@ func (s *NerveXServer) createReplicas(
 				// append pod and svc to list
 				podList = append(podList, pod)
 				svcList = append(svcList, svc)
+
+				// add ddp envs to ddp learner
+				masterAddr := svcList[0].Name
+				if j == 0 {
+					masterAddr = "localhost"
+				}
+				addDDPEnvsToDDPLearner(pod, masterAddr, int(port),
+					int(resources.GPU.Value()), gpus, startRank)
+				startRank += gpus
 			}
 
 		} else {
@@ -251,11 +262,17 @@ func (s *NerveXServer) createReplicas(
 				}
 
 				// build ddp learner pod
-				pod, svc, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+				pod, svc, port, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
 					jobName, namespace, replicaType, defaultPort, resources, volumes)
 				if err != nil {
 					return results, err
 				}
+
+				// add ddp envs to ddp learner pod
+				masterAddr := "localhost"
+				worldSize := int(resources.GPU.Value())
+				addDDPEnvsToDDPLearner(pod, masterAddr, int(port),
+					worldSize, worldSize, 0)
 			}
 
 			podList = append(podList, pod)
@@ -320,7 +337,7 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 	ownRefer metav1.OwnerReference,
 	aggOwnRefer metav1.OwnerReference,
 	jobName, namespace, replicaType string,
-	defaultPort int32, resources servertypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, error) {
+	defaultPort int32, resources servertypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
 	// make sure aggregator is the controller of ddp learners
 	aggOwnRefer.Controller = func(c bool) *bool { return &c }(true)
 	ownRefer.Controller = func(c bool) *bool { return &c }(false)
@@ -328,7 +345,7 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 	pod, svc, port, err := s.buildPodAndService(template.DeepCopy(), aggOwnRefer, jobName,
 		namespace, nervexutil.DDPLearnerName, defaultPort, resources, volumes)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, -1, err
 	}
 
 	// set owner reference of NerveXJob to aggregator
@@ -356,7 +373,17 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 			pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, lcport)
 		}
 	}
-	return pod, svc, nil
+	return pod, svc, port, nil
+}
+
+func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, masterPort, worldSize, localWorldSize, startRank int) {
+	envs := make(map[string]string)
+	envs[nervexutil.WorldSize] = strconv.Itoa(worldSize)
+	envs[nervexutil.LocalWorldSize] = strconv.Itoa(localWorldSize)
+	envs[nervexutil.MasterAddr] = masterAddr
+	envs[nervexutil.MasterPort] = strconv.Itoa(nervexutil.DefaultLearnerPort)
+	envs[nervexutil.StartRank] = strconv.Itoa(startRank)
+	nervexutil.SetPodEnv(pod, envs)
 }
 
 func (s *NerveXServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
@@ -477,6 +504,22 @@ func (s *NerveXServer) rebuildDDPLearners(namespace, aggregatorName string) ([]*
 		pod, svc := rebuildPodAndService(oldPod, oldService)
 		pods = append(pods, pod)
 		svcs = append(svcs, svc)
+
+		// add env
+		masterAddr := svcs[0].Name
+		if i == 0 {
+			masterAddr = "localhost"
+		}
+		for j := range pod.Spec.Containers {
+			if pod.Spec.Containers[j].Name != nervexutil.DefaultContainerName {
+				continue
+			}
+			for k := range pod.Spec.Containers[i].Env {
+				if pod.Spec.Containers[i].Env[k].Name == nervexutil.MasterAddr {
+					pod.Spec.Containers[i].Env[k].Value = masterAddr
+				}
+			}
+		}
 
 		// delete old pod and service
 		s.deletePodAndService(namespace, oldPod.Name)

@@ -381,7 +381,7 @@ func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, masterPort, worl
 	envs[nervexutil.WorldSize] = strconv.Itoa(worldSize)
 	envs[nervexutil.LocalWorldSize] = strconv.Itoa(localWorldSize)
 	envs[nervexutil.MasterAddr] = masterAddr
-	envs[nervexutil.MasterPort] = strconv.Itoa(nervexutil.DefaultLearnerPort)
+	envs[nervexutil.MasterPort] = strconv.Itoa(masterPort)
 	envs[nervexutil.StartRank] = strconv.Itoa(startRank)
 	nervexutil.SetPodEnv(pod, envs)
 }

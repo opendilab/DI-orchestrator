@@ -362,7 +362,12 @@ func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobRespon
 	// create collectors and learners
 	collectors, learners, err := s.createCollectorsAndLearnersForNerveXJob(&njreq, nvxJob)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.NerveXJobResponse{
+			Namespace:   njreq.Namespace,
+			Coordinator: njreq.Coordinator,
+			Collectors:  collectors,
+			Learners:    learners,
+		}, err
 	}
 	log.Info("create replicas", "collectors", collectors, "learners", learners)
 
@@ -408,20 +413,35 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	// delete collector pods
 	delCollectors, err := s.deleteSpecifiedReplicas(collectors, njreq.Namespace, njreq.Collectors.Replicas, nervexutil.CollectorName)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.NerveXJobResponse{
+			Namespace:   njreq.Namespace,
+			Coordinator: njreq.Coordinator,
+			Collectors:  delCollectors,
+			Learners:    nil,
+		}, err
 	}
 
 	// delete learner pods
 	delLearners, err := s.deleteSpecifiedReplicas(learners, njreq.Namespace, njreq.Learners.Replicas, nervexutil.LearnerName)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.NerveXJobResponse{
+			Namespace:   njreq.Namespace,
+			Coordinator: njreq.Coordinator,
+			Collectors:  delCollectors,
+			Learners:    delLearners,
+		}, err
 	}
 
 	// aggregator is also considered a learner
 	if len(delLearners) <= 0 {
 		delAggs, err := s.deleteSpecifiedReplicas(aggs, njreq.Namespace, njreq.Learners.Replicas, nervexutil.AggregatorName)
 		if err != nil {
-			return servertypes.NerveXJobResponse{}, err
+			return servertypes.NerveXJobResponse{
+				Namespace:   njreq.Namespace,
+				Coordinator: njreq.Coordinator,
+				Collectors:  delCollectors,
+				Learners:    delLearners,
+			}, err
 		}
 		delLearners = append(delLearners, delAggs...)
 	}
@@ -471,24 +491,55 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
 		return servertypes.NerveXJobResponse{}, &servertypes.NerveXError{Type: servertypes.ErrorBadRequest, Message: errMsg}
 	}
-	log.Info("failed request body: ", "request", njreq)
+	log.Info("failed replicas request body: ", "request", njreq)
 
+	// get collector pods and services
 	cpods, err := s.getPodsByNames(njreq.Namespace, njreq.Collectors)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
-	collectors, err := s.recreateReplicas(cpods, njreq.Namespace, nervexutil.CollectorName)
+	csvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Collectors)
 	if err != nil {
 		return servertypes.NerveXJobResponse{}, err
 	}
 
+	collectors, err := s.recreateReplicas(cpods, csvcs, njreq.Namespace)
+	if err != nil {
+		return servertypes.NerveXJobResponse{
+			Namespace:   njreq.Namespace,
+			Coordinator: njreq.Coordinator,
+			Collectors:  collectors,
+			Learners:    nil,
+		}, err
+	}
+
 	lpods, err := s.getPodsByNames(njreq.Namespace, njreq.Learners)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.NerveXJobResponse{
+			Namespace:   njreq.Namespace,
+			Coordinator: njreq.Coordinator,
+			Collectors:  collectors,
+			Learners:    nil,
+		}, err
 	}
-	learners, err := s.recreateReplicas(lpods, njreq.Namespace, nervexutil.LearnerName)
+	lsvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Learners)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.NerveXJobResponse{
+			Namespace:   njreq.Namespace,
+			Coordinator: njreq.Coordinator,
+			Collectors:  collectors,
+			Learners:    nil,
+		}, err
+	}
+
+	learners, err := s.recreateReplicas(lpods, lsvcs, njreq.Namespace)
+	if err != nil {
+		return servertypes.NerveXJobResponse{
+			Namespace:   njreq.Namespace,
+			Coordinator: njreq.Coordinator,
+			Collectors:  collectors,
+			Learners:    learners,
+		}, err
 	}
 
 	log.Info("recreate replicas", "collectors", collectors, "learners", learners)

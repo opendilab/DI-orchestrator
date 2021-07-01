@@ -246,6 +246,40 @@ var _ = Describe("Server Test", func() {
 				return len(pods)
 			}, timeout, interval).Should(Equal(totalPods))
 
+			By("Send request on POST /v1alpha1/replicas/failed with duplicate replicas")
+			fdurl := fmt.Sprintf("http://%s/v1alpha1/replicas/failed", addr)
+			fdreq := servertypes.NerveXJobResponse{
+				Namespace:   job.Namespace,
+				Coordinator: coorname,
+				Collectors: []string{
+					strings.Split(gnjresp.Collectors[1], ".")[0],
+					strings.Split(gnjresp.Collectors[1], ".")[0],
+				},
+				Learners: []string{
+					strings.Split(gnjresp.Learners[1], ".")[0],
+					strings.Split(gnjresp.Learners[1], ".")[0],
+				},
+			}
+			fdrbody, err := json.Marshal(fdreq)
+			Expect(err).NotTo(HaveOccurred())
+			fdnjresp, err := sendRequest(http.MethodPost, fdrbody, fdurl, http.StatusOK, true)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(fdnjresp.Collectors)).Should(Equal(1))
+			Expect(len(fdnjresp.Learners)).Should(Equal(1))
+
+			By("Waiting for server's cache to be synced")
+			time.Sleep(250 * time.Millisecond)
+
+			By("Checking the number of pods has not changed")
+			dtotalPods := cn + ln + 1 // collectors + learners + coordinator
+			Eventually(func() int {
+				pods, err := nervexutil.ListPods(ctx, k8sClient, job)
+				if err != nil {
+					return -1
+				}
+				return len(pods)
+			}, timeout, interval).Should(Equal(dtotalPods))
+
 			By("Send request on DELETE /v1alpha1/replicas")
 			var dcn, dln int = 1, 1
 			dreq := servertypes.NerveXJobRequest{

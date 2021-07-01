@@ -129,7 +129,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpu": "2",
+                                "gpus": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -269,7 +269,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpu": "2",
+                                "gpus": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -411,7 +411,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpu": "2",
+                                "gpus": "2",
                                 "replicas": 1,
                             },
                         ),

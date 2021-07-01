@@ -79,6 +79,19 @@ func (r *NerveXJobReconciler) createPod(ctx context.Context, job *nervexv1alpha1
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, FailedCreateReason, msg)
 		return fmt.Errorf("failed to create pod: %v", err)
 	}
+	// pod should be the controller of service
+	ownRefer := metav1.OwnerReference{
+		APIVersion: corev1.SchemeGroupVersion.Version,
+		Kind:       "Pod",
+		Name:       pod.Name,
+		UID:        pod.GetUID(),
+		Controller: func(c bool) *bool { return &c }(true),
+	}
+	for i := range pod.OwnerReferences {
+		pod.OwnerReferences[i].Controller = func(c bool) *bool { return &c }(false)
+	}
+	pod.OwnerReferences = append(pod.OwnerReferences, ownRefer)
+
 	msg := fmt.Sprintf("Create pod: %s", pod.Name)
 	r.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulCreateReason, msg)
 	return nil
@@ -96,7 +109,8 @@ func (r *NerveXJobReconciler) createService(ctx context.Context, job *nervexv1al
 }
 
 func (r *NerveXJobReconciler) deletePod(ctx context.Context, job *nervexv1alpha1.NerveXJob, pod *corev1.Pod) error {
-	if err := r.Delete(ctx, pod, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+	if err := r.Delete(ctx, pod,
+		&client.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !errors.IsNotFound(err) {
 		msg := fmt.Sprintf("Failed to delete pod: %s error: %v", pod.Name, err)
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, FailedDeleteReason, msg)
 		return fmt.Errorf("failed to delete pod: %v", err)
@@ -107,7 +121,8 @@ func (r *NerveXJobReconciler) deletePod(ctx context.Context, job *nervexv1alpha1
 }
 
 func (r *NerveXJobReconciler) deleteService(ctx context.Context, job *nervexv1alpha1.NerveXJob, service *corev1.Service) error {
-	if err := r.Delete(ctx, service, &client.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+	if err := r.Delete(ctx, service,
+		&client.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !errors.IsNotFound(err) {
 		msg := fmt.Sprintf("Failed to delete service: %s error: %v", service.Name, err)
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, FailedDeleteReason, msg)
 		return fmt.Errorf("failed to delete service: %v", err)

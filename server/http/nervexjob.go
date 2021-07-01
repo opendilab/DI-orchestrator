@@ -2,7 +2,6 @@ package http
 
 import (
 	"fmt"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -126,7 +125,6 @@ func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 	// create collectors
 	collectorTemplate := job.Spec.Collector.Template
 	collectors, err := s.createReplicas(&collectorTemplate, volumes, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.CollectorName, nil)
-
 	if err != nil {
 		return collectors, nil, err
 	}
@@ -134,7 +132,6 @@ func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 	// create learners
 	learnerTemplate := job.Spec.Learner.Template
 	learners, err := s.createReplicas(&learnerTemplate, volumes, ownRefer, njreq.Learners, njreq.Namespace, nervexutil.LearnerName, agtemplate)
-
 	if err != nil {
 		return collectors, learners, err
 	}
@@ -324,6 +321,9 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 	aggOwnRefer metav1.OwnerReference,
 	jobName, namespace, replicaType string,
 	defaultPort int32, resources servertypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, error) {
+	// make sure aggregator is the controller of ddp learners
+	aggOwnRefer.Controller = func(c bool) *bool { return &c }(true)
+	ownRefer.Controller = func(c bool) *bool { return &c }(false)
 
 	pod, svc, port, err := s.buildPodAndService(template.DeepCopy(), aggOwnRefer, jobName,
 		namespace, nervexutil.DDPLearnerName, defaultPort, resources, volumes)
@@ -392,56 +392,158 @@ func (s *NerveXServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace str
 	return results, nil
 }
 
-func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, namespace, replicaType string) ([]string, error) {
-	var defaultPort int32
-	switch replicaType {
-	case nervexutil.CollectorName:
-		defaultPort = nervexutil.DefaultCollectorPort
-	case nervexutil.LearnerName:
-		defaultPort = nervexutil.DefaultLearnerPort
-	default:
-
-	}
-
-	// delete pods and services
-	for _, pod := range pods {
-		if err := s.deletePodAndService(namespace, pod.Name); err != nil {
-			return nil, err
-		}
-	}
-
-	// create pods and services
+func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.Service, namespace string) ([]string, error) {
 	var results []string
-	for _, oldPod := range pods {
-		var pod *corev1.Pod = &corev1.Pod{}
-		parts := strings.Split(oldPod.Name, "-")
-		generateName := strings.Join(parts[:len(parts)-1], "-")
-		name := nervexutil.GenerateName(generateName)
-
-		pod.SetName(name)
-		pod.SetOwnerReferences(oldPod.GetOwnerReferences())
-		pod.Spec = oldPod.DeepCopy().Spec
-
-		labels := oldPod.GetLabels()
-		labels[nervexutil.PodNameLabel] = name
-		nervexutil.AddLabelsToPod(pod, labels)
-
-		// build service
-		port, ok := nervexutil.GetPortFromPod(pod)
-		if !ok {
-			port = defaultPort
+	for i := range pods {
+		oldPod := pods[i]
+		replicaType := oldPod.Labels[nervexutil.ReplicaTypeLabel]
+		var defaultPort int32
+		var needDDPLearner bool = false
+		switch replicaType {
+		case nervexutil.CollectorName:
+			defaultPort = nervexutil.DefaultCollectorPort
+		case nervexutil.LearnerName:
+			defaultPort = nervexutil.DefaultLearnerPort
+		case nervexutil.DDPLearnerName:
+			defaultPort = nervexutil.DefaultLearnerPort
+		case nervexutil.AggregatorName:
+			defaultPort = nervexutil.DefaultAggregatorPort
+			needDDPLearner = true
+		default:
+			return results, fmt.Errorf("unknown replica type")
 		}
-		svc := nervexutil.BuildService(pod.GetLabels(), port)
-		svc.SetOwnerReferences(pod.GetOwnerReferences())
-		svc.Name = pod.Name
+
+		// build new ddp learners
+		var ddppods []*corev1.Pod
+		var ddpsvcs []*corev1.Service
+		var err error
+		if needDDPLearner {
+			aggregatorName := oldPod.Name
+			ddppods, ddpsvcs, err = s.rebuildDDPLearners(namespace, aggregatorName)
+			if err != nil {
+				return results, err
+			}
+		}
+
+		// delete pods and services
+		if err := s.deletePodAndService(namespace, oldPod.Name); err != nil {
+			return results, err
+		}
+
+		oldService := services[i]
+		pod, svc := rebuildPodAndService(oldPod, oldService)
 
 		if _, err := s.createPodAndService(namespace, pod, svc); err != nil {
 			return results, err
 		}
 
-		result := nervexutil.ConcatURL(svc.Name, namespace, port)
+		var portvalue int32 = defaultPort
+		for _, port := range svc.Spec.Ports {
+			if port.Name == nervexutil.DefaultPortName {
+				portvalue = port.Port
+			}
+		}
+		result := nervexutil.ConcatURL(svc.Name, namespace, portvalue)
 		results = append(results, result)
+
+		if needDDPLearner {
+			for j := range ddppods {
+				newPod := ddppods[j]
+				newSvc := ddpsvcs[j]
+				if _, err := s.createPodAndService(namespace, newPod, newSvc); err != nil {
+					return results, err
+				}
+			}
+		}
 	}
 
 	return results, nil
+}
+
+func (s *NerveXServer) rebuildDDPLearners(namespace, aggregatorName string) ([]*corev1.Pod, []*corev1.Service, error) {
+	ddppods, ddpsvcs, err := s.getDDPLearners(namespace, aggregatorName)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(ddppods) != len(ddpsvcs) {
+		return nil, nil, fmt.Errorf("the number of ddp learner pods and services must be the same")
+	}
+
+	var pods []*corev1.Pod
+	var svcs []*corev1.Service
+	for i := range ddppods {
+		oldPod := ddppods[i]
+		oldService := ddpsvcs[i]
+		pod, svc := rebuildPodAndService(oldPod, oldService)
+		pods = append(pods, pod)
+		svcs = append(svcs, svc)
+
+		// delete old pod and service
+		s.deletePodAndService(namespace, oldPod.Name)
+	}
+	return pods, svcs, nil
+}
+
+func (s *NerveXServer) getDDPLearners(namespace, aggregatorName string) ([]*corev1.Pod, []*corev1.Service, error) {
+	log := s.Log.WithName("NerveXServer")
+
+	// get ownReference of the request coordinator
+	nvxJob, err := s.getNerveXJob(namespace, aggregatorName)
+	if err != nil {
+		log.Error(err, "failed to get owner reference")
+		return nil, nil, err
+	}
+
+	// list pods that belong to the NerveXJob
+	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: nervexutil.GenLabels(nvxJob.Name),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	_, _, _, _, DDPLearners, err := s.listReplicaPodsWithSelector(namespace, labelSelector)
+	if err != nil {
+		log.Error(err, "failed to list collectors and learners")
+		return nil, nil, err
+	}
+
+	var ddppods []*corev1.Pod
+	for _, pod := range DDPLearners {
+		owners := pod.GetOwnerReferences()
+		owns := false
+		for _, owner := range owners {
+			if owner.Name == aggregatorName {
+				owns = true
+				break
+			}
+		}
+		if !owns {
+			continue
+		}
+		ddppods = append(ddppods, pod)
+	}
+
+	_, _, _, _, DDPLearnerServices, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
+	if err != nil {
+		log.Error(err, "failed to list collectors and learners")
+		return nil, nil, err
+	}
+
+	var ddpsvcs []*corev1.Service
+	for _, pod := range DDPLearnerServices {
+		owners := pod.GetOwnerReferences()
+		owns := false
+		for _, owner := range owners {
+			if owner.Name == aggregatorName {
+				owns = true
+				break
+			}
+		}
+		if !owns {
+			continue
+		}
+		ddpsvcs = append(ddpsvcs, pod)
+	}
+
+	return ddppods, ddpsvcs, nil
 }

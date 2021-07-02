@@ -205,7 +205,7 @@ func (s *NerveXServer) createReplicas(
 				replicaResource.GPU = resource.MustParse(fmt.Sprintf("%d", gpus))
 
 				// build ddp learner pod
-				pod, svc, port, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+				pod, svc, _, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
 					jobName, namespace, replicaType, defaultPort, *replicaResource, volumes)
 				if err != nil {
 					return results, err
@@ -266,7 +266,7 @@ func (s *NerveXServer) createReplicas(
 				}
 
 				// build ddp learner pod
-				pod, svc, port, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+				pod, svc, _, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
 					jobName, namespace, replicaType, defaultPort, resources, volumes)
 				if err != nil {
 					return results, err

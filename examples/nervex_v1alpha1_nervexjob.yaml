@@ -308,8 +308,6 @@ spec:
             value: "en_US.utf-8"
           - name: PYTHONUNBUFFERED
             value: "1"
-          - name: ENABLE_LINKLINK
-            value: "true"
           command: ["/bin/bash", "-c",]
           args:
           - |

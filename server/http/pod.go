@@ -14,11 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
+	servertypes "go-sensephoenix.sensetime.com/di-orchestrator/server/types"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
 )
 
-func (s *NerveXServer) getPodsByNames(namespace string, names []string) ([]*corev1.Pod, error) {
+func (s *DIServer) getPodsByNames(namespace string, names []string) ([]*corev1.Pod, error) {
 	// use set to filter out duplicate items
 	nameSlice := []interface{}{}
 	for _, name := range names {
@@ -29,7 +29,7 @@ func (s *NerveXServer) getPodsByNames(namespace string, names []string) ([]*core
 	var keys []string
 	var pods []*corev1.Pod
 	for name := range nameSet.Iterator().C {
-		key := nervexutil.NamespacedName(namespace, name.(string))
+		key := diutil.NamespacedName(namespace, name.(string))
 		keys = append(keys, key)
 	}
 
@@ -40,7 +40,7 @@ func (s *NerveXServer) getPodsByNames(namespace string, names []string) ([]*core
 	return pods, nil
 }
 
-func (s *NerveXServer) getPodsByKeys(keys []string) ([]*corev1.Pod, error) {
+func (s *DIServer) getPodsByKeys(keys []string) ([]*corev1.Pod, error) {
 	var pods []*corev1.Pod
 	for _, key := range keys {
 		pod, err := s.getPodByKey(key)
@@ -52,7 +52,7 @@ func (s *NerveXServer) getPodsByKeys(keys []string) ([]*corev1.Pod, error) {
 	return pods, nil
 }
 
-func (s *NerveXServer) getPodByKey(key string) (*corev1.Pod, error) {
+func (s *DIServer) getPodByKey(key string) (*corev1.Pod, error) {
 	obj, exists, err := s.dyi.PodInformer.Informer().GetIndexer().GetByKey(key)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get pod: %s", err)
@@ -60,7 +60,7 @@ func (s *NerveXServer) getPodByKey(key string) (*corev1.Pod, error) {
 	}
 	if !exists {
 		errMsg := fmt.Sprintf("pod: %s not exists in cache", key)
-		return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
 	}
 
 	podUn := obj.(*unstructured.Unstructured)
@@ -74,11 +74,11 @@ func (s *NerveXServer) getPodByKey(key string) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
-func (s *NerveXServer) getServicesByNames(namespace string, names []string) ([]*corev1.Service, error) {
+func (s *DIServer) getServicesByNames(namespace string, names []string) ([]*corev1.Service, error) {
 	var keys []string
 	var services []*corev1.Service
 	for _, name := range names {
-		key := nervexutil.NamespacedName(namespace, name)
+		key := diutil.NamespacedName(namespace, name)
 		keys = append(keys, key)
 	}
 
@@ -89,7 +89,7 @@ func (s *NerveXServer) getServicesByNames(namespace string, names []string) ([]*
 	return services, nil
 }
 
-func (s *NerveXServer) getServicesByKeys(keys []string) ([]*corev1.Service, error) {
+func (s *DIServer) getServicesByKeys(keys []string) ([]*corev1.Service, error) {
 	var services []*corev1.Service
 	for _, key := range keys {
 		svc, err := s.getServiceByKey(key)
@@ -101,7 +101,7 @@ func (s *NerveXServer) getServicesByKeys(keys []string) ([]*corev1.Service, erro
 	return services, nil
 }
 
-func (s *NerveXServer) getServiceByKey(key string) (*corev1.Service, error) {
+func (s *DIServer) getServiceByKey(key string) (*corev1.Service, error) {
 	obj, exists, err := s.dyi.ServiceInformer.Informer().GetIndexer().GetByKey(key)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get service: %s", err)
@@ -109,7 +109,7 @@ func (s *NerveXServer) getServiceByKey(key string) (*corev1.Service, error) {
 	}
 	if !exists {
 		errMsg := fmt.Sprintf("service: %s not exists in cache", key)
-		return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
 	}
 
 	serviceUn := obj.(*unstructured.Unstructured)
@@ -122,7 +122,7 @@ func (s *NerveXServer) getServiceByKey(key string) (*corev1.Service, error) {
 	return &service, nil
 }
 
-func (s *NerveXServer) buildPodAndService(
+func (s *DIServer) buildPodAndService(
 	template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	jobName string,
@@ -131,7 +131,7 @@ func (s *NerveXServer) buildPodAndService(
 	resources servertypes.ResourceQuantity,
 	volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
 	// build pod
-	pod, port, err := nervexutil.BuildPodFromTemplate(template, ownRefer, jobName, namespace, replicaType, port)
+	pod, port, err := diutil.BuildPodFromTemplate(template, ownRefer, jobName, namespace, replicaType, port)
 	if err != nil {
 		return nil, nil, -1, err
 	}
@@ -142,13 +142,13 @@ func (s *NerveXServer) buildPodAndService(
 	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
 
 	// build service
-	svc := nervexutil.BuildService(pod.GetLabels(), port)
+	svc := diutil.BuildService(pod.GetLabels(), port)
 	svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
 	svc.Name = pod.Name
 	return pod, svc, port, nil
 }
 
-func (s *NerveXServer) createPodAndService(namespace string, pod *corev1.Pod, service *corev1.Service) (*corev1.Pod, error) {
+func (s *DIServer) createPodAndService(namespace string, pod *corev1.Pod, service *corev1.Service) (*corev1.Pod, error) {
 	// create pod
 	newpod, err := s.createPod(namespace, pod)
 	if err != nil {
@@ -175,29 +175,29 @@ func (s *NerveXServer) createPodAndService(namespace string, pod *corev1.Pod, se
 	return newpod, nil
 }
 
-func (s *NerveXServer) createPod(namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
+func (s *DIServer) createPod(namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
 	newpod, err := s.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
 	if err != nil {
 		if k8serrors.IsAlreadyExists(err) {
-			return newpod, &servertypes.NerveXError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
+			return newpod, &servertypes.DIError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
 		}
 		return nil, err
 	}
 	return newpod, nil
 }
 
-func (s *NerveXServer) createService(namespace string, service *corev1.Service) error {
+func (s *DIServer) createService(namespace string, service *corev1.Service) error {
 	_, err := s.KubeClient.CoreV1().Services(namespace).Create(context.Background(), service, metav1.CreateOptions{})
 	if err != nil {
 		if k8serrors.IsAlreadyExists(err) {
-			return &servertypes.NerveXError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
+			return &servertypes.DIError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
 		}
 		return err
 	}
 	return nil
 }
 
-func (s *NerveXServer) deletePodAndService(namespace, name string) error {
+func (s *DIServer) deletePodAndService(namespace, name string) error {
 	// delete pods
 	if err := s.deletePod(namespace, name); err != nil {
 		return err
@@ -210,7 +210,7 @@ func (s *NerveXServer) deletePodAndService(namespace, name string) error {
 	return nil
 }
 
-func (s *NerveXServer) deletePod(namespace, name string) error {
+func (s *DIServer) deletePod(namespace, name string) error {
 	if err := s.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), name,
 		metav1.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !k8serrors.IsNotFound(err) {
 		return err
@@ -218,7 +218,7 @@ func (s *NerveXServer) deletePod(namespace, name string) error {
 	return nil
 }
 
-func (s *NerveXServer) deleteService(namespace, name string) error {
+func (s *DIServer) deleteService(namespace, name string) error {
 	if err := s.KubeClient.CoreV1().Services(namespace).Delete(context.Background(), name,
 		metav1.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !k8serrors.IsNotFound(err) {
 		return err
@@ -226,9 +226,9 @@ func (s *NerveXServer) deleteService(namespace, name string) error {
 	return nil
 }
 
-func (s *NerveXServer) setPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity) {
+func (s *DIServer) setPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity) {
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name != nervexutil.DefaultContainerName {
+		if pod.Spec.Containers[i].Name != diutil.DefaultContainerName {
 			continue
 		}
 		if pod.Spec.Containers[i].Resources.Limits == nil {
@@ -254,7 +254,7 @@ func (s *NerveXServer) setPodResources(pod *corev1.Pod, resources servertypes.Re
 	}
 }
 
-func (s *NerveXServer) getPodResources(pod *corev1.Pod, containerName string) servertypes.ResourceQuantity {
+func (s *DIServer) getPodResources(pod *corev1.Pod, containerName string) servertypes.ResourceQuantity {
 	resource := servertypes.ResourceQuantity{
 		CPU:    resource.MustParse("0"),
 		GPU:    resource.MustParse("0"),
@@ -281,27 +281,27 @@ func (s *NerveXServer) getPodResources(pod *corev1.Pod, containerName string) se
 	return resource
 }
 
-func (s *NerveXServer) listReplicaPodsWithSelector(namespace string, labelSelector labels.Selector) (
+func (s *DIServer) listReplicaPodsWithSelector(namespace string, labelSelector labels.Selector) (
 	collectors []*corev1.Pod, learners []*corev1.Pod,
 	coordinator *corev1.Pod, aggregators []*corev1.Pod, DDPLearners []*corev1.Pod, err error) {
-	// list pods that belong to the NerveXJob
+	// list pods that belong to the DIJob
 	pods, err := s.listPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		return
 	}
 
 	// filter out terminating pods since these pods are deleted
-	pods = nervexutil.FilterOutTerminatingPods(pods)
+	pods = diutil.FilterOutTerminatingPods(pods)
 
 	// classify pods
-	collectors, learners, coordinator, aggregators, DDPLearners, err = nervexutil.ClassifyPods(pods)
+	collectors, learners, coordinator, aggregators, DDPLearners, err = diutil.ClassifyPods(pods)
 	if err != nil {
 		return
 	}
 	return
 }
 
-func (s *NerveXServer) listPodsWithSelector(namespace string, labelSelector labels.Selector) ([]*corev1.Pod, error) {
+func (s *DIServer) listPodsWithSelector(namespace string, labelSelector labels.Selector) ([]*corev1.Pod, error) {
 	ret, err := s.dyi.PodInformer.Lister().ByNamespace(namespace).List(labelSelector)
 	if err != nil {
 		return nil, err
@@ -320,24 +320,24 @@ func (s *NerveXServer) listPodsWithSelector(namespace string, labelSelector labe
 	return pods, nil
 }
 
-func (s *NerveXServer) listReplicaServicesWithSelector(namespace string, labelSelector labels.Selector) (
+func (s *DIServer) listReplicaServicesWithSelector(namespace string, labelSelector labels.Selector) (
 	collectors []*corev1.Service, learners []*corev1.Service,
 	coordinator *corev1.Service, aggregators []*corev1.Service, DDPLearners []*corev1.Service, err error) {
-	// list services that belong to the NerveXJob
+	// list services that belong to the DIJob
 	services, err := s.listServicesWithSelector(namespace, labelSelector)
 	if err != nil {
 		return
 	}
 
 	// classify services
-	collectors, learners, coordinator, aggregators, DDPLearners, err = nervexutil.ClassifyServices(services)
+	collectors, learners, coordinator, aggregators, DDPLearners, err = diutil.ClassifyServices(services)
 	if err != nil {
 		return
 	}
 	return
 }
 
-func (s *NerveXServer) listServicesWithSelector(namespace string, labelSelector labels.Selector) ([]*corev1.Service, error) {
+func (s *DIServer) listServicesWithSelector(namespace string, labelSelector labels.Selector) ([]*corev1.Service, error) {
 	ret, err := s.dyi.ServiceInformer.Lister().ByNamespace(namespace).List(labelSelector)
 	if err != nil {
 		return nil, err
@@ -360,7 +360,7 @@ func rebuildPodAndService(oldPod *corev1.Pod, oldSvc *corev1.Service) (*corev1.P
 	var pod *corev1.Pod = &corev1.Pod{}
 	parts := strings.Split(oldPod.Name, "-")
 	generateName := strings.Join(parts[:len(parts)-1], "-")
-	name := nervexutil.GenerateName(generateName)
+	name := diutil.GenerateName(generateName)
 
 	pod.SetName(name)
 	pod.SetOwnerReferences(oldPod.GetOwnerReferences())
@@ -368,16 +368,16 @@ func rebuildPodAndService(oldPod *corev1.Pod, oldSvc *corev1.Service) (*corev1.P
 	pod.Spec.NodeName = ""
 
 	labels := oldPod.GetLabels()
-	labels[nervexutil.PodNameLabel] = name
-	nervexutil.AddLabelsToPod(pod, labels)
+	labels[diutil.PodNameLabel] = name
+	diutil.AddLabelsToPod(pod, labels)
 
 	// update pod env
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name != nervexutil.DefaultContainerName {
+		if pod.Spec.Containers[i].Name != diutil.DefaultContainerName {
 			continue
 		}
 		for j := range pod.Spec.Containers[i].Env {
-			if pod.Spec.Containers[i].Env[j].Name == nervexutil.PodNameEnv {
+			if pod.Spec.Containers[i].Env[j].Name == diutil.PodNameEnv {
 				pod.Spec.Containers[i].Env[j].Value = pod.Name
 			}
 		}

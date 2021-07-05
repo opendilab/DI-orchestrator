@@ -1,4 +1,4 @@
-module go-sensephoenix.sensetime.com/nervex-operator
+module go-sensephoenix.sensetime.com/di-orchestrator
 
 go 1.15
 

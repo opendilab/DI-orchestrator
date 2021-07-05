@@ -10,14 +10,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	servertypes "go-sensephoenix.sensetime.com/di-orchestrator/server/types"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
 )
 
-func (s *NerveXServer) getNerveXJob(namespace, modulePodName string) (*nervexv1alpha1.NerveXJob, error) {
+func (s *DIServer) getDIJob(namespace, modulePodName string) (*div1alpha1.DIJob, error) {
 	// get module
-	podKey := nervexutil.NamespacedName(namespace, modulePodName)
+	podKey := diutil.NamespacedName(namespace, modulePodName)
 	modulePod, err := s.getPodByKey(podKey)
 	if err != nil {
 		return nil, err
@@ -25,59 +25,59 @@ func (s *NerveXServer) getNerveXJob(namespace, modulePodName string) (*nervexv1a
 
 	var ownRefer metav1.OwnerReference
 	ownRefers := modulePod.GetOwnerReferences()
-	ownByNerveX := false
+	ownByDI := false
 	for _, ref := range ownRefers {
-		if ref.Kind == nervexv1alpha1.KindNerveXJob {
+		if ref.Kind == div1alpha1.KindDIJob {
 			ownRefer = ref
-			ownByNerveX = true
+			ownByDI = true
 		}
 	}
-	if !ownByNerveX {
-		errMsg := fmt.Sprintf("module %s is not owned by any NerveXJob", modulePodName)
-		return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
+	if !ownByDI {
+		errMsg := fmt.Sprintf("module %s is not owned by any DIJob", modulePodName)
+		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
 	}
 
-	// get NerveXJob
-	njKey := nervexutil.NamespacedName(namespace, ownRefer.Name)
-	nvxJob, err := s.getNerveXJobByKey(njKey)
+	// get DIJob
+	njKey := diutil.NamespacedName(namespace, ownRefer.Name)
+	diJob, err := s.getDIJobByKey(njKey)
 	if err != nil {
 		return nil, err
 	}
 
-	// check if the coordinator is owned by stale NerveXJob
+	// check if the coordinator is owned by stale DIJob
 	for _, ref := range ownRefers {
-		if ref.Kind == nervexv1alpha1.KindNerveXJob && ref.UID != nvxJob.UID {
-			errMsg := fmt.Sprintf("coordinator %s is owned by stale NerveXJob", modulePodName)
-			return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		if ref.Kind == div1alpha1.KindDIJob && ref.UID != diJob.UID {
+			errMsg := fmt.Sprintf("coordinator %s is owned by stale DIJob", modulePodName)
+			return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
 		}
 	}
 
-	return nvxJob, nil
+	return diJob, nil
 }
 
-func (s *NerveXServer) getNerveXJobByKey(key string) (*nervexv1alpha1.NerveXJob, error) {
+func (s *DIServer) getDIJobByKey(key string) (*div1alpha1.DIJob, error) {
 	obj, exists, err := s.dyi.NJInformer.Informer().GetIndexer().GetByKey(key)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to get NerveXJob: %s", err)
+		errMsg := fmt.Sprintf("failed to get DIJob: %s", err)
 		return nil, fmt.Errorf(errMsg)
 	}
 
 	if !exists {
-		errMsg := fmt.Sprintf("NerveXJob: %s not exists in cache", key)
-		return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		errMsg := fmt.Sprintf("DIJob: %s not exists in cache", key)
+		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
 	}
-	nvxUn := obj.(*unstructured.Unstructured)
-	var nvxJob nervexv1alpha1.NerveXJob
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(nvxUn.UnstructuredContent(), &nvxJob)
+	diUn := obj.(*unstructured.Unstructured)
+	var diJob div1alpha1.DIJob
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(diUn.UnstructuredContent(), &diJob)
 	if err != nil {
-		errMsg := fmt.Sprintf("failed to convert unstructured: %s", nvxUn.UnstructuredContent())
+		errMsg := fmt.Sprintf("failed to convert unstructured: %s", diUn.UnstructuredContent())
 		return nil, fmt.Errorf(errMsg)
 	}
 
-	return &nvxJob, nil
+	return &diJob, nil
 }
 
-func (s *NerveXServer) getAGConfigByKey(key string) (*nervexv1alpha1.AggregatorConfig, error) {
+func (s *DIServer) getAGConfigByKey(key string) (*div1alpha1.AggregatorConfig, error) {
 	obj, exists, err := s.dyi.AGInformer.Informer().GetIndexer().GetByKey(key)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get AGConfig: %s", err)
@@ -86,10 +86,10 @@ func (s *NerveXServer) getAGConfigByKey(key string) (*nervexv1alpha1.AggregatorC
 
 	if !exists {
 		errMsg := fmt.Sprintf("AGConfig: %s not exists in cache", key)
-		return nil, &servertypes.NerveXError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
 	}
 	agUn := obj.(*unstructured.Unstructured)
-	var agconfig nervexv1alpha1.AggregatorConfig
+	var agconfig div1alpha1.AggregatorConfig
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(agUn.UnstructuredContent(), &agconfig)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to convert unstructured: %s", agUn.UnstructuredContent())
@@ -99,9 +99,9 @@ func (s *NerveXServer) getAGConfigByKey(key string) (*nervexv1alpha1.AggregatorC
 	return &agconfig, nil
 }
 
-func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
-	njreq *servertypes.NerveXJobRequest,
-	job *nervexv1alpha1.NerveXJob) ([]string, []string, error) {
+func (s *DIServer) createCollectorsAndLearnersForDIJob(
+	njreq *servertypes.DIJobRequest,
+	job *div1alpha1.DIJob) ([]string, []string, error) {
 
 	// get agconfig to fetch aggregator definition
 	agKey := s.AGConfig
@@ -125,14 +125,14 @@ func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 	volumes := job.Spec.Volumes
 	// create collectors
 	collectorTemplate := job.Spec.Collector.Template
-	collectors, err := s.createReplicas(&collectorTemplate, volumes, ownRefer, njreq.Collectors, njreq.Namespace, nervexutil.CollectorName, nil)
+	collectors, err := s.createReplicas(&collectorTemplate, volumes, ownRefer, njreq.Collectors, njreq.Namespace, diutil.CollectorName, nil)
 	if err != nil {
 		return collectors, nil, err
 	}
 
 	// create learners
 	learnerTemplate := job.Spec.Learner.Template
-	learners, err := s.createReplicas(&learnerTemplate, volumes, ownRefer, njreq.Learners, njreq.Namespace, nervexutil.LearnerName, agtemplate)
+	learners, err := s.createReplicas(&learnerTemplate, volumes, ownRefer, njreq.Learners, njreq.Namespace, diutil.LearnerName, agtemplate)
 	if err != nil {
 		return collectors, learners, err
 	}
@@ -140,7 +140,7 @@ func (s *NerveXServer) createCollectorsAndLearnersForNerveXJob(
 	return collectors, learners, nil
 }
 
-func (s *NerveXServer) createReplicas(
+func (s *DIServer) createReplicas(
 	template *corev1.PodTemplateSpec,
 	volumes []corev1.Volume,
 	ownRefer metav1.OwnerReference,
@@ -151,10 +151,10 @@ func (s *NerveXServer) createReplicas(
 
 	var defaultPort int32
 	switch replicaType {
-	case nervexutil.CollectorName:
-		defaultPort = nervexutil.DefaultCollectorPort
-	case nervexutil.LearnerName:
-		defaultPort = nervexutil.DefaultLearnerPort
+	case diutil.CollectorName:
+		defaultPort = diutil.DefaultCollectorPort
+	case diutil.LearnerName:
+		defaultPort = diutil.DefaultLearnerPort
 	default:
 
 	}
@@ -174,7 +174,7 @@ func (s *NerveXServer) createReplicas(
 		}
 
 		// if we need to create multiple ddp learner pods, we also need to create aggregator pod
-		if replicaType == nervexutil.LearnerName && needMultiDDPLearnerPod {
+		if replicaType == diutil.LearnerName && needMultiDDPLearnerPod {
 			jobName := ownRefer.Name
 			// create aggregator
 			agg, aggsvc, port, err := s.buildAggregatorPod(agtemplate, ownRefer, jobName, namespace)
@@ -194,7 +194,7 @@ func (s *NerveXServer) createReplicas(
 				Controller: func(c bool) *bool { return &c }(false),
 			}
 
-			result := nervexutil.ConcatURL(aggsvc.Name, namespace, port)
+			result := diutil.ConcatURL(aggsvc.Name, namespace, port)
 			results = append(results, result)
 
 			// allocate gpus
@@ -223,7 +223,7 @@ func (s *NerveXServer) createReplicas(
 					// set access port for ddp master port
 					mport := corev1.ServicePort{
 						Name: "master-port",
-						Port: int32(nervexutil.DefaultMasterPort),
+						Port: int32(diutil.DefaultMasterPort),
 					}
 					svcList[0].Spec.Ports = append(svcList[0].Spec.Ports, mport)
 				}
@@ -243,7 +243,7 @@ func (s *NerveXServer) createReplicas(
 			}
 			svcName = svc.Name
 
-			if replicaType == nervexutil.LearnerName && needAggregator(resources) {
+			if replicaType == diutil.LearnerName && needAggregator(resources) {
 				// create aggregator
 				agg, aggsvc, aggport, err := s.buildAggregatorPod(agtemplate, ownRefer, jobName, namespace)
 				if err != nil {
@@ -282,7 +282,7 @@ func (s *NerveXServer) createReplicas(
 
 			podList = append(podList, pod)
 			svcList = append(svcList, svc)
-			result := nervexutil.ConcatURL(svcName, namespace, port)
+			result := diutil.ConcatURL(svcName, namespace, port)
 			results = append(results, result)
 		}
 
@@ -298,7 +298,7 @@ func (s *NerveXServer) createReplicas(
 	return results, nil
 }
 
-func (s *NerveXServer) needMultiDDPLearnerPod(resource servertypes.ResourceQuantity) (bool, error) {
+func (s *DIServer) needMultiDDPLearnerPod(resource servertypes.ResourceQuantity) (bool, error) {
 	if err := s.SyncNodes(); err != nil {
 		return false, err
 	}
@@ -317,28 +317,28 @@ func needAggregator(resource servertypes.ResourceQuantity) bool {
 	return resource.GPU.Value() > 1
 }
 
-func (s *NerveXServer) buildAggregatorPod(
+func (s *DIServer) buildAggregatorPod(
 	template *corev1.PodTemplateSpec, ownRefer metav1.OwnerReference,
 	jobName, namespace string) (*corev1.Pod, *corev1.Service, int32, error) {
 	// create aggregator
 	aresource := servertypes.ResourceQuantity{}
 	pod, svc, port, err := s.buildPodAndService(template, ownRefer, jobName, namespace,
-		nervexutil.AggregatorName, nervexutil.DefaultAggregatorPort, aresource, nil)
+		diutil.AggregatorName, diutil.DefaultAggregatorPort, aresource, nil)
 	if err != nil {
 		return nil, nil, -1, err
 	}
 
 	// add env
 	envs := make(map[string]string)
-	envs[nervexutil.PodNamespaceEnv] = pod.Namespace
-	envs[nervexutil.PodNameEnv] = pod.Name
-	envs[nervexutil.ServerURLEnv] = nervexutil.DefaultServerURL
-	nervexutil.SetPodEnv(pod, envs)
+	envs[diutil.PodNamespaceEnv] = pod.Namespace
+	envs[diutil.PodNameEnv] = pod.Name
+	envs[diutil.ServerURLEnv] = diutil.DefaultServerURL
+	diutil.SetPodEnv(pod, envs)
 
 	return pod, svc, port, nil
 }
 
-func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
+func (s *DIServer) buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	aggOwnRefer metav1.OwnerReference,
 	jobName, namespace, replicaType string,
@@ -348,18 +348,18 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 	ownRefer.Controller = func(c bool) *bool { return &c }(false)
 
 	pod, svc, port, err := s.buildPodAndService(template.DeepCopy(), aggOwnRefer, jobName,
-		namespace, nervexutil.DDPLearnerName, defaultPort, resources, volumes)
+		namespace, diutil.DDPLearnerName, defaultPort, resources, volumes)
 	if err != nil {
 		return nil, nil, -1, err
 	}
 
-	// set owner reference of NerveXJob to aggregator
+	// set owner reference of DIJob to aggregator
 	pod.OwnerReferences = append(pod.OwnerReferences, ownRefer)
 	svc.OwnerReferences = append(svc.OwnerReferences, ownRefer)
 
 	// create port for all the GPU processes
 	for j := 1; j < int(resources.GPU.Value()); j++ {
-		pname := fmt.Sprintf("%s-%d", nervexutil.DDPLearnerPortPrefix, j)
+		pname := fmt.Sprintf("%s-%d", diutil.DDPLearnerPortPrefix, j)
 		pport := port + int32(j)
 		lsport := corev1.ServicePort{
 			Name: pname,
@@ -372,7 +372,7 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 			ContainerPort: pport,
 		}
 		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name != nervexutil.DefaultContainerName {
+			if pod.Spec.Containers[i].Name != diutil.DefaultContainerName {
 				continue
 			}
 			pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, lcport)
@@ -383,24 +383,24 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 
 func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, worldSize, localWorldSize, startRank int) {
 	envs := make(map[string]string)
-	envs[nervexutil.WorldSize] = strconv.Itoa(worldSize)
-	envs[nervexutil.LocalWorldSize] = strconv.Itoa(localWorldSize)
-	envs[nervexutil.MasterAddr] = masterAddr
-	envs[nervexutil.MasterPort] = strconv.Itoa(nervexutil.DefaultMasterPort)
-	envs[nervexutil.StartRank] = strconv.Itoa(startRank)
-	nervexutil.SetPodEnv(pod, envs)
+	envs[diutil.WorldSize] = strconv.Itoa(worldSize)
+	envs[diutil.LocalWorldSize] = strconv.Itoa(localWorldSize)
+	envs[diutil.MasterAddr] = masterAddr
+	envs[diutil.MasterPort] = strconv.Itoa(diutil.DefaultMasterPort)
+	envs[diutil.StartRank] = strconv.Itoa(startRank)
+	diutil.SetPodEnv(pod, envs)
 }
 
-func (s *NerveXServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
+func (s *DIServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
 	var defaultPort int32
 
 	switch replicaType {
-	case nervexutil.CollectorName:
-		defaultPort = nervexutil.DefaultCollectorPort
-	case nervexutil.LearnerName:
-		defaultPort = nervexutil.DefaultLearnerPort
-	case nervexutil.AggregatorName:
-		defaultPort = nervexutil.DefaultAggregatorPort
+	case diutil.CollectorName:
+		defaultPort = diutil.DefaultCollectorPort
+	case diutil.LearnerName:
+		defaultPort = diutil.DefaultLearnerPort
+	case diutil.AggregatorName:
+		defaultPort = diutil.DefaultAggregatorPort
 	default:
 
 	}
@@ -417,29 +417,29 @@ func (s *NerveXServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace str
 			return results, err
 		}
 
-		result := nervexutil.GetPodAccessURL(pod, defaultPort)
+		result := diutil.GetPodAccessURL(pod, defaultPort)
 		results = append(results, result)
 	}
 
 	return results, nil
 }
 
-func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.Service, namespace string) ([]string, error) {
+func (s *DIServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.Service, namespace string) ([]string, error) {
 	var results []string
 	for i := range pods {
 		oldPod := pods[i]
-		replicaType := oldPod.Labels[nervexutil.ReplicaTypeLabel]
+		replicaType := oldPod.Labels[diutil.ReplicaTypeLabel]
 		var defaultPort int32
 		var needDDPLearner bool = false
 		switch replicaType {
-		case nervexutil.CollectorName:
-			defaultPort = nervexutil.DefaultCollectorPort
-		case nervexutil.LearnerName:
-			defaultPort = nervexutil.DefaultLearnerPort
-		case nervexutil.DDPLearnerName:
-			defaultPort = nervexutil.DefaultLearnerPort
-		case nervexutil.AggregatorName:
-			defaultPort = nervexutil.DefaultAggregatorPort
+		case diutil.CollectorName:
+			defaultPort = diutil.DefaultCollectorPort
+		case diutil.LearnerName:
+			defaultPort = diutil.DefaultLearnerPort
+		case diutil.DDPLearnerName:
+			defaultPort = diutil.DefaultLearnerPort
+		case diutil.AggregatorName:
+			defaultPort = diutil.DefaultAggregatorPort
 			needDDPLearner = true
 		default:
 			return results, fmt.Errorf("unknown replica type")
@@ -471,11 +471,11 @@ func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.S
 
 		var portvalue int32 = defaultPort
 		for _, port := range svc.Spec.Ports {
-			if port.Name == nervexutil.DefaultPortName {
+			if port.Name == diutil.DefaultPortName {
 				portvalue = port.Port
 			}
 		}
-		result := nervexutil.ConcatURL(svc.Name, namespace, portvalue)
+		result := diutil.ConcatURL(svc.Name, namespace, portvalue)
 		results = append(results, result)
 
 		if needDDPLearner {
@@ -492,7 +492,7 @@ func (s *NerveXServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.S
 	return results, nil
 }
 
-func (s *NerveXServer) rebuildDDPLearners(namespace, aggregatorName string) ([]*corev1.Pod, []*corev1.Service, error) {
+func (s *DIServer) rebuildDDPLearners(namespace, aggregatorName string) ([]*corev1.Pod, []*corev1.Service, error) {
 	ddppods, ddpsvcs, err := s.getDDPLearners(namespace, aggregatorName)
 	if err != nil {
 		return nil, nil, err
@@ -516,11 +516,11 @@ func (s *NerveXServer) rebuildDDPLearners(namespace, aggregatorName string) ([]*
 			masterAddr = "localhost"
 		}
 		for j := range pod.Spec.Containers {
-			if pod.Spec.Containers[j].Name != nervexutil.DefaultContainerName {
+			if pod.Spec.Containers[j].Name != diutil.DefaultContainerName {
 				continue
 			}
 			for k := range pod.Spec.Containers[i].Env {
-				if pod.Spec.Containers[i].Env[k].Name == nervexutil.MasterAddr {
+				if pod.Spec.Containers[i].Env[k].Name == diutil.MasterAddr {
 					pod.Spec.Containers[i].Env[k].Value = masterAddr
 				}
 			}
@@ -532,19 +532,19 @@ func (s *NerveXServer) rebuildDDPLearners(namespace, aggregatorName string) ([]*
 	return pods, svcs, nil
 }
 
-func (s *NerveXServer) getDDPLearners(namespace, aggregatorName string) ([]*corev1.Pod, []*corev1.Service, error) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) getDDPLearners(namespace, aggregatorName string) ([]*corev1.Pod, []*corev1.Service, error) {
+	log := s.Log.WithName("DIServer")
 
 	// get ownReference of the request coordinator
-	nvxJob, err := s.getNerveXJob(namespace, aggregatorName)
+	diJob, err := s.getDIJob(namespace, aggregatorName)
 	if err != nil {
 		log.Error(err, "failed to get owner reference")
 		return nil, nil, err
 	}
 
-	// list pods that belong to the NerveXJob
+	// list pods that belong to the DIJob
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: nervexutil.GenLabels(nvxJob.Name),
+		MatchLabels: diutil.GenLabels(diJob.Name),
 	})
 	if err != nil {
 		return nil, nil, err

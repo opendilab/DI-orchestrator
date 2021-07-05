@@ -1,11 +1,11 @@
 package testutils
 
 const (
-	DefaultAGConfigNamespace = "nervex-system"
+	DefaultAGConfigNamespace = "di-system"
 	DefaultAGConfigName      = "aggregator-config"
 
-	NerveXJobName        = "nervexjob-example"
-	NerveXJobNamespace   = "default"
-	NerveXJobImage       = "alpine:latest"
+	DIJobName            = "dijob-example"
+	DIJobNamespace       = "default"
+	DIJobImage           = "alpine:latest"
 	DefaultSleepDuration = "2s"
 )

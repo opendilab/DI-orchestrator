@@ -2,7 +2,7 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: aggregatorconfigs.nervex.sensetime.com
+  name: aggregatorconfigs.diengine.sensetime.com
 spec:
   conversion:
     strategy: Webhook
@@ -11,7 +11,7 @@ spec:
         service:
           namespace: $(SERVICE_NAMESPACE)
           name: $(SERVICE_NAME)
-          path: /mutate-nervex-sensetime-com-v1alpha1-nervexjob
+          path: /mutate-diengine-sensetime-com-v1alpha1-dijob
       conversionReviewVersions:
       - "v1"
       - "v1beta1"

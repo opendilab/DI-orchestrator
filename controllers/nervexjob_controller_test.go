@@ -12,33 +12,33 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
-	testutil "go-sensephoenix.sensetime.com/nervex-operator/utils/testutils"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
+	testutil "go-sensephoenix.sensetime.com/di-orchestrator/utils/testutils"
 )
 
-var _ = Describe("NerveXJob Controller", func() {
+var _ = Describe("DIJob Controller", func() {
 
-	Context("When creating a NerveXJob", func() {
+	Context("When creating a DIJob", func() {
 		It("Should be succeeded", func() {
-			By("Create a NerveXJob")
+			By("Create a DIJob")
 			var err error
 			ctx := context.Background()
-			jobTmpl := testutil.NewNerveXJob()
-			nervexjob, jobKey := createNerveXJob(ctx, k8sClient, jobTmpl)
+			jobTmpl := testutil.NewDIJob()
+			dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
 
 			By("Update coordinator to Running")
 			for _, replicaName := range []string{
-				nervexutil.ReplicaPodName(nervexjob.Name, "coordinator"),
+				diutil.ReplicaPodName(dijob.Name, "coordinator"),
 			} {
-				podKey := types.NamespacedName{Namespace: nervexjob.Namespace, Name: replicaName}
+				podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 				err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodRunning)
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			var createdNvxjob nervexv1alpha1.NerveXJob
-			By("Checking the created NerveXJob has enough coordinator")
-			for _, rtype := range []nervexv1alpha1.ReplicaType{nervexv1alpha1.ReplicaTypeCoordinator} {
+			var createdNvxjob div1alpha1.DIJob
+			By("Checking the created DIJob has enough coordinator")
+			for _, rtype := range []div1alpha1.ReplicaType{div1alpha1.ReplicaTypeCoordinator} {
 				Eventually(func() int {
 					err := k8sClient.Get(ctx, jobKey, &createdNvxjob)
 					if err != nil {
@@ -51,18 +51,18 @@ var _ = Describe("NerveXJob Controller", func() {
 				}, timeout, interval).Should(Equal(1))
 			}
 
-			By("Checking the created NerveXJob is in Running state")
+			By("Checking the created DIJob is in Running state")
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, jobKey, &createdNvxjob)
 				if err != nil {
 					return false
 				}
-				return createdNvxjob.Status.Phase == nervexv1alpha1.JobRunning
+				return createdNvxjob.Status.Phase == div1alpha1.JobRunning
 			}, duration, interval).Should(BeTrue())
 
 			By("Update coordinator to Succeeded")
 			for _, replicaName := range []string{
-				nervexutil.ReplicaPodName(createdNvxjob.Name, "coordinator"),
+				diutil.ReplicaPodName(createdNvxjob.Name, "coordinator"),
 			} {
 				podKey := types.NamespacedName{Namespace: createdNvxjob.Namespace, Name: replicaName}
 				err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
@@ -70,13 +70,13 @@ var _ = Describe("NerveXJob Controller", func() {
 			}
 
 			By("Checking the job is succeeded")
-			Eventually(func() nervexv1alpha1.Phase {
+			Eventually(func() div1alpha1.Phase {
 				err := k8sClient.Get(ctx, jobKey, &createdNvxjob)
 				if err != nil {
-					return nervexv1alpha1.JobUnknown
+					return div1alpha1.JobUnknown
 				}
 				return createdNvxjob.Status.Phase
-			}, timeout, interval).Should(Equal(nervexv1alpha1.JobSucceeded))
+			}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
 
 			By("Checking the coordinator is succeeded")
 			Eventually(func() int {
@@ -84,7 +84,7 @@ var _ = Describe("NerveXJob Controller", func() {
 				if err != nil {
 					return -1
 				}
-				return int(createdNvxjob.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Succeeded)
+				return int(createdNvxjob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Succeeded)
 			}, timeout, interval).Should(Equal(1))
 
 			By("Cleaning up")
@@ -92,43 +92,43 @@ var _ = Describe("NerveXJob Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("NerveXJob status changed with components status", func() {
+		It("DIJob status changed with components status", func() {
 			type testCase struct {
 				coorStatus   corev1.PodPhase
-				expectStatus nervexv1alpha1.Phase
+				expectStatus div1alpha1.Phase
 			}
 			testCases := []testCase{
-				{coorStatus: corev1.PodRunning, expectStatus: nervexv1alpha1.JobRunning},
-				{coorStatus: corev1.PodFailed, expectStatus: nervexv1alpha1.JobFailed},
-				{coorStatus: corev1.PodSucceeded, expectStatus: nervexv1alpha1.JobSucceeded},
+				{coorStatus: corev1.PodRunning, expectStatus: div1alpha1.JobRunning},
+				{coorStatus: corev1.PodFailed, expectStatus: div1alpha1.JobFailed},
+				{coorStatus: corev1.PodSucceeded, expectStatus: div1alpha1.JobSucceeded},
 			}
 			for i := range testCases {
 				c := testCases[i]
 
-				By(fmt.Sprintf("Create the %dth NerveXJob", i+1))
+				By(fmt.Sprintf("Create the %dth DIJob", i+1))
 				var err error
 				ctx := context.Background()
-				jobTmpl := testutil.NewNerveXJob()
-				nervexjob, jobKey := createNerveXJob(ctx, k8sClient, jobTmpl)
+				jobTmpl := testutil.NewDIJob()
+				dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
 
 				By("Update coordinator status")
 				for _, replicaName := range []string{
-					nervexutil.ReplicaPodName(nervexjob.Name, "coordinator"),
+					diutil.ReplicaPodName(dijob.Name, "coordinator"),
 				} {
-					podKey := types.NamespacedName{Namespace: nervexjob.Namespace, Name: replicaName}
+					podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 					if strings.HasSuffix(replicaName, "coordinator") {
 						err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, c.coorStatus)
 					}
 					Expect(err).NotTo(HaveOccurred())
 				}
 
-				By("Checking the created NerveXJob has enough coordinator")
+				By("Checking the created DIJob has enough coordinator")
 				Eventually(func() int {
-					err := k8sClient.Get(ctx, jobKey, &nervexjob)
+					err := k8sClient.Get(ctx, jobKey, &dijob)
 					if err != nil {
 						return -1
 					}
-					if nervexjob.Status.ReplicaStatus == nil {
+					if dijob.Status.ReplicaStatus == nil {
 						return -1
 					}
 
@@ -137,31 +137,31 @@ var _ = Describe("NerveXJob Controller", func() {
 					count := 0
 					switch phase {
 					case corev1.PodRunning:
-						count = int(nervexjob.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Active)
+						count = int(dijob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Active)
 					case corev1.PodFailed:
-						count = int(nervexjob.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Failed)
+						count = int(dijob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Failed)
 					case corev1.PodSucceeded:
-						count = int(nervexjob.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Succeeded)
+						count = int(dijob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Succeeded)
 					}
 					return count
 				}, timeout, interval).Should(Equal(1))
 
-				By("Checking the created NerveXJob's state")
-				Eventually(func() nervexv1alpha1.Phase {
-					err := k8sClient.Get(ctx, jobKey, &nervexjob)
+				By("Checking the created DIJob's state")
+				Eventually(func() div1alpha1.Phase {
+					err := k8sClient.Get(ctx, jobKey, &dijob)
 					if err != nil {
-						return nervexv1alpha1.JobUnknown
+						return div1alpha1.JobUnknown
 					}
-					return nervexjob.Status.Phase
+					return dijob.Status.Phase
 				}, timeout, interval).Should(Equal(c.expectStatus))
 
 				By("Cleaning up")
-				err = testutil.CleanUpJob(ctx, k8sClient, nervexjob.DeepCopy(), timeout, interval)
+				err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy(), timeout, interval)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 	})
-	Context("When creating a NerveXJob with collectors and learners", func() {
+	Context("When creating a DIJob with collectors and learners", func() {
 		It("Should record collector and learner status to job status", func() {
 			type replica struct {
 				name   string
@@ -202,82 +202,82 @@ var _ = Describe("NerveXJob Controller", func() {
 			}
 			for i := range testCases {
 				c := testCases[i]
-				By(fmt.Sprintf("Create %dth NerveXJob", i+1))
+				By(fmt.Sprintf("Create %dth DIJob", i+1))
 				var err error
 				ctx := context.Background()
-				jobTmpl := testutil.NewNerveXJob()
-				nervexjob, jobKey := createNerveXJob(ctx, k8sClient, jobTmpl)
+				jobTmpl := testutil.NewDIJob()
+				dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
 
 				// build owner reference
 				ownRefer := metav1.OwnerReference{
-					APIVersion: nervexv1alpha1.GroupVersion.String(),
-					Kind:       nervexv1alpha1.KindNerveXJob,
-					Name:       nervexjob.Name,
-					UID:        nervexjob.GetUID(),
+					APIVersion: div1alpha1.GroupVersion.String(),
+					Kind:       div1alpha1.KindDIJob,
+					Name:       dijob.Name,
+					UID:        dijob.GetUID(),
 					Controller: func(c bool) *bool { return &c }(true),
 				}
 
-				By(fmt.Sprintf("Create replicas for NerveXJob %s", nervexjob.Name))
+				By(fmt.Sprintf("Create replicas for DIJob %s", dijob.Name))
 				colStatus := make([]int, 3)
 				for _, col := range c.collectors {
-					createAndUpdatePodPhase(ctx, k8sClient, col.name, nervexjob.Name, col.status, nervexutil.CollectorName, ownRefer, colStatus)
+					createAndUpdatePodPhase(ctx, k8sClient, col.name, dijob.Name, col.status, diutil.CollectorName, ownRefer, colStatus)
 				}
 
 				lrStatus := make([]int, 3)
 				for _, lr := range c.learners {
-					createAndUpdatePodPhase(ctx, k8sClient, lr.name, nervexjob.Name, lr.status, nervexutil.LearnerName, ownRefer, lrStatus)
+					createAndUpdatePodPhase(ctx, k8sClient, lr.name, dijob.Name, lr.status, diutil.LearnerName, ownRefer, lrStatus)
 				}
 
 				By("Checking the ReplicaStatus is as expected")
-				for _, rtype := range []nervexv1alpha1.ReplicaType{
-					nervexv1alpha1.ReplicaTypeCollector,
-					nervexv1alpha1.ReplicaTypeLearner,
+				for _, rtype := range []div1alpha1.ReplicaType{
+					div1alpha1.ReplicaTypeCollector,
+					div1alpha1.ReplicaTypeLearner,
 				} {
 					var status []int
 					switch rtype {
-					case nervexv1alpha1.ReplicaTypeCollector:
+					case div1alpha1.ReplicaTypeCollector:
 						status = colStatus
-					case nervexv1alpha1.ReplicaTypeLearner:
+					case div1alpha1.ReplicaTypeLearner:
 						status = lrStatus
 					}
 					Eventually(func() []int {
-						err = k8sClient.Get(ctx, jobKey, &nervexjob)
+						err = k8sClient.Get(ctx, jobKey, &dijob)
 						if err != nil {
 							return nil
 						}
 						result := make([]int, 3)
-						result[0] = int(nervexjob.Status.ReplicaStatus[rtype].Active)
-						result[1] = int(nervexjob.Status.ReplicaStatus[rtype].Failed)
-						result[2] = int(nervexjob.Status.ReplicaStatus[rtype].Succeeded)
+						result[0] = int(dijob.Status.ReplicaStatus[rtype].Active)
+						result[1] = int(dijob.Status.ReplicaStatus[rtype].Failed)
+						result[2] = int(dijob.Status.ReplicaStatus[rtype].Succeeded)
 						return result
 					}, timeout, interval).Should(Equal(status))
 				}
 
 				By("Update coordinator to Succeeded")
 				for _, replicaName := range []string{
-					nervexutil.ReplicaPodName(nervexjob.Name, "coordinator"),
+					diutil.ReplicaPodName(dijob.Name, "coordinator"),
 				} {
-					podKey := types.NamespacedName{Namespace: nervexjob.Namespace, Name: replicaName}
+					podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 					err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
 					Expect(err).NotTo(HaveOccurred())
 				}
 
 				By("Checking the job is successfully succeeded")
-				Eventually(func() nervexv1alpha1.Phase {
-					err := k8sClient.Get(ctx, jobKey, &nervexjob)
+				Eventually(func() div1alpha1.Phase {
+					err := k8sClient.Get(ctx, jobKey, &dijob)
 					if err != nil {
-						return nervexv1alpha1.JobUnknown
+						return div1alpha1.JobUnknown
 					}
-					return nervexjob.Status.Phase
-				}, timeout, interval).Should(Equal(nervexv1alpha1.JobSucceeded))
+					return dijob.Status.Phase
+				}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
 
 				By("Checking the coordinator is succeeded")
 				Eventually(func() int {
-					err := k8sClient.Get(ctx, jobKey, &nervexjob)
+					err := k8sClient.Get(ctx, jobKey, &dijob)
 					if err != nil {
 						return -1
 					}
-					return int(nervexjob.Status.ReplicaStatus[nervexv1alpha1.ReplicaTypeCoordinator].Succeeded)
+					return int(dijob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Succeeded)
 				}, timeout, interval).Should(Equal(1))
 
 				colStatus1 := make([]int, 3)
@@ -290,48 +290,48 @@ var _ = Describe("NerveXJob Controller", func() {
 				lrStatus1[2] = lrStatus[0] + lrStatus[2]
 
 				By("Checking the ReplicaStatus is as expected")
-				for _, rtype := range []nervexv1alpha1.ReplicaType{
-					nervexv1alpha1.ReplicaTypeCollector,
-					nervexv1alpha1.ReplicaTypeLearner,
+				for _, rtype := range []div1alpha1.ReplicaType{
+					div1alpha1.ReplicaTypeCollector,
+					div1alpha1.ReplicaTypeLearner,
 				} {
 					var status []int
 					switch rtype {
-					case nervexv1alpha1.ReplicaTypeCollector:
+					case div1alpha1.ReplicaTypeCollector:
 						status = colStatus1
-					case nervexv1alpha1.ReplicaTypeLearner:
+					case div1alpha1.ReplicaTypeLearner:
 						status = lrStatus1
 					}
 					Eventually(func() []int {
-						err = k8sClient.Get(ctx, jobKey, &nervexjob)
+						err = k8sClient.Get(ctx, jobKey, &dijob)
 						if err != nil {
 							return nil
 						}
 						result := make([]int, 3)
-						result[0] = int(nervexjob.Status.ReplicaStatus[rtype].Active)
-						result[1] = int(nervexjob.Status.ReplicaStatus[rtype].Failed)
-						result[2] = int(nervexjob.Status.ReplicaStatus[rtype].Succeeded)
+						result[0] = int(dijob.Status.ReplicaStatus[rtype].Active)
+						result[1] = int(dijob.Status.ReplicaStatus[rtype].Failed)
+						result[2] = int(dijob.Status.ReplicaStatus[rtype].Succeeded)
 						return result
 					}, timeout, interval).Should(Equal(status))
 				}
 
-				err = testutil.CleanUpJob(ctx, k8sClient, nervexjob.DeepCopy(), timeout, interval)
+				err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy(), timeout, interval)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 	})
 })
 
-func createNerveXJob(ctx context.Context, k8sClient client.Client, nervexjob *nervexv1alpha1.NerveXJob) (
-	nervexv1alpha1.NerveXJob, types.NamespacedName) {
-	name := nervexutil.GenerateName(nervexjob.Name)
-	nervexjob.SetName(name)
+func createDIJob(ctx context.Context, k8sClient client.Client, dijob *div1alpha1.DIJob) (
+	div1alpha1.DIJob, types.NamespacedName) {
+	name := diutil.GenerateName(dijob.Name)
+	dijob.SetName(name)
 
-	err := k8sClient.Create(ctx, nervexjob, &client.CreateOptions{})
+	err := k8sClient.Create(ctx, dijob, &client.CreateOptions{})
 	Expect(err).ShouldNot(HaveOccurred())
 
-	By(fmt.Sprintf("Checking the NerveXJob %s is successfully created", name))
-	key := types.NamespacedName{Namespace: nervexjob.Namespace, Name: nervexjob.Name}
-	createdNvxjob := nervexv1alpha1.NerveXJob{}
+	By(fmt.Sprintf("Checking the DIJob %s is successfully created", name))
+	key := types.NamespacedName{Namespace: dijob.Namespace, Name: dijob.Name}
+	createdNvxjob := div1alpha1.DIJob{}
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, key, &createdNvxjob)
 		if err != nil {
@@ -341,9 +341,9 @@ func createNerveXJob(ctx context.Context, k8sClient client.Client, nervexjob *ne
 	}, timeout, interval).Should(BeTrue())
 
 	By("Checking coordinator are created")
-	replicaName := nervexutil.ReplicaPodName(nervexjob.Name, "coordinator")
+	replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
 	var pod corev1.Pod
-	podKey := types.NamespacedName{Namespace: nervexjob.Namespace, Name: replicaName}
+	podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 	Eventually(func() bool {
 		err = k8sClient.Get(ctx, podKey, &pod)
 		if err != nil {
@@ -361,9 +361,9 @@ func createAndUpdatePodPhase(
 	ownRefer metav1.OwnerReference, statuses []int) {
 
 	pod := testutil.NewPod(name, jobName, ownRefer)
-	labs := nervexutil.GenLabels(jobName)
-	labs[nervexutil.ReplicaTypeLabel] = replicaType
-	labs[nervexutil.PodNameLabel] = pod.Name
+	labs := diutil.GenLabels(jobName)
+	labs[diutil.ReplicaTypeLabel] = replicaType
+	labs[diutil.PodNameLabel] = pod.Name
 	pod.SetLabels(labs)
 
 	err := k8sClient.Create(ctx, pod, &client.CreateOptions{})

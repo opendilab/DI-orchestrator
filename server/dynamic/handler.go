@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,11 +20,11 @@ func GetPodFromObject(obj interface{}) (*corev1.Pod, error) {
 	}
 	owners := pod.GetOwnerReferences()
 	for _, owner := range owners {
-		if owner.Kind == nervexv1alpha1.KindNerveXJob {
+		if owner.Kind == div1alpha1.KindDIJob {
 			return &pod, nil
 		}
 	}
-	return nil, fmt.Errorf("pod %s not belong to NerveXJob", pod.Name)
+	return nil, fmt.Errorf("pod %s not belong to DIJob", pod.Name)
 }
 
 func GetServiceFromObject(obj interface{}) (*corev1.Service, error) {
@@ -36,15 +36,15 @@ func GetServiceFromObject(obj interface{}) (*corev1.Service, error) {
 	}
 	owners := service.GetOwnerReferences()
 	for _, owner := range owners {
-		if owner.Kind == nervexv1alpha1.KindNerveXJob {
+		if owner.Kind == div1alpha1.KindDIJob {
 			return &service, nil
 		}
 	}
-	return nil, fmt.Errorf("service %s not belong to NerveXJob", service.Name)
+	return nil, fmt.Errorf("service %s not belong to DIJob", service.Name)
 }
 
-func isNotBelongToNerveXJobError(err error) bool {
-	if strings.Contains(err.Error(), "not belong to NerveXJob") {
+func isNotBelongToDIJobError(err error) bool {
+	if strings.Contains(err.Error(), "not belong to DIJob") {
 		return true
 	}
 	return false

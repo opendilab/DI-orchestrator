@@ -1,10 +1,10 @@
-# Build nervex-server with local nerver-server binary
-FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as dev-nervex-server
+# Build di-server with local nerver-server binary
+FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as dev-di-server
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /
-COPY /bin/nervex-server  .
+COPY /bin/di-server  .
 
-ENTRYPOINT ["/nervex-server"]
+ENTRYPOINT ["/di-server"]
 
 # Build the manager binary
 FROM registry.sensetime.com/cloudnative4ai/golang:1.14 as builder
@@ -13,7 +13,7 @@ WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
+# cache deps before buildi and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
 
@@ -25,13 +25,13 @@ COPY server/ server/
 COPY utils/ utils/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o nervex-server server/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-server server/main.go
 
-# Use distroless as minimal base image to package the nervex-server binary
+# Use distroless as minimal base image to package the di-server binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as nervex-server
+FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-server
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /
-COPY --from=builder /workspace/nervex-server .
+COPY --from=builder /workspace/di-server .
 
-ENTRYPOINT ["/nervex-server"]
+ENTRYPOINT ["/di-server"]

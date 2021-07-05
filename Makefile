@@ -1,5 +1,5 @@
 
-# nervex-operator version
+# di-operator version
 VERSION ?= v0.0.1-alpha.0
 MASTER_VERSION := $(VERSION)
 
@@ -16,8 +16,8 @@ VERSION := $(MASTER_VERSION)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG_BASE ?= registry.sensetime.com/cloudnative4ai/nervex-operator
-SERVER_IMG_BASE ?= registry.sensetime.com/cloudnative4ai/nervex-server
+IMG_BASE ?= registry.sensetime.com/cloudnative4ai/di-operator
+SERVER_IMG_BASE ?= registry.sensetime.com/cloudnative4ai/di-server
 
 IMG ?= ${IMG_BASE}:${VERSION}
 MASTER_IMG ?= ${IMG_BASE}:${MASTER_VERSION}
@@ -55,14 +55,14 @@ help: ## Display this help.
 ##@ Development
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=nervex-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG} ${SERVER_IMG_BASE}=${MASTER_SERVER_IMG}
 	./hack/update-version.sh ${MASTER_VERSION}
 
 # dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
 # used `make manifests` when commited git
 dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=nervex-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG} ${SERVER_IMG_BASE}=${SERVER_IMG}
 	./hack/update-version.sh ${VERSION}
 
@@ -85,26 +85,26 @@ test: ginkgo ## Run tests.
 
 ##@ Build
 
-build: generate  ## Build nervex-operator binary.
-	go build -o bin/nervex-operator main.go
-	go build -o bin/nervex-server server/main.go
+build: generate  ## Build di-operator binary.
+	go build -o bin/di-operator main.go
+	go build -o bin/di-server server/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 dev-images: build
-	docker build -t ${IMG} --target dev-nervex-operator .
-	docker build -t ${SERVER_IMG} -f Dockerfile.server --target dev-nervex-server .
+	docker build -t ${IMG} --target dev-di-operator .
+	docker build -t ${SERVER_IMG} -f Dockerfile.server --target dev-di-server .
 
-docker-build: build ## Build docker image with the nervex-operator.
-	docker build -t ${IMG} --target nervex-operator .
-	docker build -t ${SERVER_IMG} -f Dockerfile.server --target nervex-server .
+docker-build: build ## Build docker image with the di-operator.
+	docker build -t ${IMG} --target di-operator .
+	docker build -t ${SERVER_IMG} -f Dockerfile.server --target di-server .
 
-docker-push: ## Push docker image with the nervex-operator.
+docker-push: ## Push docker image with the di-operator.
 	docker push ${IMG}
 	docker push ${SERVER_IMG}
 
-docker-release: ## Release docker image with the nervex-operator.
+docker-release: ## Release docker image with the di-operator.
 	docker tag ${IMG} ${MASTER_IMG}
 	docker tag ${SERVER_IMG} ${MASTER_SERVER_IMG}
 	docker push ${MASTER_IMG} 
@@ -124,8 +124,8 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 dev-deploy: dev-manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
-installer-gen: manifests kustomize ## generate nervex-manager.yaml
-	$(KUSTOMIZE) build config/default > config/nervex-manager.yaml
+installer-gen: manifests kustomize ## generate di-manager.yaml
+	$(KUSTOMIZE) build config/default > config/di-manager.yaml
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -

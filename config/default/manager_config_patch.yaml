@@ -1,8 +1,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nervex-operator
-  namespace: nervex-system
+  name: di-operator
+  namespace: di-system
 spec:
   template:
     spec:

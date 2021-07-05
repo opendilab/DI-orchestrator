@@ -6,16 +6,16 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: nervexjobs.nervex.sensetime.com
+  name: dijobs.diengine.sensetime.com
 spec:
-  group: nervex.sensetime.com
+  group: diengine.sensetime.com
   names:
-    kind: NerveXJob
-    listKind: NerveXJobList
-    plural: nervexjobs
+    kind: DIJob
+    listKind: DIJobList
+    plural: dijobs
     shortNames:
-    - nvxjob
-    singular: nervexjob
+    - dijob
+    singular: dijob
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -28,7 +28,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NerveXJob is the Schema for the nervexjobs API
+        description: DIJob is the Schema for the dijobs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -43,11 +43,11 @@ spec:
           metadata:
             type: object
           spec:
-            description: NerveXJobSpec defines the desired state of NerveXJob
+            description: DIJobSpec defines the desired state of DIJob
             properties:
               cleanPodPolicy:
                 description: CleanPodPolicy defines the policy to clean pods after
-                  NerveXJob completed
+                  DIJob completed
                 type: string
               collector:
                 description: CollectorSpec defines the desired state of CollectorSpec
@@ -13178,7 +13178,7 @@ spec:
                 - template
                 type: object
               group:
-                description: Group is a collection of NerveXJobs
+                description: Group is a collection of DIJobs
                 type: string
               learner:
                 description: Learner defines the desired state of Learner
@@ -19745,7 +19745,7 @@ spec:
                 - template
                 type: object
               priorityClassName:
-                description: Priority labels the priority of NerveXJob
+                description: Priority labels the priority of DIJob
                 type: string
               volumes:
                 description: Volumes defines the shared volumes for nerveX components
@@ -21184,11 +21184,11 @@ spec:
             - learner
             type: object
           status:
-            description: NerveXJobStatus defines the observed state of NerveXJob
+            description: DIJobStatus defines the observed state of DIJob
             properties:
               conditions:
                 items:
-                  description: NerveXJobCondition records the conditions of NerveXJob
+                  description: DIJobCondition records the conditions of DIJob
                   properties:
                     lastTransitionTime:
                       description: Last time the condition transitioned from one status
@@ -21218,7 +21218,7 @@ spec:
                   type: object
                 type: array
               phase:
-                description: Phase defines the phase of NerveXJob
+                description: Phase defines the phase of DIJob
                 type: string
               replicaStatus:
                 additionalProperties:

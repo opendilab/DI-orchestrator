@@ -2,11 +2,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: nervex-webhook-service
-  namespace: nervex-system
+  name: di-webhook-service
+  namespace: di-system
 spec:
   ports:
     - port: 443
       targetPort: 9443
   selector:
-    control-plane: nervex-operator
+    control-plane: di-operator

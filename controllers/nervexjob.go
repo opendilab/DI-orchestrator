@@ -1,21 +1,21 @@
 package controllers
 
 import (
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
 )
 
-func isSucceeded(job *nervexv1alpha1.NerveXJob) bool {
-	return job.Status.Phase == nervexv1alpha1.JobSucceeded
+func isSucceeded(job *div1alpha1.DIJob) bool {
+	return job.Status.Phase == div1alpha1.JobSucceeded
 }
 
-func isFailed(job *nervexv1alpha1.NerveXJob) bool {
-	return job.Status.Phase == nervexv1alpha1.JobFailed
+func isFailed(job *div1alpha1.DIJob) bool {
+	return job.Status.Phase == div1alpha1.JobFailed
 }
 
-// func (r *NerveXJobReconciler) UpdateNerveXJob(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
+// func (r *DIJobReconciler) UpdateDIJob(ctx context.Context, job *div1alpha1.DIJob) error {
 // 	var err error
 // 	for i := 0; i < statusUpdateRetries; i++ {
-// 		newJob := &nervexv1alpha1.NerveXJob{}
+// 		newJob := &div1alpha1.DIJob{}
 // 		err = r.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: job.Name}, newJob)
 // 		if err != nil {
 // 			break

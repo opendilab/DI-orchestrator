@@ -2,29 +2,29 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    control-plane: nervex-operator
-  name: nervex-system
+    control-plane: di-operator
+  name: di-system
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    cert-manager.io/inject-ca-from: nervex-system/nervex-serving-cert
+    cert-manager.io/inject-ca-from: di-system/di-serving-cert
     controller-gen.kubebuilder.io/version: v0.4.1
-  name: aggregatorconfigs.nervex.sensetime.com
+  name: aggregatorconfigs.diengine.sensetime.com
 spec:
   conversion:
     strategy: Webhook
     webhook:
       clientConfig:
         service:
-          name: nervex-webhook-service
-          namespace: nervex-system
-          path: /mutate-nervex-sensetime-com-v1alpha1-nervexjob
+          name: di-webhook-service
+          namespace: di-system
+          path: /mutate-diengine-sensetime-com-v1alpha1-dijob
       conversionReviewVersions:
       - v1
       - v1beta1
-  group: nervex.sensetime.com
+  group: diengine.sensetime.com
   names:
     kind: AggregatorConfig
     listKind: AggregatorConfigList
@@ -34,7 +34,11 @@ spec:
     singular: aggregatorconfig
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: AggregatorConfig is the Schema for the AggregatorConfigs API
@@ -3814,29 +3818,29 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    cert-manager.io/inject-ca-from: nervex-system/nervex-serving-cert
+    cert-manager.io/inject-ca-from: di-system/di-serving-cert
     controller-gen.kubebuilder.io/version: v0.4.1
-  name: nervexjobs.nervex.sensetime.com
+  name: dijobs.diengine.sensetime.com
 spec:
   conversion:
     strategy: Webhook
     webhook:
       clientConfig:
         service:
-          name: nervex-webhook-service
-          namespace: nervex-system
-          path: /mutate-nervex-sensetime-com-v1alpha1-nervexjob
+          name: di-webhook-service
+          namespace: di-system
+          path: /mutate-diengine-sensetime-com-v1alpha1-dijob
       conversionReviewVersions:
       - v1
       - v1beta1
-  group: nervex.sensetime.com
+  group: diengine.sensetime.com
   names:
-    kind: NerveXJob
-    listKind: NerveXJobList
-    plural: nervexjobs
+    kind: DIJob
+    listKind: DIJobList
+    plural: dijobs
     shortNames:
-    - nvxjob
-    singular: nervexjob
+    - dijob
+    singular: dijob
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -3849,7 +3853,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: NerveXJob is the Schema for the nervexjobs API
+        description: DIJob is the Schema for the dijobs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -3860,10 +3864,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: NerveXJobSpec defines the desired state of NerveXJob
+            description: DIJobSpec defines the desired state of DIJob
             properties:
               cleanPodPolicy:
-                description: CleanPodPolicy defines the policy to clean pods after NerveXJob completed
+                description: CleanPodPolicy defines the policy to clean pods after DIJob completed
                 type: string
               collector:
                 description: CollectorSpec defines the desired state of CollectorSpec
@@ -11358,7 +11362,7 @@ spec:
                 - template
                 type: object
               group:
-                description: Group is a collection of NerveXJobs
+                description: Group is a collection of DIJobs
                 type: string
               learner:
                 description: Learner defines the desired state of Learner
@@ -15107,7 +15111,7 @@ spec:
                 - template
                 type: object
               priorityClassName:
-                description: Priority labels the priority of NerveXJob
+                description: Priority labels the priority of DIJob
                 type: string
               volumes:
                 description: Volumes defines the shared volumes for nerveX components
@@ -16018,11 +16022,11 @@ spec:
             - learner
             type: object
           status:
-            description: NerveXJobStatus defines the observed state of NerveXJob
+            description: DIJobStatus defines the observed state of DIJob
             properties:
               conditions:
                 items:
-                  description: NerveXJobCondition records the conditions of NerveXJob
+                  description: DIJobCondition records the conditions of DIJob
                   properties:
                     lastTransitionTime:
                       description: Last time the condition transitioned from one status to another.
@@ -16050,7 +16054,7 @@ spec:
                   type: object
                 type: array
               phase:
-                description: Phase defines the phase of NerveXJob
+                description: Phase defines the phase of DIJob
                 type: string
               replicaStatus:
                 additionalProperties:
@@ -16086,8 +16090,8 @@ status:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nervex-leader-election-role
-  namespace: nervex-system
+  name: di-leader-election-role
+  namespace: di-system
 rules:
 - apiGroups:
   - ""
@@ -16114,7 +16118,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nervex-metrics-reader
+  name: di-metrics-reader
 rules:
 - nonResourceURLs:
   - /metrics
@@ -16125,7 +16129,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: nervex-operator-cluster-role
+  name: di-operator-cluster-role
 rules:
 - apiGroups:
   - ""
@@ -16145,14 +16149,15 @@ rules:
   - ""
   resources:
   - namespaces
+  - nodes
   verbs:
   - get
   - list
 - apiGroups:
-  - nervex.sensetime.com
+  - diengine.sensetime.com
   resources:
   - aggregatorconfigs
-  - nervexjobs
+  - dijobs
   verbs:
   - create
   - delete
@@ -16162,17 +16167,17 @@ rules:
   - update
   - watch
 - apiGroups:
-  - nervex.sensetime.com
+  - diengine.sensetime.com
   resources:
   - aggregatorconfigs/finalizers
-  - nervexjobs/finalizers
+  - dijobs/finalizers
   verbs:
   - update
 - apiGroups:
-  - nervex.sensetime.com
+  - diengine.sensetime.com
   resources:
   - aggregatorconfigs/status
-  - nervexjobs/status
+  - dijobs/status
   verbs:
   - get
   - patch
@@ -16181,7 +16186,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nervex-proxy-role
+  name: di-proxy-role
 rules:
 - apiGroups:
   - authentication.k8s.io
@@ -16199,76 +16204,76 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: nervex-leader-election-rolebinding
-  namespace: nervex-system
+  name: di-leader-election-rolebinding
+  namespace: di-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: nervex-leader-election-role
+  name: di-leader-election-role
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: nervex-system
+  namespace: di-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nervex-operator-cluster-rolebinding
+  name: di-operator-cluster-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nervex-operator-cluster-role
+  name: di-operator-cluster-role
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: nervex-system
+  namespace: di-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: nervex-proxy-rolebinding
+  name: di-proxy-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nervex-proxy-role
+  name: di-proxy-role
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: nervex-system
+  namespace: di-system
 ---
 apiVersion: v1
 kind: Service
 metadata:
   labels:
-    control-plane: nervex-operator
-  name: nervex-operator-metrics-service
-  namespace: nervex-system
+    control-plane: di-operator
+  name: di-operator-metrics-service
+  namespace: di-system
 spec:
   ports:
   - name: https
     port: 8443
     targetPort: 8080
   selector:
-    control-plane: nervex-operator
+    control-plane: di-operator
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: nervex-server
-  namespace: nervex-system
+  name: di-server
+  namespace: di-system
 spec:
   ports:
   - port: 8080
     protocol: TCP
     targetPort: 8080
   selector:
-    control-plane: nervex-server
+    control-plane: di-server
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: nervex-server-nodeport
-  namespace: nervex-system
+  name: di-server-nodeport
+  namespace: di-system
 spec:
   ports:
   - nodePort: 32270
@@ -16276,37 +16281,37 @@ spec:
     protocol: TCP
     targetPort: 8080
   selector:
-    control-plane: nervex-server
+    control-plane: di-server
   type: NodePort
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: nervex-webhook-service
-  namespace: nervex-system
+  name: di-webhook-service
+  namespace: di-system
 spec:
   ports:
   - port: 443
     targetPort: 9443
   selector:
-    control-plane: nervex-operator
+    control-plane: di-operator
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    control-plane: nervex-operator
-  name: nervex-operator
-  namespace: nervex-system
+    control-plane: di-operator
+  name: di-operator
+  namespace: di-system
 spec:
   replicas: 1
   selector:
     matchLabels:
-      control-plane: nervex-operator
+      control-plane: di-operator
   template:
     metadata:
       labels:
-        control-plane: nervex-operator
+        control-plane: di-operator
     spec:
       containers:
       - args:
@@ -16314,8 +16319,8 @@ spec:
         - --metrics-bind-address=:8080
         - --leader-elect
         command:
-        - /nervex-operator
-        image: registry.sensetime.com/cloudnative4ai/nervex-operator:v0.0.1-alpha.0
+        - /di-operator
+        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.0.1-alpha.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16352,34 +16357,34 @@ spec:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: nervex-webhook-server-cert
+          secretName: di-webhook-server-cert
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    control-plane: nervex-server
-  name: nervex-server
-  namespace: nervex-system
+    control-plane: di-server
+  name: di-server
+  namespace: di-system
 spec:
   replicas: 1
   selector:
     matchLabels:
-      control-plane: nervex-server
+      control-plane: di-server
   template:
     metadata:
       labels:
-        control-plane: nervex-server
+        control-plane: di-server
     spec:
       containers:
       - args:
         - --server-bind-address=:8080
         - --leader-elect
-        - --lease-lock-namespace=nervex-system
-        - --lease-lock-name=nervex-server
+        - --lease-lock-namespace=di-system
+        - --lease-lock-name=di-server
         command:
-        - /nervex-server
-        image: registry.sensetime.com/cloudnative4ai/nervex-server:v0.0.1-alpha.0
+        - /di-server
+        image: registry.sensetime.com/cloudnative4ai/di-server:v0.0.1-alpha.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16402,22 +16407,22 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: nervex-serving-cert
-  namespace: nervex-system
+  name: di-serving-cert
+  namespace: di-system
 spec:
   dnsNames:
-  - nervex-webhook-service.nervex-system.svc
-  - nervex-webhook-service.nervex-system.svc.cluster.local
+  - di-webhook-service.di-system.svc
+  - di-webhook-service.di-system.svc.cluster.local
   issuerRef:
     kind: Issuer
-    name: nervex-selfsigned-issuer
-  secretName: nervex-webhook-server-cert
+    name: di-selfsigned-issuer
+  secretName: di-webhook-server-cert
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: nervex-selfsigned-issuer
-  namespace: nervex-system
+  name: di-selfsigned-issuer
+  namespace: di-system
 spec:
   selfSigned: {}
 ---
@@ -16425,56 +16430,56 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   annotations:
-    cert-manager.io/inject-ca-from: nervex-system/nervex-serving-cert
-  name: nervex-mutating-webhook-configuration
+    cert-manager.io/inject-ca-from: di-system/di-serving-cert
+  name: di-mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   - v1beta1
   clientConfig:
     service:
-      name: nervex-webhook-service
-      namespace: nervex-system
-      path: /mutate-nervex-sensetime-com-v1alpha1-nervexjob
+      name: di-webhook-service
+      namespace: di-system
+      path: /mutate-diengine-sensetime-com-v1alpha1-dijob
   failurePolicy: Fail
-  name: mnervexjob.kb.io
+  name: mdijob.kb.io
   rules:
   - apiGroups:
-    - nervex.sensetime.com
+    - diengine.sensetime.com
     apiVersions:
     - v1alpha1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - nervexjobs
+    - dijobs
   sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   annotations:
-    cert-manager.io/inject-ca-from: nervex-system/nervex-serving-cert
-  name: nervex-validating-webhook-configuration
+    cert-manager.io/inject-ca-from: di-system/di-serving-cert
+  name: di-validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   - v1beta1
   clientConfig:
     service:
-      name: nervex-webhook-service
-      namespace: nervex-system
-      path: /validate-nervex-sensetime-com-v1alpha1-nervexjob
+      name: di-webhook-service
+      namespace: di-system
+      path: /validate-diengine-sensetime-com-v1alpha1-dijob
   failurePolicy: Fail
-  name: vnervexjob.kb.io
+  name: vdijob.kb.io
   rules:
   - apiGroups:
-    - nervex.sensetime.com
+    - diengine.sensetime.com
     apiVersions:
     - v1alpha1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - nervexjobs
+    - dijobs
   sideEffects: None

@@ -1,7 +1,7 @@
-apiVersion: nervex.sensetime.com/v1alpha1
-kind: NerveXJob
+apiVersion: diengine.sensetime.com/v1alpha1
+kind: DIJob
 metadata:
-  name: nervexjob-example
+  name: dijob-example
 spec:
   group: xxx
   priorityClassName: ""
@@ -10,8 +10,8 @@ spec:
     template:
       spec:
         containers:
-        - name: nervex-container
-          image: registry.sensetime.com/cloudnative4ai/nervex-mock:v0.0.5
+        - name: di-container
+          image: registry.sensetime.com/cloudnative4ai/-mock:v0.0.5
           imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
           args: ["python3 -u main.py coordinator -l $HOSTNAME -p $COORDINATOR_PORT"]
@@ -20,23 +20,23 @@ spec:
     template:
       spec:
         containers:
-        - name: nervex-container
-          image: registry.sensetime.com/cloudnative4ai/nervex-mock:v0.0.5
+        - name: di-container
+          image: registry.sensetime.com/cloudnative4ai/-mock:v0.0.5
           imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
           args: ["until ping -c 1 $HOSTNAME.default ; do sleep 1 ; done ; sleep 10; python3 -u main.py collector -l $HOSTNAME.default -p $COLLECTOR_PORT"]
           ports:
-          - name: nervex-port
+          - name: di-port
             containerPort: 80
   learner:
     template:
       spec:
         containers:
-        - name: nervex-container
-          image: registry.sensetime.com/cloudnative4ai/nervex-mock:v0.0.5
+        - name: di-container
+          image: registry.sensetime.com/cloudnative4ai/-mock:v0.0.5
           imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
           args: ["until ping -c 1 $HOSTNAME.default ; do sleep 1 ; done ; sleep 10; python3 -u main.py learner -l $HOSTNAME.default -p $LEARNER_PORT"]
           ports:
-          - name: nervex-port
+          - name: di-port
             containerPort: 80

@@ -57,6 +57,7 @@ type AggregatorReplicaStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=agconfig
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // AggregatorConfig is the Schema for the AggregatorConfigs API
 type AggregatorConfig struct {

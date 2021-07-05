@@ -17,31 +17,31 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
-	testutil "go-sensephoenix.sensetime.com/nervex-operator/utils/testutils"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	servertypes "go-sensephoenix.sensetime.com/di-orchestrator/server/types"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
+	testutil "go-sensephoenix.sensetime.com/di-orchestrator/utils/testutils"
 )
 
 var _ = Describe("Server Test", func() {
 	Context("When send request to server", func() {
 		It("Should have correct response when request /v1alpha1/replicas and /v1alpha1/replicas/failed", func() {
-			job := testutil.NewNerveXJob()
-			name := nervexutil.GenerateName(job.Name)
+			job := testutil.NewDIJob()
+			name := diutil.GenerateName(job.Name)
 			job.SetName(name)
 
-			By(fmt.Sprintf("Create %dth NerveXJob", 1))
+			By(fmt.Sprintf("Create %dth DIJob", 1))
 			var err error
 			ctx := context.Background()
-			err = creatNerveXJob(ctx, job)
+			err = creatDIJob(ctx, job)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Send request on POST /v1alpha1/replicas")
-			coorname := nervexutil.ReplicaPodName(job.Name, "coordinator")
+			coorname := diutil.ReplicaPodName(job.Name, "coordinator")
 			addr := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
 			rurl := fmt.Sprintf("http://%s/v1alpha1/replicas", addr)
 			var cn, ln int = 2, 3
-			req := servertypes.NerveXJobRequest{
+			req := servertypes.DIJobRequest{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: servertypes.ResourceQuantity{
@@ -71,7 +71,7 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on POST /v1alpha1/replicas/failed")
 			furl := fmt.Sprintf("http://%s/v1alpha1/replicas/failed", addr)
-			freq := servertypes.NerveXJobResponse{
+			freq := servertypes.DIJobResponse{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: []string{
@@ -94,7 +94,7 @@ var _ = Describe("Server Test", func() {
 			By("Checking the number of pods has not changed")
 			totalPods := cn + ln + 1 // collectors + learners + coordinator
 			Eventually(func() int {
-				pods, err := nervexutil.ListPods(ctx, k8sClient, job)
+				pods, err := diutil.ListPods(ctx, k8sClient, job)
 				if err != nil {
 					return -1
 				}
@@ -103,7 +103,7 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on DELETE /v1alpha1/replicas")
 			var dcn, dln int = 1, 1
-			dreq := servertypes.NerveXJobRequest{
+			dreq := servertypes.DIJobRequest{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: servertypes.ResourceQuantity{
@@ -126,14 +126,14 @@ var _ = Describe("Server Test", func() {
 		})
 
 		It("Should have matched responses when requests are refused", func() {
-			job := testutil.NewNerveXJob()
-			name := nervexutil.GenerateName(job.Name)
+			job := testutil.NewDIJob()
+			name := diutil.GenerateName(job.Name)
 			job.SetName(name)
 
-			By(fmt.Sprintf("Create %dth NerveXJob", 1))
+			By(fmt.Sprintf("Create %dth DIJob", 1))
 			var err error
 			ctx := context.Background()
-			err = creatNerveXJob(ctx, job)
+			err = creatDIJob(ctx, job)
 			Expect(err).NotTo(HaveOccurred())
 
 			addr := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
@@ -145,10 +145,10 @@ var _ = Describe("Server Test", func() {
 			Expect(hresp.StatusCode).Should(Equal(http.StatusOK))
 
 			By("Send request on POST /v1alpha1/replicas")
-			coorname := nervexutil.ReplicaPodName(job.Name, "coordinator")
+			coorname := diutil.ReplicaPodName(job.Name, "coordinator")
 			rurl := fmt.Sprintf("http://%s/v1alpha1/replicas", addr)
 			var cn, ln int = 2, 3
-			req := servertypes.NerveXJobRequest{
+			req := servertypes.DIJobRequest{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: servertypes.ResourceQuantity{
@@ -216,7 +216,7 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on POST /v1alpha1/replicas/failed")
 			furl := fmt.Sprintf("http://%s/v1alpha1/replicas/failed", addr)
-			freq := servertypes.NerveXJobResponse{
+			freq := servertypes.DIJobResponse{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: []string{
@@ -239,7 +239,7 @@ var _ = Describe("Server Test", func() {
 			By("Checking the number of pods has not changed")
 			totalPods := cn + ln + 1 // collectors + learners + coordinator
 			Eventually(func() int {
-				pods, err := nervexutil.ListPods(ctx, k8sClient, job)
+				pods, err := diutil.ListPods(ctx, k8sClient, job)
 				if err != nil {
 					return -1
 				}
@@ -248,7 +248,7 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on POST /v1alpha1/replicas/failed with duplicate replicas")
 			fdurl := fmt.Sprintf("http://%s/v1alpha1/replicas/failed", addr)
-			fdreq := servertypes.NerveXJobResponse{
+			fdreq := servertypes.DIJobResponse{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: []string{
@@ -273,7 +273,7 @@ var _ = Describe("Server Test", func() {
 			By("Checking the number of pods has not changed")
 			dtotalPods := cn + ln + 1 // collectors + learners + coordinator
 			Eventually(func() int {
-				pods, err := nervexutil.ListPods(ctx, k8sClient, job)
+				pods, err := diutil.ListPods(ctx, k8sClient, job)
 				if err != nil {
 					return -1
 				}
@@ -282,7 +282,7 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on DELETE /v1alpha1/replicas")
 			var dcn, dln int = 1, 1
-			dreq := servertypes.NerveXJobRequest{
+			dreq := servertypes.DIJobRequest{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: servertypes.ResourceQuantity{
@@ -327,21 +327,21 @@ var _ = Describe("Server Test", func() {
 			}
 			for i := range testCases {
 				c := testCases[i]
-				job := testutil.NewNerveXJob()
-				name := nervexutil.GenerateName(job.Name)
+				job := testutil.NewDIJob()
+				name := diutil.GenerateName(job.Name)
 				job.SetName(name)
 
-				By(fmt.Sprintf("Create %dth NerveXJob", i+1))
+				By(fmt.Sprintf("Create %dth DIJob", i+1))
 				var err error
 				ctx := context.Background()
-				err = creatNerveXJob(ctx, job)
+				err = creatDIJob(ctx, job)
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Send request on POST /v1alpha1/replicas")
-				coorname := nervexutil.ReplicaPodName(job.Name, "coordinator")
+				coorname := diutil.ReplicaPodName(job.Name, "coordinator")
 				rurl := fmt.Sprintf("http://%s/v1alpha1/replicas", addr)
 				var ln int = c.ln
-				req := servertypes.NerveXJobRequest{
+				req := servertypes.DIJobRequest{
 					Namespace:   job.Namespace,
 					Coordinator: coorname,
 					Learners: servertypes.ResourceQuantity{
@@ -360,19 +360,19 @@ var _ = Describe("Server Test", func() {
 
 				// # of ddp learners must as expected
 				var ddpLearners corev1.PodList
-				err = k8sClient.List(ctx, &ddpLearners, client.MatchingLabels{nervexutil.ReplicaTypeLabel: nervexutil.DDPLearnerName})
+				err = k8sClient.List(ctx, &ddpLearners, client.MatchingLabels{diutil.ReplicaTypeLabel: diutil.DDPLearnerName})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(ddpLearners.Items)).Should(Equal(c.expectedDDPL))
 
 				// # of aggregators must be as expected
 				var aggs corev1.PodList
-				err = k8sClient.List(ctx, &aggs, client.MatchingLabels{nervexutil.ReplicaTypeLabel: nervexutil.AggregatorName})
+				err = k8sClient.List(ctx, &aggs, client.MatchingLabels{diutil.ReplicaTypeLabel: diutil.AggregatorName})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(aggs.Items)).Should(Equal(c.expectedAgg))
 
 				// # of ddp learner service ports must be as expected
 				var svcs corev1.ServiceList
-				err = k8sClient.List(ctx, &svcs, client.MatchingLabels{nervexutil.ReplicaTypeLabel: nervexutil.DDPLearnerName})
+				err = k8sClient.List(ctx, &svcs, client.MatchingLabels{diutil.ReplicaTypeLabel: diutil.DDPLearnerName})
 				Expect(err).NotTo(HaveOccurred())
 				portCount := 0
 				for _, svc := range svcs.Items {
@@ -409,7 +409,7 @@ var _ = Describe("Server Test", func() {
 
 				By("Send request on DELETE /v1alpha1/replicas")
 				var dln int = 1
-				dreq := servertypes.NerveXJobRequest{
+				dreq := servertypes.DIJobRequest{
 					Namespace:   job.Namespace,
 					Coordinator: coorname,
 					Learners: servertypes.ResourceQuantity{
@@ -430,7 +430,7 @@ var _ = Describe("Server Test", func() {
 	})
 })
 
-func creatNerveXJob(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
+func creatDIJob(ctx context.Context, job *div1alpha1.DIJob) error {
 	var err error
 	err = k8sClient.Create(ctx, job, &client.CreateOptions{})
 	if err != nil {
@@ -439,15 +439,15 @@ func creatNerveXJob(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
 
 	By("Create coordinator")
 	ownRefer := metav1.OwnerReference{
-		APIVersion: nervexv1alpha1.GroupVersion.String(),
-		Kind:       nervexv1alpha1.KindNerveXJob,
+		APIVersion: div1alpha1.GroupVersion.String(),
+		Kind:       div1alpha1.KindDIJob,
 		Name:       job.Name,
 		UID:        job.GetUID(),
 		Controller: func(c bool) *bool { return &c }(true),
 	}
-	coorname := nervexutil.ReplicaPodName(job.Name, "coordinator")
+	coorname := diutil.ReplicaPodName(job.Name, "coordinator")
 	coorpod := testutil.NewPod(coorname, job.Name, ownRefer)
-	lbs := nervexutil.GenLabels(job.Name)
+	lbs := diutil.GenLabels(job.Name)
 	coorpod.SetLabels(lbs)
 
 	err = k8sClient.Create(ctx, coorpod, &client.CreateOptions{})
@@ -460,7 +460,7 @@ func creatNerveXJob(ctx context.Context, job *nervexv1alpha1.NerveXJob) error {
 	return nil
 }
 
-func sendRequest(method string, rbody []byte, url string, expectedCode int, expectedSuccess bool) (*servertypes.NerveXJobResponse, error) {
+func sendRequest(method string, rbody []byte, url string, expectedCode int, expectedSuccess bool) (*servertypes.DIJobResponse, error) {
 
 	// Create client
 	reqs, err := http.NewRequest(method, url, bytes.NewReader(rbody))
@@ -478,7 +478,7 @@ func sendRequest(method string, rbody []byte, url string, expectedCode int, expe
 	return parseResponse(resp, expectedCode, expectedSuccess)
 }
 
-func parseResponse(resp *http.Response, expectedCode int, expectedSuccess bool) (*servertypes.NerveXJobResponse, error) {
+func parseResponse(resp *http.Response, expectedCode int, expectedSuccess bool) (*servertypes.DIJobResponse, error) {
 	defer resp.Body.Close()
 	var nresp servertypes.Response
 	err := json.NewDecoder(resp.Body).Decode(&nresp)
@@ -489,7 +489,7 @@ func parseResponse(resp *http.Response, expectedCode int, expectedSuccess bool) 
 	Expect(resp.StatusCode).Should(Equal(expectedCode))
 	Expect(nresp.Success).Should(Equal(expectedSuccess))
 
-	var njresp servertypes.NerveXJobResponse
+	var njresp servertypes.DIJobResponse
 	jsonBytes, err := json.Marshal(nresp.Data)
 	if err != nil {
 		return nil, err

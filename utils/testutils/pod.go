@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
 )
 
 func NewPod(name, jobName string, ownRefer metav1.OwnerReference) *corev1.Pod {
@@ -19,13 +19,13 @@ func NewPod(name, jobName string, ownRefer metav1.OwnerReference) *corev1.Pod {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: NerveXJobNamespace,
+			Namespace: DIJobNamespace,
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:    nervexutil.DefaultContainerName,
-					Image:   NerveXJobImage,
+					Name:    diutil.DefaultContainerName,
+					Image:   DIJobImage,
 					Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 				},
 			},

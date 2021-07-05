@@ -17,7 +17,7 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
 )
 
 const (
@@ -76,7 +76,7 @@ func SetPortForPod(pod *corev1.Pod, port int32) {
 }
 
 func GenLabels(jobName string) map[string]string {
-	groupName := nervexv1alpha1.GroupVersion.Group
+	groupName := div1alpha1.GroupVersion.Group
 	return map[string]string{
 		GroupNameLabel:      groupName,
 		JobNameLabel:        strings.Replace(jobName, "/", "-", -1),
@@ -99,7 +99,7 @@ func BuildPodFromTemplate(
 	jobName string,
 	ns, replicaType string,
 	defaultPort int32) (*corev1.Pod, int32, error) {
-	// generate name is the NerveXJob name
+	// generate name is the DIJob name
 	portEnv := ""
 	podName := ReplicaPodName(jobName, replicaType)
 	switch replicaType {
@@ -232,7 +232,7 @@ func GetServiceAccessURL(service *corev1.Service) string {
 	return url
 }
 
-func ListPods(ctx context.Context, cli client.Client, job *nervexv1alpha1.NerveXJob) ([]*corev1.Pod, error) {
+func ListPods(ctx context.Context, cli client.Client, job *div1alpha1.DIJob) ([]*corev1.Pod, error) {
 	podList := &corev1.PodList{}
 
 	// generate label selector
@@ -256,7 +256,7 @@ func ListPods(ctx context.Context, cli client.Client, job *nervexv1alpha1.NerveX
 	return pods, nil
 }
 
-func ListServices(ctx context.Context, cli client.Client, job *nervexv1alpha1.NerveXJob) ([]*corev1.Service, error) {
+func ListServices(ctx context.Context, cli client.Client, job *div1alpha1.DIJob) ([]*corev1.Service, error) {
 	svcList := &corev1.ServiceList{}
 
 	// generate label selector

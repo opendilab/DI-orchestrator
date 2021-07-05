@@ -15,7 +15,7 @@ import (
 )
 
 var _ = Describe("Webhook test", func() {
-	Context("When creating a NerveXJob", func() {
+	Context("When creating a DIJob", func() {
 		It("Should be validated by webhook before creating", func() {
 			type testCase struct {
 				cleanPodPolicy       CleanPodPolicy
@@ -31,7 +31,7 @@ var _ = Describe("Webhook test", func() {
 			}
 			for i := range testCases {
 				c := testCases[i]
-				job := NewNerveXJob()
+				job := NewDIJob()
 				name := GenerateName(job.Name)
 				job.SetName(name)
 
@@ -50,7 +50,7 @@ var _ = Describe("Webhook test", func() {
 					}
 				}
 
-				cjob := NerveXJob{}
+				cjob := DIJob{}
 				jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
 				Eventually(func() bool {
 					err = k8sClient.Get(ctx, jobKey, &cjob)
@@ -77,7 +77,7 @@ var _ = Describe("Webhook test", func() {
 			}
 			for i := range testCases {
 				c := testCases[i]
-				job := NewNerveXJob()
+				job := NewDIJob()
 				name := GenerateName(job.Name)
 				job.SetName(name)
 
@@ -98,7 +98,7 @@ var _ = Describe("Webhook test", func() {
 					}
 				}
 
-				cjob := NerveXJob{}
+				cjob := DIJob{}
 				jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
 				Eventually(func() CleanPodPolicy {
 					err = k8sClient.Get(ctx, jobKey, &cjob)
@@ -115,32 +115,32 @@ var _ = Describe("Webhook test", func() {
 
 const (
 	randomLength         = 5
-	NerveXJobName        = "nervexjob-example"
-	NerveXJobNamespace   = "default"
-	NerveXJobImage       = "alpine:latest"
+	DIJobName            = "dijob-example"
+	DIJobNamespace       = "default"
+	DIJobImage           = "alpine:latest"
 	DefaultSleepDuration = "5s"
 	timeout              = 5 * time.Second
 	interval             = 250 * time.Millisecond
 )
 
-func NewNerveXJob() *NerveXJob {
-	return &NerveXJob{
+func NewDIJob() *DIJob {
+	return &DIJob{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       KindNerveXJob,
+			Kind:       KindDIJob,
 			APIVersion: GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      NerveXJobName,
-			Namespace: NerveXJobNamespace,
+			Name:      DIJobName,
+			Namespace: DIJobNamespace,
 		},
-		Spec: NerveXJobSpec{
+		Spec: DIJobSpec{
 			Coordinator: CoordinatorSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
 								Name:    "coordinator",
-								Image:   NerveXJobImage,
+								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
 						},
@@ -153,7 +153,7 @@ func NewNerveXJob() *NerveXJob {
 						Containers: []corev1.Container{
 							{
 								Name:    "collector",
-								Image:   NerveXJobImage,
+								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
 						},
@@ -166,7 +166,7 @@ func NewNerveXJob() *NerveXJob {
 						Containers: []corev1.Container{
 							{
 								Name:    "learner",
-								Image:   NerveXJobImage,
+								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
 						},

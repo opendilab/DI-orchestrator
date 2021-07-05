@@ -1,7 +1,7 @@
-apiVersion: nervex.sensetime.com/v1alpha1
-kind: NerveXJob
+apiVersion: diengine.sensetime.com/v1alpha1
+kind: DIJob
 metadata:
-  name: nervexjob-example
+  name: dijob-example
 spec:
   group: xxx
   priorityClassName: ""
@@ -9,7 +9,7 @@ spec:
   volumes:
   - name: data-dir
     hostPath:
-      path: /data/nfs/nervex/cartpole
+      path: /data/nfs/di/cartpole
   - name: cache-volume
     emptyDir:
       medium: Memory
@@ -18,7 +18,7 @@ spec:
     template:
       spec:
         containers:
-        - name: nervex-container
+        - name: di-container
           image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
@@ -122,7 +122,7 @@ spec:
             cartpole_dqn_system_config = dict(
                 coordinator=dict(
                     operator_server=dict(
-                        system_addr='nervex-server.nervex-system:8080',
+                        system_addr='di-server.di-system:8080',
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
@@ -137,8 +137,8 @@ spec:
                         learner_target_num=1,
                     ),
                 ),
-                path_data='/data/nfs/nervex/cartpole/data',
-                path_policy='/data/nfs/nervex/cartpole/policy',
+                path_data='/data/nfs/di/cartpole/data',
+                path_policy='/data/nfs/di/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
                 learner_gpu_num=2
@@ -149,16 +149,16 @@ spec:
             nervex -m dist --module config -p k8s -c cartpole_dqn_config.py -s 0;
             nervex -m dist --module coordinator -p k8s -c cartpole_dqn_config.py.pkl -s 0 --disable_flask_log 0
           ports:
-          - name: nervex-port
+          - name: di-port
             containerPort: 22270
           volumeMounts:
           - name: data-dir
-            mountPath: /data/nfs/nervex/cartpole
+            mountPath: /data/nfs/di/cartpole
   collector:
     template:
       spec:
         containers:
-        - name: nervex-container
+        - name: di-container
           image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
@@ -238,7 +238,7 @@ spec:
                 ),
                 env_manager=dict(type='base'),
                 policy=dict(type='dqn_command'),
-                learner=dict(type='base', import_names=['nervex.worker.learner.base_learner']),
+                learner=dict(type='base', import_names=['di.worker.learner.base_learner']),
                 collector=dict(
                     type='zergling',
                     import_names=['nervex.worker.collector.zergling_collector'],
@@ -262,7 +262,7 @@ spec:
             cartpole_dqn_system_config = dict(
                 coordinator=dict(
                     operator_server=dict(
-                        system_addr='nervex-server.nervex-system:8080',
+                        system_addr='di-server.di-system:8080',
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
@@ -277,8 +277,8 @@ spec:
                         learner_target_num=1,
                     ),
                 ),
-                path_data='/data/nfs/nervex/cartpole/data',
-                path_policy='/data/nfs/nervex/cartpole/policy',
+                path_data='/data/nfs/di/cartpole/data',
+                path_policy='/data/nfs/di/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
                 learner_gpu_num=2
@@ -289,16 +289,16 @@ spec:
             nervex -m dist --module config -p k8s -c cartpole_dqn_config.py -s 0;
             nervex -m dist --module collector -c cartpole_dqn_config.py.pkl -s 0
           ports:
-          - name: nervex-port
+          - name: di-port
             containerPort: 22270
           volumeMounts:
           - name: data-dir
-            mountPath: /data/nfs/nervex/cartpole
+            mountPath: /data/nfs/di/cartpole
   learner:
     template:
       spec:
         containers:
-        - name: nervex-container
+        - name: di-container
           image: registry.sensetime.com/cloudnative4ai/nervex:v0.0.5-torch1.4-cuda10.1-cudnn7-devel-d6c260bf
           imagePullPolicy: Always
           env:
@@ -378,7 +378,7 @@ spec:
                 ),
                 env_manager=dict(type='base'),
                 policy=dict(type='dqn_command'),
-                learner=dict(type='base', import_names=['nervex.worker.learner.base_learner']),
+                learner=dict(type='base', import_names=['di.worker.learner.base_learner']),
                 collector=dict(
                     type='zergling',
                     import_names=['nervex.worker.collector.zergling_collector'],
@@ -402,7 +402,7 @@ spec:
             cartpole_dqn_system_config = dict(
                 coordinator=dict(
                     operator_server=dict(
-                        system_addr='nervex-server.nervex-system:8080',
+                        system_addr='di-server.di-system:8080',
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
@@ -417,8 +417,8 @@ spec:
                         learner_target_num=1,
                     ),
                 ),
-                path_data='/data/nfs/nervex/cartpole/data',
-                path_policy='/data/nfs/nervex/cartpole/policy',
+                path_data='/data/nfs/di/cartpole/data',
+                path_policy='/data/nfs/di/cartpole/policy',
                 communication_mode='auto',
                 learner_multi_gpu=False,
                 learner_gpu_num=2
@@ -429,11 +429,11 @@ spec:
             nervex -m dist --module config -p k8s -c cartpole_dqn_config.py -s 0;
             nervex -m dist --module learner -c cartpole_dqn_config.py.pkl -s 0
           ports:
-          - name: nervex-port
+          - name: di-port
             containerPort: 22270
           volumeMounts:
           - name: cache-volume
             mountPath: /dev/shm
           - name: data-dir
-            mountPath: /data/nfs/nervex/cartpole
+            mountPath: /data/nfs/di/cartpole
     

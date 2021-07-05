@@ -11,7 +11,7 @@ metadata:
   annotations:
     cert-manager.io/inject-ca-from: di-system/di-serving-cert
     controller-gen.kubebuilder.io/version: v0.4.1
-  name: aggregatorconfigs.diengine.sensetime.com
+  name: aggregatorconfigs.diengine.opendilab.org
 spec:
   conversion:
     strategy: Webhook
@@ -20,11 +20,11 @@ spec:
         service:
           name: di-webhook-service
           namespace: di-system
-          path: /mutate-diengine-sensetime-com-v1alpha1-dijob
+          path: /mutate-diengine-opendilab-org-v1alpha1-dijob
       conversionReviewVersions:
       - v1
       - v1beta1
-  group: diengine.sensetime.com
+  group: diengine.opendilab.org
   names:
     kind: AggregatorConfig
     listKind: AggregatorConfigList
@@ -3820,7 +3820,7 @@ metadata:
   annotations:
     cert-manager.io/inject-ca-from: di-system/di-serving-cert
     controller-gen.kubebuilder.io/version: v0.4.1
-  name: dijobs.diengine.sensetime.com
+  name: dijobs.diengine.opendilab.org
 spec:
   conversion:
     strategy: Webhook
@@ -3829,11 +3829,11 @@ spec:
         service:
           name: di-webhook-service
           namespace: di-system
-          path: /mutate-diengine-sensetime-com-v1alpha1-dijob
+          path: /mutate-diengine-opendilab-org-v1alpha1-dijob
       conversionReviewVersions:
       - v1
       - v1beta1
-  group: diengine.sensetime.com
+  group: diengine.opendilab.org
   names:
     kind: DIJob
     listKind: DIJobList
@@ -16154,7 +16154,7 @@ rules:
   - get
   - list
 - apiGroups:
-  - diengine.sensetime.com
+  - diengine.opendilab.org
   resources:
   - aggregatorconfigs
   - dijobs
@@ -16167,14 +16167,14 @@ rules:
   - update
   - watch
 - apiGroups:
-  - diengine.sensetime.com
+  - diengine.opendilab.org
   resources:
   - aggregatorconfigs/finalizers
   - dijobs/finalizers
   verbs:
   - update
 - apiGroups:
-  - diengine.sensetime.com
+  - diengine.opendilab.org
   resources:
   - aggregatorconfigs/status
   - dijobs/status
@@ -16440,12 +16440,12 @@ webhooks:
     service:
       name: di-webhook-service
       namespace: di-system
-      path: /mutate-diengine-sensetime-com-v1alpha1-dijob
+      path: /mutate-diengine-opendilab-org-v1alpha1-dijob
   failurePolicy: Fail
   name: mdijob.kb.io
   rules:
   - apiGroups:
-    - diengine.sensetime.com
+    - diengine.opendilab.org
     apiVersions:
     - v1alpha1
     operations:
@@ -16469,12 +16469,12 @@ webhooks:
     service:
       name: di-webhook-service
       namespace: di-system
-      path: /validate-diengine-sensetime-com-v1alpha1-dijob
+      path: /validate-diengine-opendilab-org-v1alpha1-dijob
   failurePolicy: Fail
   name: vdijob.kb.io
   rules:
   - apiGroups:
-    - diengine.sensetime.com
+    - diengine.opendilab.org
     apiVersions:
     - v1alpha1
     operations:

@@ -29,7 +29,7 @@ rules:
   - get
   - list
 - apiGroups:
-  - diengine.sensetime.com
+  - diengine.opendilab.org
   resources:
   - aggregatorconfigs
   - dijobs
@@ -42,14 +42,14 @@ rules:
   - update
   - watch
 - apiGroups:
-  - diengine.sensetime.com
+  - diengine.opendilab.org
   resources:
   - aggregatorconfigs/finalizers
   - dijobs/finalizers
   verbs:
   - update
 - apiGroups:
-  - diengine.sensetime.com
+  - diengine.opendilab.org
   resources:
   - aggregatorconfigs/status
   - dijobs/status

@@ -1,4 +1,4 @@
-apiVersion: diengine.sensetime.com/v1alpha1
+apiVersion: diengine.opendilab.org/v1alpha1
 kind: AggregatorConfig
 metadata:
   name: aggregator-config

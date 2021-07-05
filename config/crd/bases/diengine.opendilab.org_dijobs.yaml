@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: dijobs.diengine.sensetime.com
+  name: dijobs.diengine.opendilab.org
 spec:
-  group: diengine.sensetime.com
+  group: diengine.opendilab.org
   names:
     kind: DIJob
     listKind: DIJobList

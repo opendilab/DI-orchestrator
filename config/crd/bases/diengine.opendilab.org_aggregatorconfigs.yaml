@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: aggregatorconfigs.diengine.sensetime.com
+  name: aggregatorconfigs.diengine.opendilab.org
 spec:
-  group: diengine.sensetime.com
+  group: diengine.opendilab.org
   names:
     kind: AggregatorConfig
     listKind: AggregatorConfigList

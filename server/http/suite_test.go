@@ -156,7 +156,7 @@ var _ = BeforeSuite(func() {
 
 	logger := zap.New(zap.UseFlagOptions(&opts))
 
-	agconfigstr := "-system/aggregator-config"
+	agconfigstr := "di-system/aggregator-config"
 	gpuAllocPolicy := "simple"
 	diServer := NewDIServer(kubeClient, dynamicClient, logger, agconfigstr, dyi, gpuAllocPolicy)
 

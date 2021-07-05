@@ -45,9 +45,9 @@ type DIJobReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=diengine.sensetime.com,resources=dijobs;aggregatorconfigs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=diengine.sensetime.com,resources=dijobs/status;aggregatorconfigs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=diengine.sensetime.com,resources=dijobs/finalizers;aggregatorconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs;aggregatorconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs/status;aggregatorconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs/finalizers;aggregatorconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=pods;services;events,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces;nodes,verbs=get;list
 

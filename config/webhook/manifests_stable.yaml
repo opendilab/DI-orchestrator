@@ -12,12 +12,12 @@ webhooks:
     service:
       name: di-webhook-service
       namespace: di-system
-      path: /mutate-diengine-sensetime-com-v1alpha1-dijob
+      path: /mutate-diengine-opendilab-org-v1alpha1-dijob
   failurePolicy: Fail
   name: mdijob.kb.io
   rules:
   - apiGroups:
-    - diengine.sensetime.com
+    - diengine.opendilab.org
     apiVersions:
     - v1alpha1
     operations:
@@ -40,12 +40,12 @@ webhooks:
     service:
       name: di-webhook-service
       namespace: di-system
-      path: /validate-diengine-sensetime-com-v1alpha1-dijob
+      path: /validate-diengine-opendilab-org-v1alpha1-dijob
   failurePolicy: Fail
   name: vdijob.kb.io
   rules:
   - apiGroups:
-    - diengine.sensetime.com
+    - diengine.opendilab.org
     apiVersions:
     - v1alpha1
     operations:

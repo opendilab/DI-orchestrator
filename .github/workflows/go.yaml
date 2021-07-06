@@ -1,12 +1,13 @@
 name: Go
 
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+  - push
+  - pull_request
 
 jobs:
+
+  # lint: 
+  #   runs-on: 
 
   build:
     runs-on: ubuntu-latest
@@ -22,4 +23,10 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test -v ./...
+      shell: bash
+      run: |
+        # download etcd to bootstrap test environment
+        curl -L https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.2/kubebuilder_2.3.2_linux_amd64.tar.gz  | tar -xz -C /tmp/
+        mv /tmp/kubebuilder_2.3.2_linux_amd64 /tmp/kubebuilder
+        export KUBEBUILDER_ASSETS=/tmp/kubebuilder/bin
+        make test

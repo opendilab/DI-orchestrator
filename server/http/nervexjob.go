@@ -198,7 +198,8 @@ func (s *NerveXServer) createReplicas(
 			results = append(results, result)
 
 			// allocate gpus
-			gpuSlice := s.gpuAllocator.Allocate(int(resources.GPU.Value()))
+			worldSize := int(resources.GPU.Value())
+			gpuSlice := s.gpuAllocator.Allocate(worldSize)
 			startRank := 0
 			for j, gpus := range gpuSlice {
 				replicaResource := resources.DeepCopy()
@@ -217,15 +218,16 @@ func (s *NerveXServer) createReplicas(
 
 				// add ddp envs to ddp learner
 				masterAddr := svcList[0].Name
-				masterPort, ok := nervexutil.GetPortFromPod(podList[0])
-				if !ok {
-					masterPort = nervexutil.DefaultLearnerPort
-				}
 				if j == 0 {
 					masterAddr = "localhost"
+					// set access port for ddp master port
+					mport := corev1.ServicePort{
+						Name: "master-port",
+						Port: int32(nervexutil.DefaultMasterPort),
+					}
+					svcList[0].Spec.Ports = append(svcList[0].Spec.Ports, mport)
 				}
-				addDDPEnvsToDDPLearner(pod, masterAddr, int(masterPort),
-					int(resources.GPU.Value()), gpus, startRank)
+				addDDPEnvsToDDPLearner(pod, masterAddr, worldSize, gpus, startRank)
 				startRank += gpus
 			}
 
@@ -274,13 +276,8 @@ func (s *NerveXServer) createReplicas(
 
 				// add ddp envs to ddp learner pod
 				masterAddr := "localhost"
-				masterPort, ok := nervexutil.GetPortFromPod(pod)
-				if !ok {
-					masterPort = nervexutil.DefaultLearnerPort
-				}
 				worldSize := int(resources.GPU.Value())
-				addDDPEnvsToDDPLearner(pod, masterAddr, int(masterPort),
-					worldSize, worldSize, 0)
+				addDDPEnvsToDDPLearner(pod, masterAddr, worldSize, worldSize, 0)
 			}
 
 			podList = append(podList, pod)
@@ -384,12 +381,12 @@ func (s *NerveXServer) buildDDPLearnerPodAndService(template *corev1.PodTemplate
 	return pod, svc, port, nil
 }
 
-func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, masterPort, worldSize, localWorldSize, startRank int) {
+func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, worldSize, localWorldSize, startRank int) {
 	envs := make(map[string]string)
 	envs[nervexutil.WorldSize] = strconv.Itoa(worldSize)
 	envs[nervexutil.LocalWorldSize] = strconv.Itoa(localWorldSize)
 	envs[nervexutil.MasterAddr] = masterAddr
-	envs[nervexutil.MasterPort] = strconv.Itoa(masterPort)
+	envs[nervexutil.MasterPort] = strconv.Itoa(nervexutil.DefaultMasterPort)
 	envs[nervexutil.StartRank] = strconv.Itoa(startRank)
 	nervexutil.SetPodEnv(pod, envs)
 }

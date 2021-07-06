@@ -31,11 +31,12 @@ const (
 	AggregatorURLEnv  = "KUBERNETES_AGGREGATOR_URL"
 	ServerURLEnv      = "KUBERNETES_SERVER_URL"
 
-	WorldSize      = "WORLD_SIZE"
-	LocalWorldSize = "LOCAL_WORLD_SIZE"
-	StartRank      = "START_RANK"
-	MasterAddr     = "MASTER_ADDR"
-	MasterPort     = "MASTER_PORT"
+	WorldSize         = "WORLD_SIZE"
+	LocalWorldSize    = "LOCAL_WORLD_SIZE"
+	StartRank         = "START_RANK"
+	MasterAddr        = "MASTER_ADDR"
+	MasterPort        = "MASTER_PORT"
+	DefaultMasterPort = 10314
 )
 
 var (

@@ -377,6 +377,11 @@ var _ = Describe("Server Test", func() {
 				portCount := 0
 				for _, svc := range svcs.Items {
 					portCount += len(svc.Spec.Ports)
+					for _, port := range svc.Spec.Ports {
+						if port.Name == "master-port" {
+							portCount--
+						}
+					}
 				}
 				Expect(portCount).Should(Equal(c.expectedDDPLSvcPorts))
 

@@ -10,19 +10,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
-	testutil "go-sensephoenix.sensetime.com/nervex-operator/utils/testutils"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
+	testutil "go-sensephoenix.sensetime.com/di-orchestrator/utils/testutils"
 )
 
-var _ = Describe("NerveXJob Specification", func() {
+var _ = Describe("DIJob Specification", func() {
 
-	Context("When creating a NerveXJob with different CleanPodPolicy", func() {
+	Context("When creating a DIJob with different CleanPodPolicy", func() {
 		It("Should execute different pods deletion policy with different CleanPodPolicy", func() {
-			cleanPodPolicies := []nervexv1alpha1.CleanPodPolicy{
-				nervexv1alpha1.CleanPodPolicyALL,
-				nervexv1alpha1.CleanPodPolicyRunning,
-				nervexv1alpha1.CleanPodPolicyNone,
+			cleanPodPolicies := []div1alpha1.CleanPodPolicy{
+				div1alpha1.CleanPodPolicyALL,
+				div1alpha1.CleanPodPolicyRunning,
+				div1alpha1.CleanPodPolicyNone,
 			}
 			for _, policy := range cleanPodPolicies {
 				type replica struct {
@@ -68,100 +68,100 @@ var _ = Describe("NerveXJob Specification", func() {
 				}
 				for i := range testCases {
 					c := testCases[i]
-					By(fmt.Sprintf("Create %dth NerveXJob", i+1))
+					By(fmt.Sprintf("Create %dth DIJob", i+1))
 					var err error
 					ctx := context.Background()
-					jobTmpl := testutil.NewNerveXJob()
+					jobTmpl := testutil.NewDIJob()
 					jobTmpl.Spec.CleanPodPolicy = policy
-					nervexjob, jobKey := createNerveXJob(ctx, k8sClient, jobTmpl)
+					dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
 
 					// build owner reference
 					ownRefer := metav1.OwnerReference{
-						APIVersion: nervexv1alpha1.GroupVersion.String(),
-						Kind:       nervexv1alpha1.KindNerveXJob,
-						Name:       nervexjob.Name,
-						UID:        nervexjob.GetUID(),
+						APIVersion: div1alpha1.GroupVersion.String(),
+						Kind:       div1alpha1.KindDIJob,
+						Name:       dijob.Name,
+						UID:        dijob.GetUID(),
 						Controller: func(c bool) *bool { return &c }(true),
 					}
 					By(fmt.Sprintf("ownRefer: %s %s", ownRefer.APIVersion, ownRefer.Kind))
 					colStatus := make([]int, 3)
 					for _, col := range c.collectors {
 						By(fmt.Sprintf("Create pod %s", col.name))
-						createAndUpdatePodPhase(ctx, k8sClient, col.name, nervexjob.Name, col.status, nervexutil.CollectorName, ownRefer, colStatus)
+						createAndUpdatePodPhase(ctx, k8sClient, col.name, dijob.Name, col.status, diutil.CollectorName, ownRefer, colStatus)
 					}
 
 					lrStatus := make([]int, 3)
 					for _, lr := range c.learners {
 						By(fmt.Sprintf("Create pod %s", lr.name))
-						createAndUpdatePodPhase(ctx, k8sClient, lr.name, nervexjob.Name, lr.status, nervexutil.LearnerName, ownRefer, lrStatus)
+						createAndUpdatePodPhase(ctx, k8sClient, lr.name, dijob.Name, lr.status, diutil.LearnerName, ownRefer, lrStatus)
 					}
 
 					By("Get the number of pods")
-					pods, err := nervexutil.ListPods(ctx, k8sClient, &nervexjob)
+					pods, err := diutil.ListPods(ctx, k8sClient, &dijob)
 					Expect(err).NotTo(HaveOccurred())
 					npods := len(pods)
 
 					By("Update coordinator to Succeeded")
 					for _, replicaName := range []string{
-						nervexutil.ReplicaPodName(nervexjob.Name, "coordinator"),
+						diutil.ReplicaPodName(dijob.Name, "coordinator"),
 					} {
-						podKey := types.NamespacedName{Namespace: nervexjob.Namespace, Name: replicaName}
+						podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 						err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
 						Expect(err).NotTo(HaveOccurred())
 					}
 
 					By("Checking the job is succeeded")
-					Eventually(func() nervexv1alpha1.Phase {
-						err := k8sClient.Get(ctx, jobKey, &nervexjob)
+					Eventually(func() div1alpha1.Phase {
+						err := k8sClient.Get(ctx, jobKey, &dijob)
 						if err != nil {
-							return nervexv1alpha1.JobUnknown
+							return div1alpha1.JobUnknown
 						}
-						return nervexjob.Status.Phase
-					}, timeout, interval).Should(Equal(nervexv1alpha1.JobSucceeded))
+						return dijob.Status.Phase
+					}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
 
 					By("Checking all the pods and services are deleted")
 
 					switch policy {
-					case nervexv1alpha1.CleanPodPolicyALL:
+					case div1alpha1.CleanPodPolicyALL:
 						Eventually(func() int {
-							pods, err := nervexutil.ListPods(ctx, k8sClient, &nervexjob)
+							pods, err := diutil.ListPods(ctx, k8sClient, &dijob)
 							if err != nil {
 								return -1
 							}
 							return len(pods)
 						}, timeout, interval).Should(Equal(0))
 						Eventually(func() int {
-							svcs, err := nervexutil.ListServices(ctx, k8sClient, &nervexjob)
+							svcs, err := diutil.ListServices(ctx, k8sClient, &dijob)
 							if err != nil {
 								return -1
 							}
 							return len(svcs)
 						}, timeout, interval).Should(Equal(0))
-					case nervexv1alpha1.CleanPodPolicyNone:
+					case div1alpha1.CleanPodPolicyNone:
 						Consistently(func() int {
-							pods, err := nervexutil.ListPods(ctx, k8sClient, &nervexjob)
+							pods, err := diutil.ListPods(ctx, k8sClient, &dijob)
 							if err != nil {
 								return -1
 							}
 							return len(pods)
 						}, duration, interval).Should(Equal(npods))
 						Eventually(func() int {
-							svcs, err := nervexutil.ListServices(ctx, k8sClient, &nervexjob)
+							svcs, err := diutil.ListServices(ctx, k8sClient, &dijob)
 							if err != nil {
 								return -1
 							}
 							return len(svcs)
 						}, duration, interval).Should(Equal(0))
-					case nervexv1alpha1.CleanPodPolicyRunning:
+					case div1alpha1.CleanPodPolicyRunning:
 						Eventually(func() int {
-							pods, err := nervexutil.ListPods(ctx, k8sClient, &nervexjob)
+							pods, err := diutil.ListPods(ctx, k8sClient, &dijob)
 							if err != nil {
 								return -1
 							}
 							return len(pods)
 						}, duration, interval).Should(Equal(npods - c.runnings))
 						Eventually(func() int {
-							svcs, err := nervexutil.ListServices(ctx, k8sClient, &nervexjob)
+							svcs, err := diutil.ListServices(ctx, k8sClient, &dijob)
 							if err != nil {
 								return -1
 							}
@@ -170,7 +170,7 @@ var _ = Describe("NerveXJob Specification", func() {
 					}
 
 					By("Clean up pods")
-					err = testutil.CleanUpJob(ctx, k8sClient, nervexjob.DeepCopy(), timeout, interval)
+					err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy(), timeout, interval)
 					Expect(err).NotTo(HaveOccurred())
 				}
 			}

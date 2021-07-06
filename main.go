@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	"go-sensephoenix.sensetime.com/nervex-operator/controllers"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	"go-sensephoenix.sensetime.com/di-orchestrator/controllers"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -45,7 +45,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(nervexv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(div1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -57,7 +57,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&serverAddr, "server-address", nervexutil.DefaultServerURL, "The address to access nervex server.")
+	flag.StringVar(&serverAddr, "server-address", diutil.DefaultServerURL, "The address to access  server.")
 
 	opts := zap.Options{
 		Development: true,
@@ -80,22 +80,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	// set DefaultNerveXServerURL
-	nervexutil.DefaultServerURL = serverAddr
+	// set DefaultDIServerURL
+	diutil.DefaultServerURL = serverAddr
 
-	reconciler := &controllers.NerveXJobReconciler{
+	reconciler := &controllers.DIJobReconciler{
 		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("NerveXJob"),
+		Log:      ctrl.Log.WithName("controllers").WithName("DIJob"),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("nervex-operator"),
+		Recorder: mgr.GetEventRecorderFor("di-orchestrator"),
 	}
 	if err = reconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NerveXJob")
+		setupLog.Error(err, "unable to create controller", "controller", "DIJob")
 		os.Exit(1)
 	}
 
-	if err = (&nervexv1alpha1.NerveXJob{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "NerveXJob")
+	if err = (&div1alpha1.DIJob{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "DIJob")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

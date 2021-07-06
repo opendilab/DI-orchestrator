@@ -21,17 +21,17 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	nervexcommon "go-sensephoenix.sensetime.com/nervex-operator/common"
-	serverdynamic "go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
-	serverhttp "go-sensephoenix.sensetime.com/nervex-operator/server/http"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
+	dicommon "go-sensephoenix.sensetime.com/di-orchestrator/common"
+	serverdynamic "go-sensephoenix.sensetime.com/di-orchestrator/server/dynamic"
+	serverhttp "go-sensephoenix.sensetime.com/di-orchestrator/server/http"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
 )
 
 var (
-	DefaultLeaseLockNamespace = "nervex-system"
-	DefaultLeaseLockName      = "nervex-server"
+	DefaultLeaseLockNamespace = "di-system"
+	DefaultLeaseLockName      = "di-server"
 
-	DefaultAGConfigNamespace = "nervex-system"
+	DefaultAGConfigNamespace = "di-system"
 	DefaultAGConfigName      = "aggregator-config"
 )
 
@@ -51,8 +51,8 @@ func main() {
 	flag.StringVar(&leaseLockName, "lease-lock-name", DefaultLeaseLockName, "The lease lock resource name")
 	flag.StringVar(&agconfigNamespace, "agconfig-namespace", DefaultAGConfigNamespace, "The AggregatorConfig namespace to manage actors and learners.")
 	flag.StringVar(&agconfigName, "agconfig-name", DefaultAGConfigName, "The AggregatorConfig name to manage actors and learners.")
-	flag.StringVar(&gpuAllocPolicy, "gpu-alloc-policy", nervexcommon.SimpleGPUAllocPolicy, "The policy for server to allocate gpus to pods.")
-	flag.StringVar(&serverAddr, "server-address", nervexutil.DefaultServerURL, "The address to connect to nervex server.")
+	flag.StringVar(&gpuAllocPolicy, "gpu-alloc-policy", dicommon.SimpleGPUAllocPolicy, "The policy for server to allocate gpus to pods.")
+	flag.StringVar(&serverAddr, "server-address", diutil.DefaultServerURL, "The address to connect to  server.")
 	flag.Parse()
 
 	kubeconfig = flag.Lookup("kubeconfig").Value.String()
@@ -82,19 +82,19 @@ func main() {
 	logger := zap.New(zap.UseFlagOptions(&opts))
 
 	agconfig := fmt.Sprintf("%s/%s", agconfigNamespace, agconfigName)
-	nervexServer := serverhttp.NewNerveXServer(kubeClient, dynamicClient, logger, agconfig, dyi, gpuAllocPolicy)
-	nervexutil.DefaultServerURL = serverAddr
+	diServer := serverhttp.NewDIServer(kubeClient, dynamicClient, logger, agconfig, dyi, gpuAllocPolicy)
+	diutil.DefaultServerURL = serverAddr
 
 	if !enableLeaderElection {
-		if err := nervexServer.Start(serverBindAddress); err != nil {
-			log.Fatalf("Failed to start NerveXServer: %v", err)
+		if err := diServer.Start(serverBindAddress); err != nil {
+			log.Fatalf("Failed to start DIServer: %v", err)
 		}
 		return
 	}
 
 	run := func(ctx context.Context) {
-		if err := nervexServer.Start(serverBindAddress); err != nil {
-			log.Fatalf("Failed to start NerveXServer: %v", err)
+		if err := diServer.Start(serverBindAddress); err != nil {
+			log.Fatalf("Failed to start DIServer: %v", err)
 		}
 	}
 

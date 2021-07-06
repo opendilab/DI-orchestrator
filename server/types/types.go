@@ -4,7 +4,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-type NerveXJobRequestParams struct {
+type DIJobRequestParams struct {
 	Namespace   []string `json:"namespace"`
 	Coordinator []string `json:"coordinator"`
 	Name        []string `json:"name"`
@@ -18,7 +18,7 @@ const (
 	RequestParamTypeAggregator  string = "aggregator"
 )
 
-type NerveXJobRequest struct {
+type DIJobRequest struct {
 	Namespace   string           `json:"namespace"`
 	Coordinator string           `json:"coordinator"`
 	Collectors  ResourceQuantity `json:"collectors"`
@@ -53,7 +53,7 @@ const (
 	CodeFailed
 )
 
-type NerveXJobResponse struct {
+type DIJobResponse struct {
 	Namespace   string   `json:"namespace"`
 	Coordinator string   `json:"coordinator"`
 	Collectors  []string `json:"collectors"`

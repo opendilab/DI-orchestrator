@@ -43,9 +43,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	serverdynamic "go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
-	testutil "go-sensephoenix.sensetime.com/nervex-operator/utils/testutils"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	serverdynamic "go-sensephoenix.sensetime.com/di-orchestrator/server/dynamic"
+	testutil "go-sensephoenix.sensetime.com/di-orchestrator/utils/testutils"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -91,7 +91,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = nervexv1alpha1.AddToScheme(scheme.Scheme)
+	err = div1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -128,7 +128,7 @@ var _ = BeforeSuite(func() {
 
 	By("Agconfig successfully created")
 	key := types.NamespacedName{Namespace: agconfig.Namespace, Name: agconfig.Name}
-	createdAg := nervexv1alpha1.AggregatorConfig{}
+	createdAg := div1alpha1.AggregatorConfig{}
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, key, &createdAg)
 		if err != nil {
@@ -156,14 +156,14 @@ var _ = BeforeSuite(func() {
 
 	logger := zap.New(zap.UseFlagOptions(&opts))
 
-	agconfigstr := "nervex-system/aggregator-config"
+	agconfigstr := "di-system/aggregator-config"
 	gpuAllocPolicy := "simple"
-	nervexServer := NewNerveXServer(kubeClient, dynamicClient, logger, agconfigstr, dyi, gpuAllocPolicy)
+	diServer := NewDIServer(kubeClient, dynamicClient, logger, agconfigstr, dyi, gpuAllocPolicy)
 
 	localServingPort = port + config.GinkgoConfig.ParallelNode
 	addrPort := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
 	go func() {
-		err := nervexServer.Start(addrPort)
+		err := diServer.Start(addrPort)
 		fmt.Println(err.Error())
 	}()
 

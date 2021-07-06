@@ -1,12 +1,12 @@
 # Adds namespace to all resources.
-namespace: nervex-system
+namespace: di-system
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-# namePrefix: nervex-
+# namePrefix: di-
 
 # Labels to add to all resources and selectors.
 #commonLabels:
@@ -50,7 +50,7 @@ vars:
     kind: Certificate
     group: cert-manager.io
     version: v1
-    name: nervex-serving-cert # this name should match the one in certificate.yaml
+    name: di-serving-cert # this name should match the one in certificate.yaml
   fieldref:
     fieldpath: metadata.namespace
 - name: CERTIFICATE_NAME
@@ -58,16 +58,16 @@ vars:
     kind: Certificate
     group: cert-manager.io
     version: v1
-    name: nervex-serving-cert # this name should match the one in certificate.yaml
+    name: di-serving-cert # this name should match the one in certificate.yaml
 - name: SERVICE_NAMESPACE # namespace of the service
   objref:
     kind: Service
     version: v1
-    name: nervex-webhook-service
+    name: di-webhook-service
   fieldref:
     fieldpath: metadata.namespace
 - name: SERVICE_NAME
   objref:
     kind: Service
     version: v1
-    name: nervex-webhook-service
+    name: di-webhook-service

@@ -17,11 +17,11 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	nervexcommon "go-sensephoenix.sensetime.com/nervex-operator/common"
-	serverdynamic "go-sensephoenix.sensetime.com/nervex-operator/server/dynamic"
-	servertypes "go-sensephoenix.sensetime.com/nervex-operator/server/types"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	dicommon "go-sensephoenix.sensetime.com/di-orchestrator/common"
+	serverdynamic "go-sensephoenix.sensetime.com/di-orchestrator/server/dynamic"
+	servertypes "go-sensephoenix.sensetime.com/di-orchestrator/server/types"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
 )
 
 var (
@@ -34,29 +34,29 @@ func withAPIVersion(api string) string {
 	return fmt.Sprintf("/%s%s", apiVersion, api)
 }
 
-type NerveXServer struct {
+type DIServer struct {
 	KubeClient    *kubernetes.Clientset
 	DynamicClient dynamic.Interface
 	Log           logr.Logger
 	AGConfig      string
 	dyi           serverdynamic.Informers
-	gpuAllocator  nervexcommon.GPUAllocator
+	gpuAllocator  dicommon.GPUAllocator
 }
 
-func NewNerveXServer(
+func NewDIServer(
 	kubeClient *kubernetes.Clientset,
 	dynamicClient dynamic.Interface,
 	log logr.Logger,
 	agconfig string,
 	dyi serverdynamic.Informers,
-	gpuAllocPolicy string) *NerveXServer {
+	gpuAllocPolicy string) *DIServer {
 
-	var gpuAllocator nervexcommon.GPUAllocator
+	var gpuAllocator dicommon.GPUAllocator
 	switch gpuAllocPolicy {
-	case nervexcommon.SimpleGPUAllocPolicy:
-		gpuAllocator = *nervexcommon.NewSimpleGPUAllocator([]*corev1.Node{})
+	case dicommon.SimpleGPUAllocPolicy:
+		gpuAllocator = *dicommon.NewSimpleGPUAllocator([]*corev1.Node{})
 	}
-	return &NerveXServer{
+	return &DIServer{
 		KubeClient:    kubeClient,
 		DynamicClient: dynamicClient,
 		Log:           log,
@@ -66,8 +66,8 @@ func NewNerveXServer(
 	}
 }
 
-func (s *NerveXServer) Start(serverBindAddress string) error {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) Start(serverBindAddress string) error {
+	log := s.Log.WithName("DIServer")
 	http.HandleFunc(withAPIVersion(replicasAPI), s.Replicas)
 	http.HandleFunc(withAPIVersion(replicasFailedAPI), s.ReplicasFailed)
 	http.HandleFunc("/healthz", healthz)
@@ -79,7 +79,7 @@ func (s *NerveXServer) Start(serverBindAddress string) error {
 	return nil
 }
 
-func (s *NerveXServer) SyncNodes() error {
+func (s *DIServer) SyncNodes() error {
 	rets, err := s.dyi.NodeInformer.Lister().List(labels.Everything())
 	if err != nil && !errors.IsNotFound(err) {
 		return err
@@ -98,8 +98,8 @@ func (s *NerveXServer) SyncNodes() error {
 	return nil
 }
 
-func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) Replicas(w http.ResponseWriter, r *http.Request) {
+	log := s.Log.WithName("DIServer")
 
 	var reps interface{}
 	var err error
@@ -117,7 +117,7 @@ func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 		msg = "successfully delete replicas"
 		reps, err = s.deleteReplicas(r)
 	default:
-		err = &servertypes.NerveXError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
+		err = &servertypes.DIError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
 		log.Error(err, "method not implemented")
 	}
 
@@ -129,9 +129,9 @@ func (s *NerveXServer) Replicas(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *NerveXServer) getReplicas(r *http.Request) (interface{}, error) {
+func (s *DIServer) getReplicas(r *http.Request) (interface{}, error) {
 	// get request params from request
-	rp := servertypes.NerveXJobRequestParams{}
+	rp := servertypes.DIJobRequestParams{}
 	params := r.URL.Query()
 	for k, v := range params {
 		switch strings.ToLower(k) {
@@ -145,7 +145,7 @@ func (s *NerveXServer) getReplicas(r *http.Request) (interface{}, error) {
 			rp.Aggregator = v
 		default:
 			errInfo := fmt.Sprintf("request param %s is not supported", k)
-			return nil, &servertypes.NerveXError{Type: servertypes.ErrorBadRequest, Message: errInfo}
+			return nil, &servertypes.DIError{Type: servertypes.ErrorBadRequest, Message: errInfo}
 		}
 	}
 
@@ -178,13 +178,13 @@ func (s *NerveXServer) getReplicas(r *http.Request) (interface{}, error) {
 	return reps, nil
 }
 
-func (s *NerveXServer) getAllReplicas() ([]servertypes.NerveXJobResponse, error) {
+func (s *DIServer) getAllReplicas() ([]servertypes.DIJobResponse, error) {
 	nsl, err := s.KubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	results := []servertypes.NerveXJobResponse{}
+	results := []servertypes.DIJobResponse{}
 	for _, ns := range nsl.Items {
 		reps, err := s.getNamespacedReplicas(ns.Name)
 		if err != nil {
@@ -195,14 +195,14 @@ func (s *NerveXServer) getAllReplicas() ([]servertypes.NerveXJobResponse, error)
 	return results, nil
 }
 
-func (s *NerveXServer) getNamespacedReplicas(namespace string) ([]servertypes.NerveXJobResponse, error) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) getNamespacedReplicas(namespace string) ([]servertypes.DIJobResponse, error) {
+	log := s.Log.WithName("DIServer")
 
 	// construct label selector to list coordinators in namespace
 	lbs := map[string]string{
-		nervexutil.GroupNameLabel:      nervexv1alpha1.GroupVersion.Group,
-		nervexutil.ControllerNameLabel: nervexutil.ControllerName,
-		nervexutil.ReplicaTypeLabel:    nervexutil.CoordinatorName,
+		diutil.GroupNameLabel:      div1alpha1.GroupVersion.Group,
+		diutil.ControllerNameLabel: diutil.ControllerName,
+		diutil.ReplicaTypeLabel:    diutil.CoordinatorName,
 	}
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: lbs,
@@ -217,7 +217,7 @@ func (s *NerveXServer) getNamespacedReplicas(namespace string) ([]servertypes.Ne
 		return nil, err
 	}
 
-	results := []servertypes.NerveXJobResponse{}
+	results := []servertypes.DIJobResponse{}
 	for _, pod := range pods {
 		result, err := s.getNamespacedReplicasByCoordinator(namespace, pod.Name)
 		if err != nil {
@@ -230,48 +230,48 @@ func (s *NerveXServer) getNamespacedReplicas(namespace string) ([]servertypes.Ne
 	return results, nil
 }
 
-func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName string) (servertypes.NerveXJobResponse, error) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName string) (servertypes.DIJobResponse, error) {
+	log := s.Log.WithName("DIServer")
 
 	// get ownReference of the request coordinator
-	nvxJob, err := s.getNerveXJob(namespace, coordinatorName)
+	diJob, err := s.getDIJob(namespace, coordinatorName)
 	if err != nil {
 		log.Error(err, "failed to get owner reference")
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 
-	// list pods that belong to the NerveXJob
+	// list pods that belong to the DIJob
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: nervexutil.GenLabels(nvxJob.Name),
+		MatchLabels: diutil.GenLabels(diJob.Name),
 	})
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 	collectors, learners, _, aggregators, _, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 
 	// get access urls
 	collectorURLs := []string{}
 	learnerURLs := []string{}
 	for _, svc := range collectors {
-		url := nervexutil.GetServiceAccessURL(svc)
+		url := diutil.GetServiceAccessURL(svc)
 		collectorURLs = append(collectorURLs, url)
 	}
 	for _, svc := range learners {
-		url := nervexutil.GetServiceAccessURL(svc)
+		url := diutil.GetServiceAccessURL(svc)
 		learnerURLs = append(learnerURLs, url)
 	}
 
 	// aggregators are also considered to be learners in view of coordinator
 	for _, svc := range aggregators {
-		url := nervexutil.GetServiceAccessURL(svc)
+		url := diutil.GetServiceAccessURL(svc)
 		learnerURLs = append(learnerURLs, url)
 	}
 
-	rep := servertypes.NerveXJobResponse{
+	rep := servertypes.DIJobResponse{
 		Namespace:   namespace,
 		Coordinator: coordinatorName,
 		Collectors:  collectorURLs,
@@ -282,27 +282,27 @@ func (s *NerveXServer) getNamespacedReplicasByCoordinator(namespace, coordinator
 	return rep, nil
 }
 
-func (s *NerveXServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorName string) (servertypes.NerveXJobResponse, error) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorName string) (servertypes.DIJobResponse, error) {
+	log := s.Log.WithName("DIServer")
 
 	// get ownReference of the request coordinator
-	nvxJob, err := s.getNerveXJob(namespace, aggregatorName)
+	diJob, err := s.getDIJob(namespace, aggregatorName)
 	if err != nil {
 		log.Error(err, "failed to get owner reference")
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 
-	// list pods that belong to the NerveXJob
+	// list pods that belong to the DIJob
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: nervexutil.GenLabels(nvxJob.Name),
+		MatchLabels: diutil.GenLabels(diJob.Name),
 	})
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 	_, _, _, _, DDPLearners, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 
 	// get access urls
@@ -321,20 +321,20 @@ func (s *NerveXServer) getNamespacedDDPLearnersByAggregator(namespace, aggregato
 		}
 
 		// build access urls to ddp learners
-		url := nervexutil.GetServiceAccessURL(svc)
+		url := diutil.GetServiceAccessURL(svc)
 		ddpLearnerURLs = append(ddpLearnerURLs, url)
 
 		// append all gpu process access urls to response
 		for _, port := range svc.Spec.Ports {
-			if !strings.HasPrefix(port.Name, nervexutil.DDPLearnerPortPrefix) {
+			if !strings.HasPrefix(port.Name, diutil.DDPLearnerPortPrefix) {
 				continue
 			}
-			url := nervexutil.ConcatURL(svc.Name, namespace, port.Port)
+			url := diutil.ConcatURL(svc.Name, namespace, port.Port)
 			ddpLearnerURLs = append(ddpLearnerURLs, url)
 		}
 	}
 
-	rep := servertypes.NerveXJobResponse{
+	rep := servertypes.DIJobResponse{
 		Namespace:   namespace,
 		Coordinator: aggregatorName,
 		Learners:    ddpLearnerURLs,
@@ -343,26 +343,26 @@ func (s *NerveXServer) getNamespacedDDPLearnersByAggregator(namespace, aggregato
 }
 
 // add replicas api
-func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobResponse, error) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) addReplicas(r *http.Request) (servertypes.DIJobResponse, error) {
+	log := s.Log.WithName("DIServer")
 	// get request body
-	var njreq servertypes.NerveXJobRequest
+	var njreq servertypes.DIJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
-		return servertypes.NerveXJobResponse{}, &servertypes.NerveXError{Type: servertypes.ErrorBadRequest, Message: errMsg}
+		return servertypes.DIJobResponse{}, &servertypes.DIError{Type: servertypes.ErrorBadRequest, Message: errMsg}
 	}
 
 	// get ownReference of request coordinator
-	nvxJob, err := s.getNerveXJob(njreq.Namespace, njreq.Coordinator)
+	diJob, err := s.getDIJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 
 	// create collectors and learners
-	collectors, learners, err := s.createCollectorsAndLearnersForNerveXJob(&njreq, nvxJob)
+	collectors, learners, err := s.createCollectorsAndLearnersForDIJob(&njreq, diJob)
 	if err != nil {
-		return servertypes.NerveXJobResponse{
+		return servertypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -371,7 +371,7 @@ func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobRespon
 	}
 	log.Info("create replicas", "collectors", collectors, "learners", learners)
 
-	rep := servertypes.NerveXJobResponse{
+	rep := servertypes.DIJobResponse{
 		Namespace:   njreq.Namespace,
 		Coordinator: njreq.Coordinator,
 		Collectors:  collectors,
@@ -382,38 +382,38 @@ func (s *NerveXServer) addReplicas(r *http.Request) (servertypes.NerveXJobRespon
 }
 
 // delete replicas api
-func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobResponse, error) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) deleteReplicas(r *http.Request) (servertypes.DIJobResponse, error) {
+	log := s.Log.WithName("DIServer")
 	// get request body
-	var njreq servertypes.NerveXJobRequest
+	var njreq servertypes.DIJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
-		return servertypes.NerveXJobResponse{}, &servertypes.NerveXError{Type: servertypes.ErrorBadRequest, Message: errMsg}
+		return servertypes.DIJobResponse{}, &servertypes.DIError{Type: servertypes.ErrorBadRequest, Message: errMsg}
 	}
 
 	// get ownReference of the request coordinator
-	nvxJob, err := s.getNerveXJob(njreq.Namespace, njreq.Coordinator)
+	diJob, err := s.getDIJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 
-	// list pods that belong to the NerveXJob
+	// list pods that belong to the DIJob
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: nervexutil.GenLabels(nvxJob.Name),
+		MatchLabels: diutil.GenLabels(diJob.Name),
 	})
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 	collectors, learners, _, aggs, _, err := s.listReplicaPodsWithSelector(njreq.Namespace, labelSelector)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 
 	// delete collector pods
-	delCollectors, err := s.deleteSpecifiedReplicas(collectors, njreq.Namespace, njreq.Collectors.Replicas, nervexutil.CollectorName)
+	delCollectors, err := s.deleteSpecifiedReplicas(collectors, njreq.Namespace, njreq.Collectors.Replicas, diutil.CollectorName)
 	if err != nil {
-		return servertypes.NerveXJobResponse{
+		return servertypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  delCollectors,
@@ -422,9 +422,9 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 	}
 
 	// delete learner pods
-	delLearners, err := s.deleteSpecifiedReplicas(learners, njreq.Namespace, njreq.Learners.Replicas, nervexutil.LearnerName)
+	delLearners, err := s.deleteSpecifiedReplicas(learners, njreq.Namespace, njreq.Learners.Replicas, diutil.LearnerName)
 	if err != nil {
-		return servertypes.NerveXJobResponse{
+		return servertypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  delCollectors,
@@ -434,9 +434,9 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 
 	// aggregator is also considered a learner
 	if len(delLearners) <= 0 {
-		delAggs, err := s.deleteSpecifiedReplicas(aggs, njreq.Namespace, njreq.Learners.Replicas, nervexutil.AggregatorName)
+		delAggs, err := s.deleteSpecifiedReplicas(aggs, njreq.Namespace, njreq.Learners.Replicas, diutil.AggregatorName)
 		if err != nil {
-			return servertypes.NerveXJobResponse{
+			return servertypes.DIJobResponse{
 				Namespace:   njreq.Namespace,
 				Coordinator: njreq.Coordinator,
 				Collectors:  delCollectors,
@@ -448,7 +448,7 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 
 	log.Info("delete replicas", "collectors", delCollectors, "learners", delLearners)
 
-	rep := servertypes.NerveXJobResponse{
+	rep := servertypes.DIJobResponse{
 		Namespace:   njreq.Namespace,
 		Coordinator: njreq.Coordinator,
 		Collectors:  delCollectors,
@@ -459,8 +459,8 @@ func (s *NerveXServer) deleteReplicas(r *http.Request) (servertypes.NerveXJobRes
 }
 
 // ReplicasFailed will delete the failed replicas reported by caller, and recreate the same number of replicas
-func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
+	log := s.Log.WithName("DIServer")
 
 	var reps interface{}
 	var err error
@@ -470,7 +470,7 @@ func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
 		msg = "successfully recreate replicas"
 		reps, err = s.replicasFailed(r)
 	default:
-		err = &servertypes.NerveXError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
+		err = &servertypes.DIError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
 		log.Error(err, "method not implemented")
 	}
 
@@ -481,31 +481,31 @@ func (s *NerveXServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobResponse, error) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) replicasFailed(r *http.Request) (servertypes.DIJobResponse, error) {
+	log := s.Log.WithName("DIServer")
 
 	// parse request body
-	var njreq servertypes.NerveXJobResponse
+	var njreq servertypes.DIJobResponse
 	err := json.NewDecoder(r.Body).Decode(&njreq)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
-		return servertypes.NerveXJobResponse{}, &servertypes.NerveXError{Type: servertypes.ErrorBadRequest, Message: errMsg}
+		return servertypes.DIJobResponse{}, &servertypes.DIError{Type: servertypes.ErrorBadRequest, Message: errMsg}
 	}
 	log.Info("failed replicas request body: ", "request", njreq)
 
 	// get collector pods and services
 	cpods, err := s.getPodsByNames(njreq.Namespace, njreq.Collectors)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 	csvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Collectors)
 	if err != nil {
-		return servertypes.NerveXJobResponse{}, err
+		return servertypes.DIJobResponse{}, err
 	}
 
 	collectors, err := s.recreateReplicas(cpods, csvcs, njreq.Namespace)
 	if err != nil {
-		return servertypes.NerveXJobResponse{
+		return servertypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -515,7 +515,7 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 
 	lpods, err := s.getPodsByNames(njreq.Namespace, njreq.Learners)
 	if err != nil {
-		return servertypes.NerveXJobResponse{
+		return servertypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -524,7 +524,7 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 	}
 	lsvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Learners)
 	if err != nil {
-		return servertypes.NerveXJobResponse{
+		return servertypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -534,7 +534,7 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 
 	learners, err := s.recreateReplicas(lpods, lsvcs, njreq.Namespace)
 	if err != nil {
-		return servertypes.NerveXJobResponse{
+		return servertypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -544,7 +544,7 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 
 	log.Info("recreate replicas", "collectors", collectors, "learners", learners)
 
-	rep := servertypes.NerveXJobResponse{
+	rep := servertypes.DIJobResponse{
 		Namespace:   njreq.Namespace,
 		Coordinator: njreq.Coordinator,
 		Collectors:  collectors,
@@ -553,8 +553,8 @@ func (s *NerveXServer) replicasFailed(r *http.Request) (servertypes.NerveXJobRes
 	return rep, nil
 }
 
-func (s *NerveXServer) buildResponse(reps interface{}, msg string, err error) (servertypes.Response, int) {
-	log := s.Log.WithName("NerveXServer")
+func (s *DIServer) buildResponse(reps interface{}, msg string, err error) (servertypes.Response, int) {
+	log := s.Log.WithName("DIServer")
 
 	var success bool = true
 	var code int = servertypes.CodeSuccess

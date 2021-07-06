@@ -8,54 +8,54 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
-	nervexutil "go-sensephoenix.sensetime.com/nervex-operator/utils"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
 )
 
-func NewNerveXJob() *nervexv1alpha1.NerveXJob {
-	return &nervexv1alpha1.NerveXJob{
+func NewDIJob() *div1alpha1.DIJob {
+	return &div1alpha1.DIJob{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       nervexv1alpha1.KindNerveXJob,
-			APIVersion: nervexv1alpha1.GroupVersion.String(),
+			Kind:       div1alpha1.KindDIJob,
+			APIVersion: div1alpha1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      NerveXJobName,
-			Namespace: NerveXJobNamespace,
+			Name:      DIJobName,
+			Namespace: DIJobNamespace,
 		},
-		Spec: nervexv1alpha1.NerveXJobSpec{
-			Coordinator: nervexv1alpha1.CoordinatorSpec{
+		Spec: div1alpha1.DIJobSpec{
+			Coordinator: div1alpha1.CoordinatorSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    nervexutil.DefaultContainerName,
-								Image:   NerveXJobImage,
+								Name:    diutil.DefaultContainerName,
+								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
 						},
 					},
 				},
 			},
-			Collector: nervexv1alpha1.CollectorSpec{
+			Collector: div1alpha1.CollectorSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    nervexutil.DefaultContainerName,
-								Image:   NerveXJobImage,
+								Name:    diutil.DefaultContainerName,
+								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
 						},
 					},
 				},
 			},
-			Learner: nervexv1alpha1.LearnerSpec{
+			Learner: div1alpha1.LearnerSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    nervexutil.DefaultContainerName,
-								Image:   NerveXJobImage,
+								Name:    diutil.DefaultContainerName,
+								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
 						},
@@ -78,24 +78,24 @@ func NewNamespace(namespace string) *corev1.Namespace {
 	}
 }
 
-func NewAggregatorConfig() *nervexv1alpha1.AggregatorConfig {
-	return &nervexv1alpha1.AggregatorConfig{
+func NewAggregatorConfig() *div1alpha1.AggregatorConfig {
+	return &div1alpha1.AggregatorConfig{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: nervexv1alpha1.GroupVersion.String(),
-			Kind:       nervexv1alpha1.KindAGConfig,
+			APIVersion: div1alpha1.GroupVersion.String(),
+			Kind:       div1alpha1.KindAGConfig,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      DefaultAGConfigName,
 			Namespace: DefaultAGConfigNamespace,
 		},
-		Spec: nervexv1alpha1.AggregatorConfigSpec{
-			Aggregator: nervexv1alpha1.AggregatorSpec{
+		Spec: div1alpha1.AggregatorConfigSpec{
+			Aggregator: div1alpha1.AggregatorSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    nervexutil.DefaultContainerName,
-								Image:   NerveXJobImage,
+								Name:    diutil.DefaultContainerName,
+								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
 						},
@@ -106,7 +106,7 @@ func NewAggregatorConfig() *nervexv1alpha1.AggregatorConfig {
 	}
 }
 
-func CleanUpJob(ctx context.Context, k8sClient client.Client, job *nervexv1alpha1.NerveXJob, timeout, interval time.Duration) error {
+func CleanUpJob(ctx context.Context, k8sClient client.Client, job *div1alpha1.DIJob, timeout, interval time.Duration) error {
 	err := k8sClient.Delete(ctx, job, &client.DeleteOptions{})
 	if err != nil {
 		return err
@@ -114,7 +114,7 @@ func CleanUpJob(ctx context.Context, k8sClient client.Client, job *nervexv1alpha
 
 	time.Sleep(250 * time.Millisecond)
 
-	pods, err := nervexutil.ListPods(ctx, k8sClient, job)
+	pods, err := diutil.ListPods(ctx, k8sClient, job)
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func CleanUpJob(ctx context.Context, k8sClient client.Client, job *nervexv1alpha
 		}
 	}
 
-	svcs, err := nervexutil.ListServices(ctx, k8sClient, job)
+	svcs, err := diutil.ListServices(ctx, k8sClient, job)
 	if err != nil {
 		return err
 	}

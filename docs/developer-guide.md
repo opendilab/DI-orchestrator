@@ -16,13 +16,13 @@ This project is based on [kubebuilder v3](https://github.com/kubernetes-sigs/kub
 ```bash
 kubebuilder init --domain sensetime.com --license apache2 --owner "The SensePhoenix authors"
 
-kubebuilder create api --group nervex --version v1alpha1 --kind NerveXJob
+kubebuilder create api --group di --version v1alpha1 --kind DIJob
 
-kubebuilder create api --group nervex --version v1alpha1 --kind AggregatorConfig
+kubebuilder create api --group di --version v1alpha1 --kind AggregatorConfig
 ```
 
 ## CRD Design
-Make codes in [nervexjob_types.go](./api/v1alpha1/nervexjob_types.go) and [aggregatorconfig_types.go](./api/v1alpha1/aggregatorconfig.go) with your requirements, and generate deepcopy functions.
+Make codes in [dijob_types.go](./api/v1alpha1/dijob_types.go) and [aggregatorconfig_types.go](./api/v1alpha1/aggregatorconfig.go) with your requirements, and generate deepcopy functions.
 ```bash
 make generate
 ```
@@ -35,7 +35,7 @@ New CRD files will be generated in [./config/crd/bases](./config/crd/bases)
 ## controller logic
 Referenced to [controllers](./controllers)
 
-## nervex-server logic
+## di-server logic
 Referenced to [server](./server)
 
 ## Installation
@@ -45,7 +45,7 @@ Run the following command in the project root directory.
 # build images. If you are not working in Linux, here you should use `make docker-build`
 make dev-images
 make docker-push
-# deploy nervex-operator and server to cluster
+# deploy di-operator and server to cluster
 make dev-deploy
 ```
 Since the CustomResourceDefinitions are too long, you will probably find the following error:
@@ -56,15 +56,15 @@ Then run the following command will solve the problem:
 kustomize build config/crd | kubectl create -f -
 ```
 
-`nervex-operator` and `nervex-server` will be installed in `nervex-system` namespace. 
+`di-operator` and `di-server` will be installed in `di-system` namespace. 
 ```bash
-$ kubectl get pod -n nervex-system
+$ kubectl get pod -n di-system
 NAME                               READY   STATUS    RESTARTS   AGE
-nervex-operator-57cc65d5c9-5vnvn   1/1     Running   0          59s
-nervex-server-7b86ff8df4-jfgmp     1/1     Running   0          59s
+di-operator-57cc65d5c9-5vnvn   1/1     Running   0          59s
+di-server-7b86ff8df4-jfgmp     1/1     Running   0          59s
 ```
 
-Install global components of NerveXJob defined in AggregatorConfig:
+Install global components of DIJob defined in AggregatorConfig:
 ```bash
-kubectl create -f examples/nervex-mock-agconfig.yaml -n nervex-system
+kubectl create -f examples/di-mock-agconfig.yaml -n di-system
 ```

@@ -2,20 +2,20 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/nervex.sensetime.com_nervexjobs.yaml
-- bases/nervex.sensetime.com_aggregatorconfigs.yaml
+- bases/diengine.opendilab.org_dijobs.yaml
+- bases/diengine.opendilab.org_aggregatorconfigs.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
 # patches here are for enabling the conversion webhook for each CRD
-- patches/webhook_in_nervexjobs.yaml
+- patches/webhook_in_dijobs.yaml
 - patches/webhook_in_aggregatorconfigs.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable webhook, uncomment all the sections with [CERTMANAGER] prefix.
 # patches here are for enabling the CA injection for each CRD
-- patches/cainjection_in_nervexjobs.yaml
+- patches/cainjection_in_dijobs.yaml
 - patches/cainjection_in_aggregatorconfigs.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 

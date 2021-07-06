@@ -2,8 +2,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: nervex-leader-election-role
-  namespace: nervex-system
+  name: di-leader-election-role
+  namespace: di-system
 rules:
 - apiGroups:
   - ""

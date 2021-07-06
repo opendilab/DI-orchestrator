@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: nervex-metrics-reader
+  name: di-metrics-reader
 rules:
 - nonResourceURLs: ["/metrics"]
   verbs: ["get"]

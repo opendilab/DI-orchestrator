@@ -3,54 +3,54 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: nervex-mutating-webhook-configuration
+  name: di-mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   - v1beta1
   clientConfig:
     service:
-      name: nervex-webhook-service
-      namespace: nervex-system
-      path: /mutate-nervex-sensetime-com-v1alpha1-nervexjob
+      name: di-webhook-service
+      namespace: di-system
+      path: /mutate-diengine-opendilab-org-v1alpha1-dijob
   failurePolicy: Fail
-  name: mnervexjob.kb.io
+  name: mdijob.kb.io
   rules:
   - apiGroups:
-    - nervex.sensetime.com
+    - diengine.opendilab.org
     apiVersions:
     - v1alpha1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - nervexjobs
+    - dijobs
   sideEffects: None
 
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: nervex-validating-webhook-configuration
+  name: di-validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
   - v1beta1
   clientConfig:
     service:
-      name: nervex-webhook-service
-      namespace: nervex-system
-      path: /validate-nervex-sensetime-com-v1alpha1-nervexjob
+      name: di-webhook-service
+      namespace: di-system
+      path: /validate-diengine-opendilab-org-v1alpha1-dijob
   failurePolicy: Fail
-  name: vnervexjob.kb.io
+  name: vdijob.kb.io
   rules:
   - apiGroups:
-    - nervex.sensetime.com
+    - diengine.opendilab.org
     apiVersions:
     - v1alpha1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - nervexjobs
+    - dijobs
   sideEffects: None

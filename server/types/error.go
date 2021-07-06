@@ -4,12 +4,12 @@ import (
 	"errors"
 )
 
-type NerveXError struct {
+type DIError struct {
 	Type    ErrorType `json:"type"`
 	Message string    `json:"message"`
 }
 
-func (n *NerveXError) Error() string {
+func (n *DIError) Error() string {
 	return n.Message
 }
 
@@ -49,9 +49,9 @@ func IsNotImplemented(err error) bool {
 }
 
 func TypeForError(err error) ErrorType {
-	var nvxErr *NerveXError
-	if errors.As(err, &nvxErr) {
-		return nvxErr.Type
+	var diErr *DIError
+	if errors.As(err, &diErr) {
+		return diErr.Type
 	}
 	return ErrorUnknown
 }

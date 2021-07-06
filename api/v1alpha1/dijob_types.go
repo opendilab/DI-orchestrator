@@ -24,18 +24,18 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// NerveXJobSpec defines the desired state of NerveXJob
-type NerveXJobSpec struct {
+// DIJobSpec defines the desired state of DIJob
+type DIJobSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Group is a collection of NerveXJobs
+	// Group is a collection of DIJobs
 	Group string `json:"group,omitempty"`
 
-	//Priority labels the priority of NerveXJob
+	//Priority labels the priority of DIJob
 	PriorityClassName PriorityClassName `json:"priorityClassName,omitempty"`
 
-	// CleanPodPolicy defines the policy to clean pods after NerveXJob completed
+	// CleanPodPolicy defines the policy to clean pods after DIJob completed
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
 
 	// Volumes defines the shared volumes for nerveX components
@@ -48,7 +48,7 @@ type NerveXJobSpec struct {
 	Learner LearnerSpec `json:"learner,"`
 }
 
-// Priority defines the priority of NerveXJob
+// Priority defines the priority of DIJob
 type PriorityClassName string
 
 const (
@@ -87,19 +87,19 @@ type LearnerSpec struct {
 	Template corev1.PodTemplateSpec `json:"template,"`
 }
 
-// NerveXJobStatus defines the observed state of NerveXJob
-type NerveXJobStatus struct {
+// DIJobStatus defines the observed state of DIJob
+type DIJobStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
 	Phase Phase `json:"phase,omitempty"`
 
-	Conditions []NerveXJobCondition `json:"conditions,omitempty"`
+	Conditions []DIJobCondition `json:"conditions,omitempty"`
 
 	ReplicaStatus map[ReplicaType]*ReplicaStatus `json:"replicaStatus,omitempty"`
 }
 
-// Phase defines the phase of NerveXJob
+// Phase defines the phase of DIJob
 type Phase string
 
 const (
@@ -144,8 +144,8 @@ type ReplicaStatus struct {
 	Failed int32 `json:"failed,omitempty"`
 }
 
-// NerveXJobCondition records the conditions of NerveXJob
-type NerveXJobCondition struct {
+// DIJobCondition records the conditions of DIJob
+type DIJobCondition struct {
 	// Type of job condition.
 	Type Phase `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
@@ -162,28 +162,28 @@ type NerveXJobCondition struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:shortName=nvxjob
+// +kubebuilder:resource:shortName=dijob
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// NerveXJob is the Schema for the nervexjobs API
-type NerveXJob struct {
+// DIJob is the Schema for the dijobs API
+type DIJob struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   NerveXJobSpec   `json:"spec,omitempty"`
-	Status NerveXJobStatus `json:"status,omitempty"`
+	Spec   DIJobSpec   `json:"spec,omitempty"`
+	Status DIJobStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// NerveXJobList contains a list of NerveXJob
-type NerveXJobList struct {
+// DIJobList contains a list of DIJob
+type DIJobList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NerveXJob `json:"items"`
+	Items           []DIJob `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&NerveXJob{}, &NerveXJobList{})
+	SchemeBuilder.Register(&DIJob{}, &DIJobList{})
 }

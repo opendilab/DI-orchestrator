@@ -2,21 +2,21 @@ package util
 
 const (
 	GroupNameLabel      = "group-name"
-	JobNameLabel        = "nervexjob-name"
+	JobNameLabel        = "dijob-name"
 	ControllerNameLabel = "controller-name"
 	ReplicaTypeLabel    = "replica-type"
 	PodNameLabel        = "pod-name"
 
-	ControllerName  = "nervex-operator"
+	ControllerName  = "di-operator"
 	CollectorName   = "collector"
 	LearnerName     = "learner"
 	DDPLearnerName  = "ddp-learner"
 	AggregatorName  = "aggregator"
 	CoordinatorName = "coordinator"
 
-	DefaultContainerName = "nervex-container"
+	DefaultContainerName = "di-container"
 
-	DefaultPortName = "nervex-port"
+	DefaultPortName = "di-port"
 
 	DefaultCollectorPort   = 22270
 	DefaultLearnerPort     = 22271
@@ -40,5 +40,5 @@ const (
 )
 
 var (
-	DefaultServerURL = "nervex-server.nervex-system:8080"
+	DefaultServerURL = "di-server.di-system:8080"
 )

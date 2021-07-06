@@ -6,9 +6,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.4.1
   creationTimestamp: null
-  name: aggregatorconfigs.nervex.sensetime.com
+  name: aggregatorconfigs.diengine.opendilab.org
 spec:
-  group: nervex.sensetime.com
+  group: diengine.opendilab.org
   names:
     kind: AggregatorConfig
     listKind: AggregatorConfigList
@@ -18,7 +18,11 @@ spec:
     singular: aggregatorconfig
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: AggregatorConfig is the Schema for the AggregatorConfigs API

@@ -1,17 +1,17 @@
-domain: sensetime.com
+domain: opendilab.org
 layout:
 - go.kubebuilder.io/v3
-projectName: nervex
-repo: go-sensephoenix.sensetime.com/nervex-operator
+projectName: di
+repo: go-sensephoenix.sensetime.com/di-orchestrator
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: sensetime.com
-  group: nervex
-  kind: NerveXJob
-  path: go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1
+  domain: opendilab.org
+  group: diengine
+  kind: DIJob
+  path: go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1
   version: v1alpha1
   webhooks:
     defaulting: true
@@ -20,9 +20,9 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
-  domain: sensetime.com
-  group: nervex
+  domain: opendilab.org
+  group: diengine
   kind: AggregatorConfig
-  path: go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1
+  path: go-sensephoenix.sensetime.com/di-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

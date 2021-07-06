@@ -4,16 +4,16 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: nervex-selfsigned-issuer
-  namespace: nervex-system
+  name: di-selfsigned-issuer
+  namespace: di-system
 spec:
   selfSigned: {}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: nervex-serving-cert  # this name should match the one appeared in kustomizeconfig.yaml
-  namespace: nervex-system
+  name: di-serving-cert  # this name should match the one appeared in kustomizeconfig.yaml
+  namespace: di-system
 spec:
   # $(SERVICE_NAME) and $(SERVICE_NAMESPACE) will be substituted by kustomize
   dnsNames:
@@ -21,5 +21,5 @@ spec:
   - $(SERVICE_NAME).$(SERVICE_NAMESPACE).svc.cluster.local
   issuerRef:
     kind: Issuer
-    name: nervex-selfsigned-issuer
-  secretName: nervex-webhook-server-cert # this secret will not be prefixed, since it's not managed by kustomize
+    name: di-selfsigned-issuer
+  secretName: di-webhook-server-cert # this secret will not be prefixed, since it's not managed by kustomize

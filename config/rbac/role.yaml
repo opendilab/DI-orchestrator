@@ -4,7 +4,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: nervex-operator-cluster-role
+  name: di-operator-cluster-role
 rules:
 - apiGroups:
   - ""
@@ -29,10 +29,10 @@ rules:
   - get
   - list
 - apiGroups:
-  - nervex.sensetime.com
+  - diengine.opendilab.org
   resources:
   - aggregatorconfigs
-  - nervexjobs
+  - dijobs
   verbs:
   - create
   - delete
@@ -42,17 +42,17 @@ rules:
   - update
   - watch
 - apiGroups:
-  - nervex.sensetime.com
+  - diengine.opendilab.org
   resources:
   - aggregatorconfigs/finalizers
-  - nervexjobs/finalizers
+  - dijobs/finalizers
   verbs:
   - update
 - apiGroups:
-  - nervex.sensetime.com
+  - diengine.opendilab.org
   resources:
   - aggregatorconfigs/status
-  - nervexjobs/status
+  - dijobs/status
   verbs:
   - get
   - patch

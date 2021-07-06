@@ -1,12 +1,12 @@
 resources:
-- nervex_operator.yaml
-- nervex_server.yaml
+- di_operator.yaml
+- di_server.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
-- name: registry.sensetime.com/cloudnative4ai/nervex-operator
-  newName: registry.sensetime.com/cloudnative4ai/nervex-operator
+- name: registry.sensetime.com/cloudnative4ai/di-operator
+  newName: registry.sensetime.com/cloudnative4ai/di-operator
   newTag: v0.0.1-alpha.0
-- name: registry.sensetime.com/cloudnative4ai/nervex-server
-  newName: registry.sensetime.com/cloudnative4ai/nervex-server
+- name: registry.sensetime.com/cloudnative4ai/di-server
+  newName: registry.sensetime.com/cloudnative4ai/di-server
   newTag: v0.0.1-alpha.0

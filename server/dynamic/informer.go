@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 
-	nervexv1alpha1 "go-sensephoenix.sensetime.com/nervex-operator/api/v1alpha1"
+	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
 )
 
 var (
@@ -29,16 +29,16 @@ type Informers struct {
 func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Informers {
 	// add ALConfig informer
 	aggregatorGVR := schema.GroupVersionResource{
-		Group:    nervexv1alpha1.GroupVersion.Group,
-		Version:  nervexv1alpha1.GroupVersion.Version,
+		Group:    div1alpha1.GroupVersion.Group,
+		Version:  div1alpha1.GroupVersion.Version,
 		Resource: "aggregatorconfigs",
 	}
 
 	// add NervexJob informer
 	njGVR := schema.GroupVersionResource{
-		Group:    nervexv1alpha1.GroupVersion.Group,
-		Version:  nervexv1alpha1.GroupVersion.Version,
-		Resource: "nervexjobs",
+		Group:    div1alpha1.GroupVersion.Group,
+		Version:  div1alpha1.GroupVersion.Version,
+		Resource: "dijobs",
 	}
 
 	// add pod informer
@@ -74,7 +74,7 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				// on add object
-				log.Printf("new NerveXJob: %s/%s", obj.(*unstructured.Unstructured).GetNamespace(), obj.(*unstructured.Unstructured).GetName())
+				log.Printf("new DIJob: %s/%s", obj.(*unstructured.Unstructured).GetNamespace(), obj.(*unstructured.Unstructured).GetName())
 			},
 			UpdateFunc: func(old, new interface{}) {
 				// on update object
@@ -106,7 +106,7 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 				// on add object
 				pod, err := GetPodFromObject(obj)
 				if err != nil {
-					if isNotBelongToNerveXJobError(err) {
+					if isNotBelongToDIJobError(err) {
 						dyi.PodInformer.Informer().GetIndexer().Delete(obj)
 					}
 					return
@@ -134,7 +134,7 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 				// on add object
 				service, err := GetServiceFromObject(obj)
 				if err != nil {
-					if isNotBelongToNerveXJobError(err) {
+					if isNotBelongToDIJobError(err) {
 						dyi.ServiceInformer.Informer().GetIndexer().Delete(obj)
 					}
 					return

@@ -6,10 +6,31 @@ on:
 
 jobs:
 
-  # lint: 
-  #   runs-on: 
+  lint: 
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+
+    - name: lint
+      shell: bash
+      run: |
+        # binary will be $(go env GOPATH)/bin/golangci-lint
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.41.1
+        # or install it into ./bin/
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.41.1
+        # In alpine linux (as it does not come with curl by default)
+        wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.41.1
+        golangci-lint --version
+
+        make lint
 
   build:
+    needs: lint
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2

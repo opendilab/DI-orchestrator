@@ -10,6 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
 	diutil "opendilab.org/di-orchestrator/utils"
 )
 
@@ -32,8 +33,8 @@ func (r *DIJobReconciler) reconcilePods(ctx context.Context, job *div1alpha1.DIJ
 		// build coordinator pod
 		volumes := job.Spec.Volumes
 		template := job.Spec.Coordinator.Template.DeepCopy()
-		coorpod, coorsvc, coorurl, err := buildPodAndServiceForReplica(template, job, diutil.CoordinatorName,
-			diutil.DefaultCoordinatorPort, volumes)
+		coorpod, coorsvc, coorurl, err := buildPodAndServiceForReplica(template, job, dicommon.CoordinatorName,
+			dicommon.DefaultCoordinatorPort, volumes)
 		if err != nil {
 			msg := fmt.Sprintf("build coordinator pod for job %s failed", job.Name)
 			log.Error(err, msg)
@@ -41,8 +42,8 @@ func (r *DIJobReconciler) reconcilePods(ctx context.Context, job *div1alpha1.DIJ
 		}
 		// add env
 		envs := make(map[string]string)
-		envs[diutil.CoordinatorURLEnv] = coorurl
-		diutil.SetPodEnv(coorpod, envs)
+		envs[dicommon.CoordinatorURLEnv] = coorurl
+		diutil.AddEnvsToPod(coorpod, envs)
 
 		if coordinator == nil {
 			if err := r.createPodAndService(ctx, job, coorpod, coorsvc); err != nil {
@@ -140,7 +141,7 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *div1alp
 	}
 
 	// set restart policy for coordinator
-	if replicaType == diutil.CoordinatorName && template.Spec.RestartPolicy == "" {
+	if replicaType == dicommon.CoordinatorName && template.Spec.RestartPolicy == "" {
 		template.Spec.RestartPolicy = corev1.RestartPolicyNever
 	}
 
@@ -161,10 +162,10 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *div1alp
 
 	// add env
 	envs := make(map[string]string)
-	envs[diutil.PodNamespaceEnv] = pod.Namespace
-	envs[diutil.PodNameEnv] = pod.Name
-	envs[diutil.ServerURLEnv] = diutil.DefaultServerURL
-	diutil.SetPodEnv(pod, envs)
+	envs[dicommon.PodNamespaceEnv] = pod.Namespace
+	envs[dicommon.PodNameEnv] = pod.Name
+	envs[dicommon.ServerURLEnv] = dicommon.DefaultServerURL
+	diutil.AddEnvsToPod(pod, envs)
 
 	// add volumes
 	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)

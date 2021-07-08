@@ -3,9 +3,6 @@ name: Go
 on:
   - push
 
-env: 
-  VERSION: v0.0.1-alpha.0
-
 jobs:
 
   lint: 

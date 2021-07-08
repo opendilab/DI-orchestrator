@@ -1,5 +1,5 @@
 """
-Copyright 2020 Sensetime X-lab. All Rights Reserved
+Copyright 2020 OpenDILab. All Rights Reserved
 """
 import os
 import socket

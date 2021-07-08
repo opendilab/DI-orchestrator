@@ -1,5 +1,5 @@
 """
-Copyright 2020 Sensetime X-lab. All Rights Reserved
+Copyright 2020 OpenDILab. All Rights Reserved
 """
 from typing import Union, Mapping, List, NamedTuple, Tuple, Callable, Optional, Any
 import copy

@@ -10,11 +10,11 @@ run:
   tests: true
 
   skip-dirs:
-    - manifests # deploy phoenix-rubber yaml 
+    - manifests 
     - third_party # from go-ethereum
-    - _out  #phoenix-rubber executable binary file
+    - _out  
     - doc # user tutorial
-    - deployment # deploy phoenix-rubber yaml
+    - deployment 
     - config # the crd config yaml
     - cluster # the logging bash
     - vendor # the third library

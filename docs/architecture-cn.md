@@ -1,19 +1,19 @@
 # DI Orchestrator架构
-DI框架分为3个重要的模块，分别是coordinator、collector和learner。一般情况下，一个DI训练任务只有一个coordinator，learner和collector的数目可以变化。三个模块的作用分别为：
+DI-engine框架分为3个重要的模块，分别是coordinator、collector和learner。一般情况下，一个DI-engine训练任务只有一个coordinator，learner和collector的数目可以变化。三个模块的作用分别为：
 - coordinator：保持与collector和learner的连接，接受collector和learner的获取原信息请求、推送原信息请求等，向learner和collector发送任务。
 - collector：从coordinator获取RL模型在存储中间件中的位置并加载RL模型，然后在自身构造的环境中根据RL模型决策产生数据帧，将数据帧存储回存储中间件，并将数据帧原信息（存储路径、大小等）汇报给coordinator。
 - learner：从coordinator获取数据帧存储位置并从存储中间件中加载数据帧开始训练RL模型，训练完成之后将模型存储到中间件中，并将模型原信息（存储路径、大小等）汇报给coordinator。由于learner部分常常存在数据并行训练这一额外的分布式机制，避免混淆，我们将与coordinator进行交互的模块称作logic learner，是coordinator下发任务的基本单位；而将数据并行训练中的单个learner进程称作ddp learner，多个ddp learner进程提供数据并行服务。一个logic learner可以对应1个ddp learner（单卡）或多个ddp learner（多卡）。另外，提供数据并行训练服务还需要额外引入aggregator模块，aggregator负责将多个ddp learner的训练结果进行汇总并发送给coordinator，即aggregator与多个ddp learner一起构成logic learner，而coordinator只会与logic learner进行交互。
 
-有关DI的详细介绍可参考[DI developer tutorial](https://opendilab.github.io/DI-engine/tutorial_dev/index.html)。
+有关DI-engine的详细介绍可参考[DI-engine developer tutorial](https://opendilab.github.io/DI-engine/tutorial_dev/index.html)。
 
-为了提供DI在Kubernetes（K8s）中运行的支持，我们设计了DI Orchestrator，本文将说明利用DI Orchestrator，DI各个模块在K8s系统上如何被创建、如何相互发现、如何开始训练等。DI Orchestrator的架构如下图所示：
+为了提供DI-engine在Kubernetes（K8s）中运行的支持，我们设计了DI Orchestrator，本文将说明利用DI Orchestrator，DI-engine各个模块在K8s系统上如何被创建、如何相互发现、如何开始训练等。DI Orchestrator的架构如下图所示：
 
 ![](images/di-arch.svg)
 
-整体分为两大模块：`di-server`和`di-operator`，`DDPL`指ddp learner，`Lm`指Learner，`Cn`指Collector，`Aggregator+DDPL`构成一个logic learner。接下来将首先介绍一个DI任务提交到K8s之后DI Orchestrator如何将DI的各个模块（在K8s中就是一个[pod](https://kubernetes.io/docs/concepts/workloads/pods/)）创建并启动，然后将对di-server和di-operator进行介绍。
+整体分为两大模块：`di-server`和`di-operator`，`DDPL`指ddp learner，`Lm`指Learner，`Cn`指Collector，`Aggregator+DDPL`构成一个logic learner。接下来将首先介绍一个DI-engine任务提交到K8s之后DI Orchestrator如何将DI-engine的各个模块（在K8s中就是一个[pod](https://kubernetes.io/docs/concepts/workloads/pods/)）创建并启动，然后将对di-server和di-operator进行介绍。
 
 ## 任务创建流程
-这里介绍任务创建流程，说明一个DI任务在K8s中从创建到执行完成的一整个生命周期
+这里介绍任务创建流程，说明一个DI-engine任务在K8s中从创建到执行完成的一整个生命周期
 - 编写AggregatorConfig yaml文件，定义aggregator的模板，将在后面创建DIJob的时候用来创建aggregator，aggregator可以为训练端提供数据并行训练服务。
 - 编写DIJob yaml文件，定义coordinator、collector、learner的模板，提交到K8s集群中。
 - di-operator监听到DIJob的提交，创建coordinator，并为coordinator创建可访问的域名。
@@ -41,7 +41,7 @@ type DIJobSpec struct {
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
 
-	// Volumes defines the shared volumes for DI components
+	// Volumes defines the shared volumes for DI-engine components
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	Coordinator CoordinatorSpec `json:"coordinator"`
@@ -60,7 +60,7 @@ type AggregatorConfigSpec struct {
 ```
 
 > **为什么aggregator单独定义？**
-    aggregator对所有使用DI框架进行RL训练的任务都是通用的，因此我们将aggregator定义为一个全局的、共享的资源AggregatorConfig，所有RL任务提交后，di-server将通过读取集群中唯一的AggregatorConfig来创建aggregator。另外，aggregator只是针对最常见的数据并行训练，如果是其他并行训练方法，需要定义新的Custom Resource。
+    aggregator对所有使用DI-engine框架进行RL训练的任务都是通用的，因此我们将aggregator定义为一个全局的、共享的资源AggregatorConfig，所有RL任务提交后，di-server将通过读取集群中唯一的AggregatorConfig来创建aggregator。另外，aggregator只是针对最常见的数据并行训练，如果是其他并行训练方法，需要定义新的Custom Resource。
 ### 状态定义
 用户提交DIJob后，di-operator便接管了DIJob的生命周期的管理，为了便于用户了解DIJob的状态，我们定义了以下阶段（phase）：
 
@@ -103,7 +103,7 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 当用户提交DIJob后，informer获取到该提交事件后触发handler，之后Reconcile函数被调用；Reconcile函数中调用list pod方法发现coordinator未创建，则读取DIJob中关于coordinator的定义模板，创建相应的coordinator pod（coordinator程序在其中运行）和service（用于pod间通信），并将一些环境变量写入pod中，包括pod的名称、pod的命名空间、访问coordinator的URL等环境变量。
 
-其中，DI框架的每个模块占用的端口都有一个默认值，如下所示：
+其中，DI-engine框架的每个模块占用的端口都有一个默认值，如下所示：
 
 ```go
 DefaultCollectorPort   = 22270
@@ -122,7 +122,7 @@ coordinator创建之后，di-operator将监听pod的状态并修改DIJob的状�
 di-operator中实现了webhook校验方法，创建MutatingWebhook用于设置DIJob的默认值；创建ValidatingWebhook用于校验DIJob的正确性。比如对`CleanPodPolicy`字段，我们在MutatingWebhook中设置其默认值为`Running`，表示DIJob完成后将Running的pod都删除；我们在ValidatingWebhook中校验`CleanPodPolicy`字段的值，如果用户设置的值不等于`None`、`ALL`、`Running`中的任何一个，则拒绝提交该DIJob。
 
 ## DI Server
-di-server是一个为DI框架定制的http服务器，提供新增、删除和查询collector、learner、aggregator的功能。通过调用di-server的相关接口，di-server为DIJob提供了动态增删collector和learner的能力。下面将对di-server的设计进行简要介绍，包括存储AggregatorConfig、DIJob以及DIJob所有pod的本地cache；用于动态新增、删除和查询collector、learner和aggregator的http接口设计。
+di-server是一个为DI-engine框架定制的http服务器，提供新增、删除和查询collector、learner、aggregator的功能。通过调用di-server的相关接口，di-server为DIJob提供了动态增删collector和learner的能力。下面将对di-server的设计进行简要介绍，包括存储AggregatorConfig、DIJob以及DIJob所有pod的本地cache；用于动态新增、删除和查询collector、learner和aggregator的http接口设计。
 
 ### 本地cache
 为了减少di-server与K8s api server之间查询的频率，从而减轻K8s api server的负担，我们利用[client-go](https://github.com/kubernetes/client-go)提供的informer机制将AggregatorConfig、DIJob和DIJob的所有pod存储在本地cache，如下图所示
@@ -158,8 +158,8 @@ genericInformer.Informer().GetIndexer().GetByKey(key)
 
 
 ## DI Orchestrator的优势
-DI Orchestrator为DI框架提供了分布式场景下基于K8s的容器运行方案。对于用户提交的DIJob，di-operator负责对DI的各个模块进行编排，使得各个模块可以正常运行并执行训练任务。通过调用di-server的接口，赋予coordinator新增、删除和查询其所有的collector、learner和aggregator的功能，提升DI框架资源动态分配的能力。总结DI Orchestrator提供了以下优势：
-1. 封装性。依赖di-operator的编排能力，部署DI分布式RL训练的细节（包括pod创建、服务发现）对用户来说是透明的。根据DI框架对分布式RL训练的部署需求，di-operator会将coordinator创建出来，然后coordinator再请求di-server创建其他模块，di-operator会把每个模块的pod的状态记录到DIJob的状态中。DIJob的生命周期也由di-operator维护，向用户展示DIJob在不同阶段的状态。
+DI Orchestrator为DI-engine框架提供了分布式场景下基于K8s的容器运行方案。对于用户提交的DIJob，di-operator负责对DI-engine的各个模块进行编排，使得各个模块可以正常运行并执行训练任务。通过调用di-server的接口，赋予coordinator新增、删除和查询其所有的collector、learner和aggregator的功能，提升DI-engine框架资源动态分配的能力。总结DI Orchestrator提供了以下优势：
+1. 封装性。依赖di-operator的编排能力，部署DI-engine分布式RL训练的细节（包括pod创建、服务发现）对用户来说是透明的。根据DI-engine框架对分布式RL训练的部署需求，di-operator会将coordinator创建出来，然后coordinator再请求di-server创建其他模块，di-operator会把每个模块的pod的状态记录到DIJob的状态中。DIJob的生命周期也由di-operator维护，向用户展示DIJob在不同阶段的状态。
 2. 易用性。用户只需要在DIJob的yaml文件中定义好coordinator、collector、learner的配置之后，一键提交到K8s集群即可，di-operator将负责完成部署工作，将用户从K8s集群中复杂的分布式RL训练部署中解放出来。
 3. 鲁棒性。依赖K8s的pod重启机制，保证pod在意外退出的情况下能自动重启，coordinator能够迅速响应并重新连接。
 4. 动态扩展。DIJob所需的collector/learner/aggregator是动态变化的，因此di-server提供了http接口可以动态调整collector/learner的数目，使得DIJob可以根据自身需求调整collector和learner的比例，优化吞吐量。

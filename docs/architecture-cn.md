@@ -8,7 +8,7 @@ DI框架分为3个重要的模块，分别是coordinator、collector和learner�
 
 为了提供DI在Kubernetes（K8s）中运行的支持，我们设计了DI Orchestrator，本文将说明利用DI Orchestrator，DI各个模块在K8s系统上如何被创建、如何相互发现、如何开始训练等。DI Orchestrator的架构如下图所示：
 
-![](images/di-arch.png)
+![](images/di-arch.svg)
 
 整体分为两大模块：`di-server`和`di-operator`，`DDPL`指ddp learner，`Lm`指Learner，`Cn`指Collector，`Aggregator+DDPL`构成一个logic learner。接下来将首先介绍一个DI任务提交到K8s之后DI Orchestrator如何将DI的各个模块（在K8s中就是一个[pod](https://kubernetes.io/docs/concepts/workloads/pods/)）创建并启动，然后将对di-server和di-operator进行介绍。
 

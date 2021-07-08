@@ -24,19 +24,19 @@ di-server-7b86ff8df4-jfgmp     1/1     Running   0          59s
 
 Install global components of DIJob defined in AggregatorConfig:
 ```bash
-kubectl create -f examples/di_v1alpha1_agconfig.yaml -n di-system
+kubectl create -f config/samples/agconfig.yaml -n di-system
 ```
 ### Submit DIJob
 ```bash
 # submit DIJob
-$ kubectl create -f examples/di_v1alpha1_dijob.yaml
+$ kubectl create -f config/samples/dijob-cartpole.yaml
 
 # get pod and you will see coordinator is created by di-operator
 # a few seconds later, you will see collectors and learners created by di-server
 $ kubectl get pod
 
 # get logs of coordinator
-$ kubectl logs dijob-example-coordinator
+$ kubectl logs cartpole-dqn-coordinator
 ```
 
 ## User Guide

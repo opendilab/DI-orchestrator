@@ -8,7 +8,7 @@ For the introduction of DI, please refer to [DI developer tutorial](https://open
 
 In order to provide running support for DI in Kubernetes (K8s), we designed `DI Orchestrator`. This article will explain how to use DI Orchestrator, how each module of DI is created on K8s and discovers each other, how to start training, etc. The architecture of DI Orchestrator is shown in the figure below:
 
-![](images/di-arch.png)
+![](images/di-arch.svg)
 
 There are two main modules that is `di-server` and `di-operator`. 
 `DDPL` represents ddp learner, `Lm` represents logic learner, `Cn` represents collector, and `Aggregator+DDPL` constructs a logic learner. In the following pages, we will first introduce how `DI Orchestrator` creates and starts each module of DI after a DI job is submitted to K8s, and then introduces the architecture of `di-server` and `di-operator`.

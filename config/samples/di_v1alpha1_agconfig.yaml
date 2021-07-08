@@ -1,0 +1,34 @@
+apiVersion: diengine.opendilab.org/v1alpha1
+kind: AggregatorConfig
+metadata:
+  name: aggregator-config
+  namespace: di-system
+spec:
+  aggregator:
+    template:
+      spec:
+        containers:
+        - name: di-container
+          image: diorchestrator/ding:v0.1.0-df39b81c
+          imagePullPolicy: Always
+          env:
+          - name: PYTHONUNBUFFERED
+            value: "1"
+          resources:
+            requests:
+              cpu: 3
+              memory: "10Gi"
+            limits:
+              cpu: 3
+              memory: "10Gi"
+          command: ["/bin/bash", "-c",]
+          args:
+          - |
+            # if code has been changed in the mount path, we have to reinstall  cli
+            # pip install --no-cache-dir -e .;
+            # pip install --no-cache-dir -e .[common_env]
+            
+            ding -m dist --module learner_aggregator
+          ports:
+          - name: di-port
+            containerPort: 22270

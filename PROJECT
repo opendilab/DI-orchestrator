@@ -1,0 +1,28 @@
+domain: opendilab.org
+layout:
+- go.kubebuilder.io/v3
+projectName: di
+repo: opendilab.org/di-orchestrator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: opendilab.org
+  group: diengine
+  kind: DIJob
+  path: opendilab.org/di-orchestrator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: opendilab.org
+  group: diengine
+  kind: AggregatorConfig
+  path: opendilab.org/di-operator/api/v1alpha1
+  version: v1alpha1
+version: "3"

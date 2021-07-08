@@ -8,7 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	diutil "opendilab.org/di-orchestrator/utils"
+	dicommon "opendilab.org/di-orchestrator/common"
 )
 
 func NewPod(name, jobName string, ownRefer metav1.OwnerReference) *corev1.Pod {
@@ -24,7 +24,7 @@ func NewPod(name, jobName string, ownRefer metav1.OwnerReference) *corev1.Pod {
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
 				{
-					Name:    diutil.DefaultContainerName,
+					Name:    dicommon.DefaultContainerName,
 					Image:   DIJobImage,
 					Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 				},

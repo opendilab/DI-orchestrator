@@ -2,14 +2,14 @@
 DI Orchestrator is designed to manage DI (Decision Intelligence) jobs using Kubernetes Custom Resource and Operator. 
 
 ### Prerequisites
-- a well prepared kubernetes cluster. Follow the [instructions](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create a kubernetes cluster, or create a local kubernetes node referring to [kind](https://kind.sigs.k8s.io/docs/user/quick-start/) or [minikube](https://minikube.sigs.k8s.io/docs/start/)
-- cert-manager. Installation on kubernetes referenced to [cert-manager docs](https://cert-manager.io/docs/installation/kubernetes/). Or you can install by the following command.
+- A well prepared kubernetes cluster. Follow the [instructions](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create a kubernetes cluster, or create a local kubernetes node referring to [kind](https://kind.sigs.k8s.io/docs/user/quick-start/) or [minikube](https://minikube.sigs.k8s.io/docs/start/)
+- Cert-manager. Installation on kubernetes please refer to [cert-manager docs](https://cert-manager.io/docs/installation/kubernetes/). Or you can install by the following command.
 ```bash
 kubectl create -f ./config/certmanager/cert-manager.yaml
 ```
 
 ### Install DI Orchestrator
-Install `di-operator` and `di-server` with the following command.
+DI Orchestrator consists of two components: `di-operator` and `di-server`. Install `di-operator` and `di-server` with the following command.
 ```bash
 kubectl create -f ./config/di-manager.yaml
 ```

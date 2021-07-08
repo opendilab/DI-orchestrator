@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
 	"opendilab.org/di-orchestrator/controllers"
-	diutil "opendilab.org/di-orchestrator/utils"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -57,7 +57,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&serverAddr, "server-address", diutil.DefaultServerURL, "The address to access  server.")
+	flag.StringVar(&serverAddr, "server-address", dicommon.DefaultServerURL, "The address to access  server.")
 
 	opts := zap.Options{
 		Development: true,
@@ -81,7 +81,7 @@ func main() {
 	}
 
 	// set DefaultDIServerURL
-	diutil.DefaultServerURL = serverAddr
+	dicommon.DefaultServerURL = serverAddr
 
 	reconciler := &controllers.DIJobReconciler{
 		Client:   mgr.GetClient(),

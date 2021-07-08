@@ -3,9 +3,6 @@ name: Go
 on:
   - push
 
-env: 
-  VERSION: v0.0.1-alpha.0
-
 jobs:
 
   lint: 
@@ -15,7 +12,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.16
+        go-version: 1.15
     - name: lint
       shell: bash
       run: |
@@ -37,7 +34,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.16
+        go-version: 1.15
     - name: Test
       shell: bash
       run: |
@@ -55,6 +52,6 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.16
-    - name: Build Images
+        go-version: 1.15
+    - name: Build Bin
       run: make build

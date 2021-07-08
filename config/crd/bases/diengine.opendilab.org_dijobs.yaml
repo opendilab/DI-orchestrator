@@ -19748,7 +19748,7 @@ spec:
                 description: Priority labels the priority of DIJob
                 type: string
               volumes:
-                description: Volumes defines the shared volumes for di components
+                description: Volumes defines the shared volumes for DI-engine components
                 items:
                   description: Volume represents a named volume in a pod that may
                     be accessed by any container in the pod.

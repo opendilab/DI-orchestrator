@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
 	diutil "opendilab.org/di-orchestrator/utils"
 )
 
@@ -28,7 +29,7 @@ func NewDIJob() *div1alpha1.DIJob {
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    diutil.DefaultContainerName,
+								Name:    dicommon.DefaultContainerName,
 								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
@@ -41,7 +42,7 @@ func NewDIJob() *div1alpha1.DIJob {
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    diutil.DefaultContainerName,
+								Name:    dicommon.DefaultContainerName,
 								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
@@ -54,7 +55,7 @@ func NewDIJob() *div1alpha1.DIJob {
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    diutil.DefaultContainerName,
+								Name:    dicommon.DefaultContainerName,
 								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},
@@ -94,7 +95,7 @@ func NewAggregatorConfig() *div1alpha1.AggregatorConfig {
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
 							{
-								Name:    diutil.DefaultContainerName,
+								Name:    dicommon.DefaultContainerName,
 								Image:   DIJobImage,
 								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 							},

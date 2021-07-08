@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
 	servertypes "opendilab.org/di-orchestrator/server/types"
 	diutil "opendilab.org/di-orchestrator/utils"
 )
@@ -125,14 +126,14 @@ func (s *DIServer) createCollectorsAndLearnersForDIJob(
 	volumes := job.Spec.Volumes
 	// create collectors
 	collectorTemplate := job.Spec.Collector.Template
-	collectors, err := s.createReplicas(&collectorTemplate, volumes, ownRefer, njreq.Collectors, njreq.Namespace, diutil.CollectorName, nil)
+	collectors, err := s.createReplicas(&collectorTemplate, volumes, ownRefer, njreq.Collectors, njreq.Namespace, dicommon.CollectorName, nil)
 	if err != nil {
 		return collectors, nil, err
 	}
 
 	// create learners
 	learnerTemplate := job.Spec.Learner.Template
-	learners, err := s.createReplicas(&learnerTemplate, volumes, ownRefer, njreq.Learners, njreq.Namespace, diutil.LearnerName, agtemplate)
+	learners, err := s.createReplicas(&learnerTemplate, volumes, ownRefer, njreq.Learners, njreq.Namespace, dicommon.LearnerName, agtemplate)
 	if err != nil {
 		return collectors, learners, err
 	}
@@ -151,10 +152,10 @@ func (s *DIServer) createReplicas(
 
 	var defaultPort int32
 	switch replicaType {
-	case diutil.CollectorName:
-		defaultPort = diutil.DefaultCollectorPort
-	case diutil.LearnerName:
-		defaultPort = diutil.DefaultLearnerPort
+	case dicommon.CollectorName:
+		defaultPort = dicommon.DefaultCollectorPort
+	case dicommon.LearnerName:
+		defaultPort = dicommon.DefaultLearnerPort
 	default:
 
 	}
@@ -174,7 +175,7 @@ func (s *DIServer) createReplicas(
 		}
 
 		// if we need to create multiple ddp learner pods, we also need to create aggregator pod
-		if replicaType == diutil.LearnerName && needMultiDDPLearnerPod {
+		if replicaType == dicommon.LearnerName && needMultiDDPLearnerPod {
 			jobName := ownRefer.Name
 			// create aggregator
 			agg, aggsvc, port, err := s.buildAggregatorPod(agtemplate, ownRefer, jobName, namespace)
@@ -223,7 +224,7 @@ func (s *DIServer) createReplicas(
 					// set access port for ddp master port
 					mport := corev1.ServicePort{
 						Name: "master-port",
-						Port: int32(diutil.DefaultMasterPort),
+						Port: int32(dicommon.DefaultMasterPort),
 					}
 					svcList[0].Spec.Ports = append(svcList[0].Spec.Ports, mport)
 				}
@@ -243,7 +244,7 @@ func (s *DIServer) createReplicas(
 			}
 			svcName = svc.Name
 
-			if replicaType == diutil.LearnerName && needAggregator(resources) {
+			if replicaType == dicommon.LearnerName && needAggregator(resources) {
 				// create aggregator
 				agg, aggsvc, aggport, err := s.buildAggregatorPod(agtemplate, ownRefer, jobName, namespace)
 				if err != nil {
@@ -323,17 +324,17 @@ func (s *DIServer) buildAggregatorPod(
 	// create aggregator
 	aresource := servertypes.ResourceQuantity{}
 	pod, svc, port, err := s.buildPodAndService(template, ownRefer, jobName, namespace,
-		diutil.AggregatorName, diutil.DefaultAggregatorPort, aresource, nil)
+		dicommon.AggregatorName, dicommon.DefaultAggregatorPort, aresource, nil)
 	if err != nil {
 		return nil, nil, -1, err
 	}
 
 	// add env
 	envs := make(map[string]string)
-	envs[diutil.PodNamespaceEnv] = pod.Namespace
-	envs[diutil.PodNameEnv] = pod.Name
-	envs[diutil.ServerURLEnv] = diutil.DefaultServerURL
-	diutil.SetPodEnv(pod, envs)
+	envs[dicommon.PodNamespaceEnv] = pod.Namespace
+	envs[dicommon.PodNameEnv] = pod.Name
+	envs[dicommon.ServerURLEnv] = dicommon.DefaultServerURL
+	diutil.AddEnvsToPod(pod, envs)
 
 	return pod, svc, port, nil
 }
@@ -348,7 +349,7 @@ func (s *DIServer) buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec
 	ownRefer.Controller = func(c bool) *bool { return &c }(false)
 
 	pod, svc, port, err := s.buildPodAndService(template.DeepCopy(), aggOwnRefer, jobName,
-		namespace, diutil.DDPLearnerName, defaultPort, resources, volumes)
+		namespace, dicommon.DDPLearnerName, defaultPort, resources, volumes)
 	if err != nil {
 		return nil, nil, -1, err
 	}
@@ -359,7 +360,7 @@ func (s *DIServer) buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec
 
 	// create port for all the GPU processes
 	for j := 1; j < int(resources.GPU.Value()); j++ {
-		pname := fmt.Sprintf("%s-%d", diutil.DDPLearnerPortPrefix, j)
+		pname := fmt.Sprintf("%s-%d", dicommon.DDPLearnerPortPrefix, j)
 		pport := port + int32(j)
 		lsport := corev1.ServicePort{
 			Name: pname,
@@ -372,7 +373,7 @@ func (s *DIServer) buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec
 			ContainerPort: pport,
 		}
 		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name != diutil.DefaultContainerName {
+			if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
 				continue
 			}
 			pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, lcport)
@@ -383,24 +384,24 @@ func (s *DIServer) buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec
 
 func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, worldSize, localWorldSize, startRank int) {
 	envs := make(map[string]string)
-	envs[diutil.WorldSize] = strconv.Itoa(worldSize)
-	envs[diutil.LocalWorldSize] = strconv.Itoa(localWorldSize)
-	envs[diutil.MasterAddr] = masterAddr
-	envs[diutil.MasterPort] = strconv.Itoa(diutil.DefaultMasterPort)
-	envs[diutil.StartRank] = strconv.Itoa(startRank)
-	diutil.SetPodEnv(pod, envs)
+	envs[dicommon.WorldSize] = strconv.Itoa(worldSize)
+	envs[dicommon.LocalWorldSize] = strconv.Itoa(localWorldSize)
+	envs[dicommon.MasterAddr] = masterAddr
+	envs[dicommon.MasterPort] = strconv.Itoa(dicommon.DefaultMasterPort)
+	envs[dicommon.StartRank] = strconv.Itoa(startRank)
+	diutil.AddEnvsToPod(pod, envs)
 }
 
 func (s *DIServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
 	var defaultPort int32
 
 	switch replicaType {
-	case diutil.CollectorName:
-		defaultPort = diutil.DefaultCollectorPort
-	case diutil.LearnerName:
-		defaultPort = diutil.DefaultLearnerPort
-	case diutil.AggregatorName:
-		defaultPort = diutil.DefaultAggregatorPort
+	case dicommon.CollectorName:
+		defaultPort = dicommon.DefaultCollectorPort
+	case dicommon.LearnerName:
+		defaultPort = dicommon.DefaultLearnerPort
+	case dicommon.AggregatorName:
+		defaultPort = dicommon.DefaultAggregatorPort
 	default:
 
 	}
@@ -428,18 +429,18 @@ func (s *DIServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.Servi
 	var results []string
 	for i := range pods {
 		oldPod := pods[i]
-		replicaType := oldPod.Labels[diutil.ReplicaTypeLabel]
+		replicaType := oldPod.Labels[dicommon.ReplicaTypeLabel]
 		var defaultPort int32
 		var needDDPLearner bool = false
 		switch replicaType {
-		case diutil.CollectorName:
-			defaultPort = diutil.DefaultCollectorPort
-		case diutil.LearnerName:
-			defaultPort = diutil.DefaultLearnerPort
-		case diutil.DDPLearnerName:
-			defaultPort = diutil.DefaultLearnerPort
-		case diutil.AggregatorName:
-			defaultPort = diutil.DefaultAggregatorPort
+		case dicommon.CollectorName:
+			defaultPort = dicommon.DefaultCollectorPort
+		case dicommon.LearnerName:
+			defaultPort = dicommon.DefaultLearnerPort
+		case dicommon.DDPLearnerName:
+			defaultPort = dicommon.DefaultLearnerPort
+		case dicommon.AggregatorName:
+			defaultPort = dicommon.DefaultAggregatorPort
 			needDDPLearner = true
 		default:
 			return results, fmt.Errorf("unknown replica type")
@@ -471,7 +472,7 @@ func (s *DIServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.Servi
 
 		var portvalue int32 = defaultPort
 		for _, port := range svc.Spec.Ports {
-			if port.Name == diutil.DefaultPortName {
+			if port.Name == dicommon.DefaultPortName {
 				portvalue = port.Port
 			}
 		}
@@ -516,11 +517,11 @@ func (s *DIServer) rebuildDDPLearners(namespace, aggregatorName string) ([]*core
 			masterAddr = "localhost"
 		}
 		for j := range pod.Spec.Containers {
-			if pod.Spec.Containers[j].Name != diutil.DefaultContainerName {
+			if pod.Spec.Containers[j].Name != dicommon.DefaultContainerName {
 				continue
 			}
 			for k := range pod.Spec.Containers[i].Env {
-				if pod.Spec.Containers[i].Env[k].Name == diutil.MasterAddr {
+				if pod.Spec.Containers[i].Env[k].Name == dicommon.MasterAddr {
 					pod.Spec.Containers[i].Env[k].Value = masterAddr
 				}
 			}

@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
 	diutil "opendilab.org/di-orchestrator/utils"
 	testutil "opendilab.org/di-orchestrator/utils/testutils"
 )
@@ -87,13 +88,13 @@ var _ = Describe("DIJob Specification", func() {
 					colStatus := make([]int, 3)
 					for _, col := range c.collectors {
 						By(fmt.Sprintf("Create pod %s", col.name))
-						createAndUpdatePodPhase(ctx, k8sClient, col.name, dijob.Name, col.status, diutil.CollectorName, ownRefer, colStatus)
+						createAndUpdatePodPhase(ctx, k8sClient, col.name, dijob.Name, col.status, dicommon.CollectorName, ownRefer, colStatus)
 					}
 
 					lrStatus := make([]int, 3)
 					for _, lr := range c.learners {
 						By(fmt.Sprintf("Create pod %s", lr.name))
-						createAndUpdatePodPhase(ctx, k8sClient, lr.name, dijob.Name, lr.status, diutil.LearnerName, ownRefer, lrStatus)
+						createAndUpdatePodPhase(ctx, k8sClient, lr.name, dijob.Name, lr.status, dicommon.LearnerName, ownRefer, lrStatus)
 					}
 
 					By("Get the number of pods")

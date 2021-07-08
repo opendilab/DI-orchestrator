@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
 	diutil "opendilab.org/di-orchestrator/utils"
 	testutil "opendilab.org/di-orchestrator/utils/testutils"
 )
@@ -220,12 +221,12 @@ var _ = Describe("DIJob Controller", func() {
 				By(fmt.Sprintf("Create replicas for DIJob %s", dijob.Name))
 				colStatus := make([]int, 3)
 				for _, col := range c.collectors {
-					createAndUpdatePodPhase(ctx, k8sClient, col.name, dijob.Name, col.status, diutil.CollectorName, ownRefer, colStatus)
+					createAndUpdatePodPhase(ctx, k8sClient, col.name, dijob.Name, col.status, dicommon.CollectorName, ownRefer, colStatus)
 				}
 
 				lrStatus := make([]int, 3)
 				for _, lr := range c.learners {
-					createAndUpdatePodPhase(ctx, k8sClient, lr.name, dijob.Name, lr.status, diutil.LearnerName, ownRefer, lrStatus)
+					createAndUpdatePodPhase(ctx, k8sClient, lr.name, dijob.Name, lr.status, dicommon.LearnerName, ownRefer, lrStatus)
 				}
 
 				By("Checking the ReplicaStatus is as expected")
@@ -362,8 +363,8 @@ func createAndUpdatePodPhase(
 
 	pod := testutil.NewPod(name, jobName, ownRefer)
 	labs := diutil.GenLabels(jobName)
-	labs[diutil.ReplicaTypeLabel] = replicaType
-	labs[diutil.PodNameLabel] = pod.Name
+	labs[dicommon.ReplicaTypeLabel] = replicaType
+	labs[dicommon.PodNameLabel] = pod.Name
 	pod.SetLabels(labs)
 
 	err := k8sClient.Create(ctx, pod, &client.CreateOptions{})

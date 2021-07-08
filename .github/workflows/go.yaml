@@ -3,9 +3,6 @@ name: Go
 on:
   - push
 
-env: 
-  VERSION: v0.0.1-alpha.0
-
 jobs:
 
   lint: 
@@ -56,5 +53,5 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.16
-    - name: Build Images
+    - name: Build Bin
       run: make build

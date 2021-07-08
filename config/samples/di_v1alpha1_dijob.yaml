@@ -18,7 +18,7 @@ spec:
     template:
       spec:
         containers:
-        - name: coordinator
+        - name: di-container
           image: diorchestrator/ding:v0.1.0-df39b81c
           imagePullPolicy: Always
           env:
@@ -129,7 +129,7 @@ spec:
             qbert_dqn_system_config = dict(
                 coordinator=dict(
                     operator_server=dict(
-                        system_addr='ding-server.ding-system:8080',
+                        system_addr='di-server.di-system:8080',
                         api_version='/v1alpha1',
                         init_replicas_request=dict(
                             collectors={
@@ -159,7 +159,7 @@ spec:
             ding -m dist --module config -P k8s -c qbert_dqn_config_k8s.py -s 0;
             ding -m dist --module coordinator -c qbert_dqn_config_k8s.py.pkl -s 0 --disable-flask-log 0 -cdp $COORDINATOR_PORT
           ports:
-          - name: coordinator
+          - name: di-port
             containerPort: 22273
           volumeMounts:
           - name: work-dir
@@ -168,7 +168,7 @@ spec:
     template:
       spec:
         containers:
-        - name: collector
+        - name: di-container
           image: diorchestrator/ding:v0.1.0-df39b81c
           imagePullPolicy: Always
           env:
@@ -189,7 +189,7 @@ spec:
 
             ding -m dist --module collector -c qbert_dqn_config_k8s.py.pkl -s 0 -clp $COLLECTOR_PORT --disable-flask-log 0
           ports:
-          - name: collector
+          - name: di-port
             containerPort: 22270
           volumeMounts:
           - name: work-dir
@@ -198,7 +198,7 @@ spec:
     template:
       spec:
         containers:
-        - name: learner
+        - name: di-container
           image: diorchestrator/ding:v0.1.0-df39b81c
           imagePullPolicy: Always
           env:
@@ -219,7 +219,7 @@ spec:
 
             ding -m dist --module spawn_learner -c qbert_dqn_config_k8s.py.pkl -s 0 -lp $LEARNER_PORT --disable-flask-log 0
           ports:
-          - name: learner
+          - name: di-port
             containerPort: 22271
           volumeMounts:
           - name: cache-volume

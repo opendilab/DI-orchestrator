@@ -169,11 +169,11 @@ spec:
             value: "1"
           resources:
             requests:
-              cpu: 8
-              memory: "10Gi"
+              cpu: 16
+              memory: "5Gi"
             limits:
-              cpu: 8
-              memory: "10Gi"
+              cpu: 16
+              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -196,11 +196,11 @@ spec:
             value: "1"
           resources:
             requests:
-              cpu: 8
-              memory: "20Gi"
+              cpu: 16
+              memory: "5Gi"
             limits:
-              cpu: 8
-              memory: "20Gi"
+              cpu: 16
+              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |

@@ -177,10 +177,10 @@ spec:
             value: "1"
           resources:
             requests:
-              cpu: 8
+              cpu: 16
               memory: "10Gi"
             limits:
-              cpu: 8
+              cpu: 16
               memory: "10Gi"
           command: ["/bin/bash", "-c",]
           args:
@@ -207,13 +207,11 @@ spec:
             value: "1"
           resources:
             requests:
-              cpu: 3
-              nvidia.com/gpu: 2
-              memory: "30Gi"
+              cpu: 16
+              memory: "20Gi"
             limits:
-              cpu: 3
-              nvidia.com/gpu: 2
-              memory: "30Gi"
+              cpu: 16
+              memory: "20Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |

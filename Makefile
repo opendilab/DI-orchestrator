@@ -87,11 +87,6 @@ test: ginkgo ## Run tests.
 	go tool cover -func=./server/http/coverage.out 
 	go tool cover -func=./common/gpuallocator/coverage.out
 
-.PHONY: e2e-test
-e2e-test: ## Run e2e tests.
-	go test -timeout 20m  -v ./e2e -shared-volumes-dir /data/nfs/ding/cartpole --kubeconfig ~/.kube/config
-	go tool cover -func=./e2e/coverage.out 
-
 ##@ Build
 
 build: generate  ## Build di-operator binary.

@@ -27,3 +27,5 @@ bin
 
 *.coverprofile
 coverage.out.*
+
+config/webhook/manifests.yaml

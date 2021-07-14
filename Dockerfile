@@ -1,14 +1,5 @@
-# Build di-operator with local di-operator binary
-FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as dev-di-operator
-RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /
-COPY /bin/di-operator  .
-
-ENTRYPOINT ["/di-operator"]
-
 # Build the di-operator binary
-FROM registry.sensetime.com/cloudnative4ai/golang:1.14 as builder
-LABEL maintainer="liqingping@sensetime.com"
+FROM registry.sensetime.com/cloudnative4ai/golang:1.15 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -23,17 +14,30 @@ RUN go mod download
 # Copy the go source
 COPY main.go main.go
 COPY api/ api/
+COPY common/ common/
 COPY controllers/ controllers/
+COPY server/ server/
 COPY utils/ utils/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-operator main.go
+# Build
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-server server/main.go
 
 # Use distroless as minimal base image to package the di-operator binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-operator
+LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /
 COPY --from=builder /workspace/di-operator .
 
 ENTRYPOINT ["/di-operator"]
+
+FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-server
+LABEL maintainer="opendilab.contact@gmail.com"
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+WORKDIR /
+COPY --from=builder /workspace/di-server .
+
+ENTRYPOINT ["/di-server"]

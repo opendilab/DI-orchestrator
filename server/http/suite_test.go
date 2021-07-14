@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The SensePhoenix authors.
+Copyright 2021 The OpenDILab authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,9 +43,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
-	serverdynamic "go-sensephoenix.sensetime.com/di-orchestrator/server/dynamic"
-	testutil "go-sensephoenix.sensetime.com/di-orchestrator/utils/testutils"
+	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	serverdynamic "opendilab.org/di-orchestrator/server/dynamic"
+	testutil "opendilab.org/di-orchestrator/utils/testutils"
 	//+kubebuilder:scaffold:imports
 )
 

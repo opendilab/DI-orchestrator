@@ -15114,7 +15114,11 @@ spec:
                 description: Priority labels the priority of DIJob
                 type: string
               volumes:
+<<<<<<< HEAD
                 description: Volumes defines the shared volumes for nerveX components
+=======
+                description: Volumes defines the shared volumes for di components
+>>>>>>> test-e2e
                 items:
                   description: Volume represents a named volume in a pod that may be accessed by any container in the pod.
                   properties:
@@ -16320,7 +16324,11 @@ spec:
         - --leader-elect
         command:
         - /di-operator
+<<<<<<< HEAD
         image: registry.sensetime.com/cloudnative4ai/di-operator:v0.0.1-alpha.0
+=======
+        image: diorchestrator/di-operator:v0.1.0
+>>>>>>> test-e2e
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16384,7 +16392,11 @@ spec:
         - --lease-lock-name=di-server
         command:
         - /di-server
+<<<<<<< HEAD
         image: registry.sensetime.com/cloudnative4ai/di-server:v0.0.1-alpha.0
+=======
+        image: diorchestrator/di-server:v0.1.0
+>>>>>>> test-e2e
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

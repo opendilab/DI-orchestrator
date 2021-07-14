@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The SensePhoenix authors.
+Copyright 2021 The OpenDILab authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
-	"go-sensephoenix.sensetime.com/di-orchestrator/controllers"
-	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
+	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
+	"opendilab.org/di-orchestrator/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -57,7 +57,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&serverAddr, "server-address", diutil.DefaultServerURL, "The address to access  server.")
+	flag.StringVar(&serverAddr, "server-address", dicommon.DefaultServerURL, "The address to access  server.")
 
 	opts := zap.Options{
 		Development: true,
@@ -73,7 +73,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "12841a5d.sensetime.com",
+		LeaderElectionID:       "12841a5d.opendilab.org",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -81,7 +81,7 @@ func main() {
 	}
 
 	// set DefaultDIServerURL
-	diutil.DefaultServerURL = serverAddr
+	dicommon.DefaultServerURL = serverAddr
 
 	reconciler := &controllers.DIJobReconciler{
 		Client:   mgr.GetClient(),

@@ -14,8 +14,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	servertypes "go-sensephoenix.sensetime.com/di-orchestrator/server/types"
-	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
+	dicommon "opendilab.org/di-orchestrator/common"
+	servertypes "opendilab.org/di-orchestrator/server/types"
+	diutil "opendilab.org/di-orchestrator/utils"
 )
 
 func (s *DIServer) getPodsByNames(namespace string, names []string) ([]*corev1.Pod, error) {
@@ -228,7 +229,7 @@ func (s *DIServer) deleteService(namespace, name string) error {
 
 func (s *DIServer) setPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity) {
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name != diutil.DefaultContainerName {
+		if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
 			continue
 		}
 		if pod.Spec.Containers[i].Resources.Limits == nil {
@@ -368,16 +369,16 @@ func rebuildPodAndService(oldPod *corev1.Pod, oldSvc *corev1.Service) (*corev1.P
 	pod.Spec.NodeName = ""
 
 	labels := oldPod.GetLabels()
-	labels[diutil.PodNameLabel] = name
+	labels[dicommon.PodNameLabel] = name
 	diutil.AddLabelsToPod(pod, labels)
 
 	// update pod env
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name != diutil.DefaultContainerName {
+		if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
 			continue
 		}
 		for j := range pod.Spec.Containers[i].Env {
-			if pod.Spec.Containers[i].Env[j].Name == diutil.PodNameEnv {
+			if pod.Spec.Containers[i].Env[j].Name == dicommon.PodNameEnv {
 				pod.Spec.Containers[i].Env[j].Value = pod.Name
 			}
 		}

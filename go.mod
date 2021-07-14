@@ -1,4 +1,4 @@
-module go-sensephoenix.sensetime.com/di-orchestrator
+module opendilab.org/di-orchestrator
 
 go 1.15
 

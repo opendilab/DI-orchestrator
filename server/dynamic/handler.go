@@ -5,10 +5,10 @@ import (
 	"log"
 	"strings"
 
-	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 )
 
 func GetPodFromObject(obj interface{}) (*corev1.Pod, error) {

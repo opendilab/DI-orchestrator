@@ -17,10 +17,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
-	servertypes "go-sensephoenix.sensetime.com/di-orchestrator/server/types"
-	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
-	testutil "go-sensephoenix.sensetime.com/di-orchestrator/utils/testutils"
+	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
+	servertypes "opendilab.org/di-orchestrator/server/types"
+	diutil "opendilab.org/di-orchestrator/utils"
+	testutil "opendilab.org/di-orchestrator/utils/testutils"
 )
 
 var _ = Describe("Server Test", func() {
@@ -121,7 +122,7 @@ var _ = Describe("Server Test", func() {
 			Expect(len(dnjresp.Collectors)).Should(Equal(dcn))
 			Expect(len(dnjresp.Learners)).Should(Equal(dln))
 
-			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy(), timeout, interval)
+			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy())
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -300,7 +301,7 @@ var _ = Describe("Server Test", func() {
 			Expect(len(dnjresp.Collectors)).Should(Equal(dcn))
 			Expect(len(dnjresp.Learners)).Should(Equal(dln))
 
-			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy(), timeout, interval)
+			err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy())
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -360,19 +361,19 @@ var _ = Describe("Server Test", func() {
 
 				// # of ddp learners must as expected
 				var ddpLearners corev1.PodList
-				err = k8sClient.List(ctx, &ddpLearners, client.MatchingLabels{diutil.ReplicaTypeLabel: diutil.DDPLearnerName})
+				err = k8sClient.List(ctx, &ddpLearners, client.MatchingLabels{dicommon.ReplicaTypeLabel: dicommon.DDPLearnerName})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(ddpLearners.Items)).Should(Equal(c.expectedDDPL))
 
 				// # of aggregators must be as expected
 				var aggs corev1.PodList
-				err = k8sClient.List(ctx, &aggs, client.MatchingLabels{diutil.ReplicaTypeLabel: diutil.AggregatorName})
+				err = k8sClient.List(ctx, &aggs, client.MatchingLabels{dicommon.ReplicaTypeLabel: dicommon.AggregatorName})
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(aggs.Items)).Should(Equal(c.expectedAgg))
 
 				// # of ddp learner service ports must be as expected
 				var svcs corev1.ServiceList
-				err = k8sClient.List(ctx, &svcs, client.MatchingLabels{diutil.ReplicaTypeLabel: diutil.DDPLearnerName})
+				err = k8sClient.List(ctx, &svcs, client.MatchingLabels{dicommon.ReplicaTypeLabel: dicommon.DDPLearnerName})
 				Expect(err).NotTo(HaveOccurred())
 				portCount := 0
 				for _, svc := range svcs.Items {
@@ -423,7 +424,7 @@ var _ = Describe("Server Test", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(len(dnjresp.Learners)).Should(Equal(dln))
 
-				err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy(), timeout, interval)
+				err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy())
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})

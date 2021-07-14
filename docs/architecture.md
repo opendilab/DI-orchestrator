@@ -1,20 +1,20 @@
 # DI Operator architecture
-DI framework consists of 3 important modules, namely coordinator, collector and learner. In general, a nerveX training job has only one coordinator, and the number of learners and collectors can vary. The roles of the three modules are:
+DI-engine framework consists of 3 important modules, namely coordinator, collector and learner. In general, a DI-engine training job has only one coordinator, and the number of learners and collectors can vary. The roles of the three modules are:
 - Coordinator. Maintain connections with collectors and learners, accept meta-infos requests and posts from collectors and learners, and send tasks to collectors and learners.
 - Collector. Request path to RL model stored in storage middleware from coordinator, load the RL model, and then generate data frames according to the RL model's steps from environment. Store the data frames back to the storage middleware, and report meta-infos (the storage path, size, etc.) of the data frames to coordinator.
 - Learner: Request data frames storage path from coordinator and load the data frames from storage middleware to start training the RL model. After the training is completed, store the model into the storage middleware, and report model meta-infos (storage path, size, etc.) to coordinator. Because we often need to use distributed mechanism of data parallel training, to avoid confusion, we call the module interacting with coordinator the logic learner, which is the basic unit for coordinator to issue tasks. And the single learner process in the data parallel training is called ddp learner, and multiple ddp learner processes provide data parallel services. One logic learner can correspond to one ddp learner (single-gpu) or multiple ddp learners (multi-gpu). In addition, to provide data parallel training services, an additional aggregator module needs to be introduced. The aggregator is responsible for summarizing the training results of multiple ddp learners and sending them to coordinator. That is, the aggregator and multiple ddp learners form a logic learner, and coordinator will only interact with logic learners.
 
-For the introduction of nerveX, please refer to [nerveX developer tutorial](http://open-xlab.pages.gitlab.bj.sensetime.com/cell/nerveX/tutorial_dev/index.html).
+For the introduction of DI-engine, please refer to [DI-engine developer tutorial](https://opendilab.github.io/DI-engine/tutorial_dev/index.html).
 
-In order to provide running support for nerveX in Kubernetes (K8s), we designed `DI Orchestrator`. This article will explain how to use DI Orchestrator, how each module of nerveX is created on K8s and discovers each other, how to start training, etc. The architecture of DI Orchestrator is shown in the figure below:
+In order to provide running support for DI-engine in Kubernetes (K8s), we designed `DI Orchestrator`. This article will explain how to use DI Orchestrator, how each module of DI-engine is created on K8s and discovers each other, how to start training, etc. The architecture of DI Orchestrator is shown in the figure below:
 
-![](images/di-arch.png)
+![](images/di-arch.svg)
 
 There are two main modules that is `di-server` and `di-operator`. 
-`DDPL` represents ddp learner, `Lm` represents logic learner, `Cn` represents collector, and `Aggregator+DDPL` constructs a logic learner. In the following pages, we will first introduce how `DI Orchestrator` creates and starts each module of nerveX after a nerveX job is submitted to K8s, and then introduces the architecture of `di-server` and `di-operator`.
+`DDPL` represents ddp learner, `Lm` represents logic learner, `Cn` represents collector, and `Aggregator+DDPL` constructs a logic learner. In the following pages, we will first introduce how `DI Orchestrator` creates and starts each module of DI-engine after a DI-engine job is submitted to K8s, and then introduces the architecture of `di-server` and `di-operator`.
 
 ## Job creation process
-Here is a description of the job creation process, illustrating the entire life cycle of a nerveX job from creation to execution in K8s.
+Here is a description of the job creation process, illustrating the entire life cycle of a DI-engine job from creation to execution in K8s.
 - Edit the AggregatorConfig yaml file to define the aggregator template, which will be used to create aggregators when DIJob is created later. Aggregator can provide data parallel training services.
 - Edit the DIJob yaml file to define the template of coordinator, collector and learner, and submit it to K8s.
 - After di-operator received the event of DIJob submission, it creates a coordinator, and creates an accessible domain name for the coordinator.
@@ -25,7 +25,7 @@ Here is a description of the job creation process, illustrating the entire life 
 - When the training is completed, di-operator will delete all collectors, learners by default, while coordinator will be reserved for users to view logs and other operations.
 
 ## DI Operator
-Ding-operator is a component responsible for orchestrating DIJob in K8s. It uses K8s [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) to monitor the status of DIJob objects in K8s cluster through the control loop in [controller pattern](https://kubernetes.io/docs/concepts/architecture/controller/), and to update the status of DIJob when necessary. The status is modified so that the actual status of DIJob is as consistent as possible with our predefined status.
+Di-operator is a component responsible for orchestrating DIJob in K8s. It uses K8s [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) to monitor the status of DIJob objects in K8s cluster through the control loop in [controller pattern](https://kubernetes.io/docs/concepts/architecture/controller/), and to update the status of DIJob when necessary. The status is modified so that the actual status of DIJob is as consistent as possible with our predefined status.
 
 ### API definition
 According to the characteristics of each module, we have defined two Custom Resources, namely DIJob and AggregatorConfig. The former is used to define the prerequisites for coordinator, collector and learner to start running, including docker images, startup commands, computing and storage resources, environment variables, etc. The latter is used to define the prerequisites for aggregator.
@@ -42,7 +42,7 @@ type DIJobSpec struct {
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
 
-	// Volumes defines the shared volumes for nerveX components
+	// Volumes defines the shared volumes for DI-engine components
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	Coordinator CoordinatorSpec `json:"coordinator"`
@@ -61,7 +61,7 @@ type AggregatorConfigSpec struct {
 ```
 
 > **Why should aggregator be defined alone?**
-    Aggregator is common module for all RL training jobs using nerveX framework, so we define the aggregator as a global and shared resource named AggregatorConfig. After RL jobs are submitted, di-server will read the global AggregatorConfig in K8s cluster to create aggregators for these RL jobs. In addition, aggregator is only for most common data parallel training. You need to define a new Custom Resource if other parallel training methods are used.
+    Aggregator is common module for all RL training jobs using DI-engine framework, so we define the aggregator as a global and shared resource named AggregatorConfig. After RL jobs are submitted, di-server will read the global AggregatorConfig in K8s cluster to create aggregators for these RL jobs. In addition, aggregator is only for most common data parallel training. You need to define a new Custom Resource if other parallel training methods are used.
 ### Status definition
 After DIJob is submitted, di-operator takes over the management of the life cycle of the DIJob. In order to facilitate the user to have a better view of the DIJob's status, we define the following phases:
 
@@ -105,7 +105,7 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 When DIJob is submitted, we firstly list pods that belong to DIJob in the Reconcile function and find that the coordinator has not been created. Then we read the coordinator template defined in DIJob and create the corresponding coordinator pod (used to run coordinator main process) and service (used for inter-pod communication), and write some environment variables into the pod, including the name of the pod, the namespace of the pod, the port which coordinator listens to, and the URL to access the coordinator.
 
-The port occupied by each module of the nerveX framework has a default value, as shown below:
+The port occupied by each module of the DI-engine framework has a default value, as shown below:
 
 ```go
 DefaultCollectorPort   = 22270
@@ -124,7 +124,7 @@ To achieve the above goals, we can configure webhooks in K8s. K8s webhook consis
 The webhook verification is implemented in di-operator. MutatingWebhook is created to set the default value for DIJob; ValidatingWebhook is created to verify the correctness of DIJob. For example, for the `CleanPodPolicy` field in DIJob, we set its default value in MutatingWebhook to `Running`, which means that all running pods will be deleted after DIJob is completed. We verify the value of the `CleanPodPolicy` field in ValidatingWebhook, if the value set by the user is not equal to any of `None`, `ALL`, or `Running`, the DIJob will be rejected.
 
 ## DI Server
-Ding-server is an http server customized for nerveX framework, providing the apis of adding, deleting, and querying collectors, learners, and aggregators. By calling the related apis of di-server, di-server can provide DIJob with the ability to dynamically scale collectors and learners. The following will briefly introduce the design of di-server, including the local cache for storing AggregatorConfig, DIJob and all pods of DIJob; the http interface design for dynamically adding, deleting and querying collectors, learners and aggregators.
+Di-server is an http server customized for DI-engine framework, providing the apis of adding, deleting, and querying collectors, learners, and aggregators. By calling the related apis of di-server, di-server can provide DIJob with the ability to dynamically scale collectors and learners. The following will briefly introduce the design of di-server, including the local cache for storing AggregatorConfig, DIJob and all pods of DIJob; the http interface design for dynamically adding, deleting and querying collectors, learners and aggregators.
 
 ### Local cache
 In order to reduce the frequency of queries between di-server and K8s api server, thereby reducing the burden of K8s api server, we use [client-go](https://github.com/kubernetes/client-go)'s informer mechanism to store AggregatorConfig, DIJob and all pods of DIJob in local cache, as shown in the following figure
@@ -147,7 +147,7 @@ In order to support dynamic scaling of collectors/learners for DIJobs, di-server
 
 ![](images/di-api.png)
 
-提供如下接口：
+The following http interfaces are provided:
 
 | method  |  path |  description |
 |---|---|---|
@@ -159,11 +159,10 @@ In order to support dynamic scaling of collectors/learners for DIJobs, di-server
 | POST  | /v1alpha1/replicas  | create replicas. put data in request body  |
 | POST  | /v1alpha1/replicas/failed  | post failed replicas and request for recreation. put data in request body  |
 
-For the request format, request parameters, request body, and return value of each interface, please refer to [http interface definition](https://gitlab.bj.sensetime.com/platform/CloudNative4AI/cluster-lifecycle/di-operator/issues/6)。
 
 ## Advantages of DI Orchestrator
-DI Orchestrator provides a K8s-based container-orchestration solution for the nerveX framework in a distributed scenario. For a DIJob, di-operator is responsible for arranging the various modules of nerveX so that each module can run normally and perform training tasks. By calling di-server’s HTTP interface, coordinator is given the ability to add, delete, and query all its collectors, learners, aggregators and improve the dynamic allocation of nerveX framework resources. In summary, DI Orchestrator provides the following advantages:
-1. Encapsulation. Relying on the orchestration capabilities of di-operator, deploying nerveX distributed RL training (including pod creation and service discovery) are transparent to us. According to the deployment requirements of the nerveX framework for distributed RL training, di-operator will create coordinator, and then the coordinator will request di-server to create other modules. Ding-operator will record the status of the pod of each module into the status of the DIJob. The life cycle of DIJob is also maintained by di-operator, providing us with status of DIJob in different stages.
-2. Ease of use. We only need to define the configuration of coordinator, collector, and learner in the yaml file of DIJob, and submit them to K8s cluster with one click. Ding-operator will be responsible for deploying nerveX RL trainings and liberating us from the complex distributed RL deployments in K8s cluster.
-3. Robustness. Relying on the pod restart mechanism of K8s, it ensures that pods can automatically restart in the event of an unexpected exit, and the coordinator can respond quickly and reconnect.
-4. Dynamic expansion. Collectors/learners required by DIJob is dynamically changing, so di-server provides HTTP interfaces to allow us to dynamically adjust the number of collectors/learners, so that DIJob can adjust the ratio of collectors and learners according to its own needs to optimize throughput.
+DI Orchestrator provides a K8s-based container-orchestration solution for the DI-engine framework in a distributed scenario. For a DIJob, di-operator is responsible for arranging the various modules of DI-engine so that each module can run normally and perform training tasks. By calling di-server’s HTTP interface, coordinator is given the ability to add, delete, and query all its collectors, learners, aggregators and improve the dynamic allocation of DI-engine framework resources. In summary, DI Orchestrator provides the following advantages:
+1. Encapsulation. Relying on the orchestration capabilities of di-operator, deploying DI-engine distributed RL training (including pod creation and service discovery) is transparent to us. According to the deployment requirements of the DI-engine framework for distributed RL training, di-operator will create coordinator, and then the coordinator will request di-server to create other modules. Di-operator will record the status of the pod of each module into the status of the DIJob. The life cycle of DIJob is also maintained by di-operator, providing us with status of DIJob in different stages.
+2. Ease of use. We only need to define the configuration of coordinator, collector, and learner in the yaml file of DIJob, and submit them to K8s cluster with one click. Di-operator will be responsible for deploying DI-engine RL training and liberating us from the complex distributed RL deployments in K8s cluster.
+3. Robustness. Relying on the pod restart mechanism of K8s, ensures that pods can automatically restart in the event of an unexpected exit, and the coordinator can respond quickly and reconnect.
+4. Dynamic expansion. Collectors/learners required by DIJob are dynamically changing, so di-server provides HTTP interfaces to allow us to dynamically adjust the number of collectors/learners, so that DIJob can adjust the ratio of collectors and learners according to its own needs to optimize throughput.

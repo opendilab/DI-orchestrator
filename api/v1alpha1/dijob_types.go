@@ -38,7 +38,7 @@ type DIJobSpec struct {
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
 
-	// Volumes defines the shared volumes for nerveX components
+	// Volumes defines the shared volumes for DI-engine components
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	Coordinator CoordinatorSpec `json:"coordinator"`

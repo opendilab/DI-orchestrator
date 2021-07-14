@@ -23,7 +23,7 @@ spec:
         - "--leader-elect"
         - "--lease-lock-namespace=di-system"
         - "--lease-lock-name=di-server"
-        image: registry.sensetime.com/cloudnative4ai/di-server:v0.0.1-alpha.0
+        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.0-alpha.0
         imagePullPolicy: Always
         name: server
         securityContext:

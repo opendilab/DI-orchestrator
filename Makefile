@@ -1,6 +1,6 @@
 
 # di-operator version
-VERSION ?= v0.1.0
+VERSION ?= v0.2.0-alpha.0
 MASTER_VERSION := $(VERSION)
 
 COMMIT_SHORT_SHA=$(shell git log -n 1 | head -n 1 | sed -e 's/^commit //' | head -c 8)
@@ -81,7 +81,16 @@ lint:
 
 .PHONY: test
 test: ginkgo ## Run tests.
-	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./... 
+	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./api/v1alpha1 ./controllers ./server/http ./common/gpuallocator 
+	go tool cover -func=./api/v1alpha1/coverage.out 
+	go tool cover -func=./controllers/coverage.out 
+	go tool cover -func=./server/http/coverage.out 
+	go tool cover -func=./common/gpuallocator/coverage.out
+
+.PHONY: e2e-test
+e2e-test: ## Run e2e tests.
+	go test -timeout 20m  -v ./e2e -shared-volumes-dir /data/nfs/ding/cartpole --kubeconfig ~/.kube/config
+	go tool cover -func=./e2e/coverage.out 
 
 ##@ Build
 

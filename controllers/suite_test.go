@@ -53,7 +53,7 @@ const (
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
-func TestAPIs(t *testing.T) {
+func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecsWithDefaultAndCustomReporters(t,

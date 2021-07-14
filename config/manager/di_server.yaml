@@ -23,7 +23,7 @@ spec:
         - "--leader-elect"
         - "--lease-lock-namespace=di-system"
         - "--lease-lock-name=di-server"
-        image: diorchestrator/di-server:v0.1.0
+        image: diorchestrator/di-server:v0.2.0-alpha.0
         imagePullPolicy: Always
         name: server
         securityContext:

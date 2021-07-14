@@ -27,7 +27,7 @@ spec:
         - /di-operator
         args:
         - "--server-address=http://di-server.di-system:8080"
-        image: diorchestrator/di-operator:v0.1.0
+        image: diorchestrator/di-operator:v0.2.0-alpha.0
         imagePullPolicy: Always
         name: manager
         securityContext:

@@ -105,6 +105,8 @@ docker-push: ## Push docker image with the di-operator.
 	docker push ${SERVER_IMG}
 
 docker-release: ## Release docker image with the di-operator.
+	docker pull ${IMG}
+	docker pull ${SERVER_IMG}
 	docker tag ${IMG} ${MASTER_IMG}
 	docker tag ${SERVER_IMG} ${MASTER_SERVER_IMG}
 	docker push ${MASTER_IMG} 

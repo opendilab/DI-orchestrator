@@ -1,0 +1,58 @@
+name: Go
+
+on:
+  - push
+  - pull_request
+
+jobs:
+
+  lint: 
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15
+    - name: lint
+      shell: bash
+      run: |
+        # binary will be $(go env GOPATH)/bin/golangci-lint
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.41.1
+        # or install it into ./bin/
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.41.1
+        # In alpine linux (as it does not come with curl by default)
+        wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.41.1
+        golangci-lint --version
+
+        make lint
+  
+  unit-test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15
+    - name: Test
+      shell: bash
+      run: |
+        # download etcd to bootstrap test environment
+        curl -L https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.2/kubebuilder_2.3.2_linux_amd64.tar.gz  | tar -xz -C /tmp/
+        mv /tmp/kubebuilder_2.3.2_linux_amd64 /tmp/kubebuilder
+        export KUBEBUILDER_ASSETS=/tmp/kubebuilder/bin
+        make test
+  
+  build:
+    needs: unit-test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.15
+    - name: Build Bin
+      run: make build

@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 
-	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 )
 
 var (
@@ -34,7 +34,7 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 		Resource: "aggregatorconfigs",
 	}
 
-	// add NervexJob informer
+	// add DIJob informer
 	njGVR := schema.GroupVersionResource{
 		Group:    div1alpha1.GroupVersion.Group,
 		Version:  div1alpha1.GroupVersion.Version,

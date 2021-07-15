@@ -17,11 +17,12 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
-	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
-	dicommon "go-sensephoenix.sensetime.com/di-orchestrator/common"
-	serverdynamic "go-sensephoenix.sensetime.com/di-orchestrator/server/dynamic"
-	servertypes "go-sensephoenix.sensetime.com/di-orchestrator/server/types"
-	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
+	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
+	gpualloc "opendilab.org/di-orchestrator/common/gpuallocator"
+	serverdynamic "opendilab.org/di-orchestrator/server/dynamic"
+	servertypes "opendilab.org/di-orchestrator/server/types"
+	diutil "opendilab.org/di-orchestrator/utils"
 )
 
 var (
@@ -40,7 +41,7 @@ type DIServer struct {
 	Log           logr.Logger
 	AGConfig      string
 	dyi           serverdynamic.Informers
-	gpuAllocator  dicommon.GPUAllocator
+	gpuAllocator  gpualloc.GPUAllocator
 }
 
 func NewDIServer(
@@ -51,10 +52,10 @@ func NewDIServer(
 	dyi serverdynamic.Informers,
 	gpuAllocPolicy string) *DIServer {
 
-	var gpuAllocator dicommon.GPUAllocator
+	var gpuAllocator gpualloc.GPUAllocator
 	switch gpuAllocPolicy {
-	case dicommon.SimpleGPUAllocPolicy:
-		gpuAllocator = *dicommon.NewSimpleGPUAllocator([]*corev1.Node{})
+	case gpualloc.SimpleGPUAllocPolicy:
+		gpuAllocator = *gpualloc.NewSimpleGPUAllocator([]*corev1.Node{})
 	}
 	return &DIServer{
 		KubeClient:    kubeClient,
@@ -200,9 +201,9 @@ func (s *DIServer) getNamespacedReplicas(namespace string) ([]servertypes.DIJobR
 
 	// construct label selector to list coordinators in namespace
 	lbs := map[string]string{
-		diutil.GroupNameLabel:      div1alpha1.GroupVersion.Group,
-		diutil.ControllerNameLabel: diutil.ControllerName,
-		diutil.ReplicaTypeLabel:    diutil.CoordinatorName,
+		dicommon.GroupNameLabel:      div1alpha1.GroupVersion.Group,
+		dicommon.ControllerNameLabel: dicommon.ControllerName,
+		dicommon.ReplicaTypeLabel:    dicommon.CoordinatorName,
 	}
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: lbs,
@@ -326,7 +327,7 @@ func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorNam
 
 		// append all gpu process access urls to response
 		for _, port := range svc.Spec.Ports {
-			if !strings.HasPrefix(port.Name, diutil.DDPLearnerPortPrefix) {
+			if !strings.HasPrefix(port.Name, dicommon.DDPLearnerPortPrefix) {
 				continue
 			}
 			url := diutil.ConcatURL(svc.Name, namespace, port.Port)
@@ -411,7 +412,7 @@ func (s *DIServer) deleteReplicas(r *http.Request) (servertypes.DIJobResponse, e
 	}
 
 	// delete collector pods
-	delCollectors, err := s.deleteSpecifiedReplicas(collectors, njreq.Namespace, njreq.Collectors.Replicas, diutil.CollectorName)
+	delCollectors, err := s.deleteSpecifiedReplicas(collectors, njreq.Namespace, njreq.Collectors.Replicas, dicommon.CollectorName)
 	if err != nil {
 		return servertypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
@@ -422,7 +423,7 @@ func (s *DIServer) deleteReplicas(r *http.Request) (servertypes.DIJobResponse, e
 	}
 
 	// delete learner pods
-	delLearners, err := s.deleteSpecifiedReplicas(learners, njreq.Namespace, njreq.Learners.Replicas, diutil.LearnerName)
+	delLearners, err := s.deleteSpecifiedReplicas(learners, njreq.Namespace, njreq.Learners.Replicas, dicommon.LearnerName)
 	if err != nil {
 		return servertypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
@@ -434,7 +435,7 @@ func (s *DIServer) deleteReplicas(r *http.Request) (servertypes.DIJobResponse, e
 
 	// aggregator is also considered a learner
 	if len(delLearners) <= 0 {
-		delAggs, err := s.deleteSpecifiedReplicas(aggs, njreq.Namespace, njreq.Learners.Replicas, diutil.AggregatorName)
+		delAggs, err := s.deleteSpecifiedReplicas(aggs, njreq.Namespace, njreq.Learners.Replicas, dicommon.AggregatorName)
 		if err != nil {
 			return servertypes.DIJobResponse{
 				Namespace:   njreq.Namespace,

@@ -17,7 +17,8 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
+	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
 )
 
 const (
@@ -30,6 +31,22 @@ func init() {
 
 func GenerateName(name string) string {
 	return fmt.Sprintf("%s-%s", name, utilrand.String(randomLength))
+}
+
+func ReplicaPodName(name, replicaType string) string {
+	return fmt.Sprintf("%s-%s", name, replicaType)
+}
+
+func NamespacedName(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
+}
+
+func SplitNamespaceName(namespaceName string) (types.NamespacedName, error) {
+	strs := strings.Split(namespaceName, "/")
+	if len(strs) != 2 {
+		return types.NamespacedName{}, fmt.Errorf("Invalid namespace, name %s", namespaceName)
+	}
+	return types.NamespacedName{Namespace: strs[0], Name: strs[1]}, nil
 }
 
 func GetObjectFromUnstructured(obj interface{}, dest interface{}) error {
@@ -45,13 +62,13 @@ func GetObjectFromUnstructured(obj interface{}, dest interface{}) error {
 	return nil
 }
 
-func GetPortFromPod(pod *corev1.Pod) (int32, bool) {
+func GetDefaultPortFromPod(pod *corev1.Pod) (int32, bool) {
 	for _, c := range pod.Spec.Containers {
-		if c.Name != DefaultContainerName {
+		if c.Name != dicommon.DefaultContainerName {
 			continue
 		}
 		for _, port := range c.Ports {
-			if port.Name == DefaultPortName {
+			if port.Name == dicommon.DefaultPortName {
 				return port.ContainerPort, true
 			}
 		}
@@ -59,16 +76,16 @@ func GetPortFromPod(pod *corev1.Pod) (int32, bool) {
 	return -1, false
 }
 
-func SetPortForPod(pod *corev1.Pod, port int32) {
+func AddDefaultPortToPod(pod *corev1.Pod, port int32) {
 	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name != DefaultContainerName {
+		if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
 			continue
 		}
 		if pod.Spec.Containers[i].Ports == nil {
 			pod.Spec.Containers[i].Ports = []corev1.ContainerPort{}
 		}
 		portObj := corev1.ContainerPort{
-			Name:          DefaultPortName,
+			Name:          dicommon.DefaultPortName,
 			ContainerPort: port,
 		}
 		pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, portObj)
@@ -78,9 +95,9 @@ func SetPortForPod(pod *corev1.Pod, port int32) {
 func GenLabels(jobName string) map[string]string {
 	groupName := div1alpha1.GroupVersion.Group
 	return map[string]string{
-		GroupNameLabel:      groupName,
-		JobNameLabel:        strings.Replace(jobName, "/", "-", -1),
-		ControllerNameLabel: ControllerName,
+		dicommon.GroupNameLabel:      groupName,
+		dicommon.JobNameLabel:        strings.Replace(jobName, "/", "-", -1),
+		dicommon.ControllerNameLabel: dicommon.ControllerName,
 	}
 }
 
@@ -90,6 +107,22 @@ func AddLabelsToPod(pod *corev1.Pod, labels map[string]string) {
 	}
 	for k, v := range labels {
 		pod.ObjectMeta.Labels[k] = v
+	}
+}
+
+func AddEnvsToPod(pod *corev1.Pod, envs map[string]string) {
+	// add env
+	for i := range pod.Spec.Containers {
+		if len(pod.Spec.Containers[i].Env) == 0 {
+			pod.Spec.Containers[i].Env = make([]corev1.EnvVar, 0)
+		}
+		for k, v := range envs {
+			env := corev1.EnvVar{
+				Name:  k,
+				Value: v,
+			}
+			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, env)
+		}
 	}
 }
 
@@ -103,19 +136,19 @@ func BuildPodFromTemplate(
 	portEnv := ""
 	podName := ReplicaPodName(jobName, replicaType)
 	switch replicaType {
-	case CollectorName:
+	case dicommon.CollectorName:
 		portEnv = "COLLECTOR_PORT"
 		podName = GenerateName(podName)
-	case LearnerName:
+	case dicommon.LearnerName:
 		portEnv = "LEARNER_PORT"
 		podName = GenerateName(podName)
-	case DDPLearnerName:
+	case dicommon.DDPLearnerName:
 		portEnv = "LEARNER_PORT"
 		podName = GenerateName(podName)
-	case AggregatorName:
+	case dicommon.AggregatorName:
 		portEnv = "AGGREGATOR_PORT"
 		podName = GenerateName(podName)
-	case CoordinatorName:
+	case dicommon.CoordinatorName:
 		portEnv = "COORDINATOR_PORT"
 	default:
 		return nil, -1, fmt.Errorf("wrong replica type: %s", replicaType)
@@ -137,43 +170,23 @@ func BuildPodFromTemplate(
 
 	// add labels to pod
 	labels := GenLabels(jobName)
-	labels[ReplicaTypeLabel] = replicaType
-	labels[PodNameLabel] = pod.Name
+	labels[dicommon.ReplicaTypeLabel] = replicaType
+	labels[dicommon.PodNameLabel] = pod.Name
 	AddLabelsToPod(pod, labels)
 
 	// get pod port
-	port, ok := GetPortFromPod(pod)
+	port, ok := GetDefaultPortFromPod(pod)
 	if !ok {
 		port = defaultPort
-		logrus.Infof("no port found, use default port for container %s port %d", DefaultContainerName, port)
-		SetPortForPod(pod, port)
+		logrus.Infof("no port found, use default port for container %s port %d", dicommon.DefaultContainerName, port)
+		AddDefaultPortToPod(pod, port)
 	}
 
 	// add env
 	envs := make(map[string]string)
 	envs[portEnv] = fmt.Sprintf("%d", port)
-	SetPodEnv(pod, envs)
+	AddEnvsToPod(pod, envs)
 	return pod, port, nil
-}
-
-func ReplicaPodName(name, replicaType string) string {
-	return fmt.Sprintf("%s-%s", name, replicaType)
-}
-
-func SetPodEnv(pod *corev1.Pod, envs map[string]string) {
-	// add env
-	for i := range pod.Spec.Containers {
-		if len(pod.Spec.Containers[i].Env) == 0 {
-			pod.Spec.Containers[i].Env = make([]corev1.EnvVar, 0)
-		}
-		for k, v := range envs {
-			env := corev1.EnvVar{
-				Name:  k,
-				Value: v,
-			}
-			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, env)
-		}
-	}
 }
 
 func BuildService(labels map[string]string, port int32) *corev1.Service {
@@ -188,7 +201,7 @@ func BuildService(labels map[string]string, port int32) *corev1.Service {
 			Ports: []corev1.ServicePort{
 				{
 					Port: port,
-					Name: DefaultPortName,
+					Name: dicommon.DefaultPortName,
 				},
 			},
 		},
@@ -197,24 +210,12 @@ func BuildService(labels map[string]string, port int32) *corev1.Service {
 	return svc
 }
 
-func NamespacedName(namespace, name string) string {
-	return fmt.Sprintf("%s/%s", namespace, name)
-}
-
-func SplitNamespaceName(namespaceName string) (types.NamespacedName, error) {
-	strs := strings.Split(namespaceName, "/")
-	if len(strs) != 2 {
-		return types.NamespacedName{}, fmt.Errorf("Invalid namespace, name %s", namespaceName)
-	}
-	return types.NamespacedName{Namespace: strs[0], Name: strs[1]}, nil
-}
-
 func ConcatURL(name, ns string, port int32) string {
 	return fmt.Sprintf("%s.%s:%d", name, ns, port)
 }
 
 func GetPodAccessURL(pod *corev1.Pod, defaultPort int32) string {
-	port, found := GetPortFromPod(pod)
+	port, found := GetDefaultPortFromPod(pod)
 	if !found {
 		port = defaultPort
 	}
@@ -224,7 +225,7 @@ func GetPodAccessURL(pod *corev1.Pod, defaultPort int32) string {
 func GetServiceAccessURL(service *corev1.Service) string {
 	url := ""
 	for _, port := range service.Spec.Ports {
-		if port.Name == DefaultPortName {
+		if port.Name == dicommon.DefaultPortName {
 			url = ConcatURL(service.Name, service.Namespace, port.Port)
 			break
 		}
@@ -283,30 +284,30 @@ func ListServices(ctx context.Context, cli client.Client, job *div1alpha1.DIJob)
 func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*corev1.Pod,
 	coordinator *corev1.Pod, aggregators []*corev1.Pod, DDPLearners []*corev1.Pod, err error) {
 	// filter out collectors
-	collectors, err = filterReplicaPods(pods, CollectorName)
+	collectors, err = filterReplicaPods(pods, dicommon.CollectorName)
 	if err != nil {
 		return
 	}
 
 	// filter out leader pods
-	learners, err = filterReplicaPods(pods, LearnerName)
+	learners, err = filterReplicaPods(pods, dicommon.LearnerName)
 	if err != nil {
 		return
 	}
 
 	// filter out coordinator pod
-	coordinators, err := filterReplicaPods(pods, CoordinatorName)
+	coordinators, err := filterReplicaPods(pods, dicommon.CoordinatorName)
 	if err != nil {
 		return
 	}
 
 	// filter aggregator pod
-	aggregators, err = filterReplicaPods(pods, AggregatorName)
+	aggregators, err = filterReplicaPods(pods, dicommon.AggregatorName)
 	if err != nil {
 		return
 	}
 
-	DDPLearners, err = filterReplicaPods(pods, DDPLearnerName)
+	DDPLearners, err = filterReplicaPods(pods, dicommon.DDPLearnerName)
 	if err != nil {
 		return
 	}
@@ -324,7 +325,7 @@ func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*cor
 
 func filterReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: map[string]string{ReplicaTypeLabel: replicaType},
+		MatchLabels: map[string]string{dicommon.ReplicaTypeLabel: replicaType},
 	})
 	if err != nil {
 		return nil, err
@@ -336,6 +337,66 @@ func filterReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod, e
 			continue
 		}
 		result = append(result, pod)
+	}
+	return result, nil
+}
+
+func ClassifyServices(services []*corev1.Service) (collectors []*corev1.Service, learners []*corev1.Service,
+	coordinator *corev1.Service, aggregators []*corev1.Service, DDPLearners []*corev1.Service, err error) {
+	// filter out collectors
+	collectors, err = filterReplicaServices(services, dicommon.CollectorName)
+	if err != nil {
+		return
+	}
+
+	// filter out leader services
+	learners, err = filterReplicaServices(services, dicommon.LearnerName)
+	if err != nil {
+		return
+	}
+
+	// filter out coordinator service
+	coordinators, err := filterReplicaServices(services, dicommon.CoordinatorName)
+	if err != nil {
+		return
+	}
+
+	// filter aggregator service
+	aggregators, err = filterReplicaServices(services, dicommon.AggregatorName)
+	if err != nil {
+		return
+	}
+
+	DDPLearners, err = filterReplicaServices(services, dicommon.DDPLearnerName)
+	if err != nil {
+		return
+	}
+
+	if len(coordinators) > 1 {
+		err = fmt.Errorf("there must be only one coordinator")
+		return
+	}
+	if len(coordinators) < 1 {
+		return
+	}
+	coordinator = coordinators[0]
+	return
+}
+
+func filterReplicaServices(services []*corev1.Service, replicaType string) ([]*corev1.Service, error) {
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{dicommon.ReplicaTypeLabel: replicaType},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := []*corev1.Service{}
+	for _, service := range services {
+		if !selector.Matches(labels.Set(service.Labels)) {
+			continue
+		}
+		result = append(result, service)
 	}
 	return result, nil
 }
@@ -355,64 +416,4 @@ func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 // IsTerminating returns true if pod's DeletionTimestamp has been set
 func IsTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
-}
-
-func ClassifyServices(services []*corev1.Service) (collectors []*corev1.Service, learners []*corev1.Service,
-	coordinator *corev1.Service, aggregators []*corev1.Service, DDPLearners []*corev1.Service, err error) {
-	// filter out collectors
-	collectors, err = filterReplicaServices(services, CollectorName)
-	if err != nil {
-		return
-	}
-
-	// filter out leader services
-	learners, err = filterReplicaServices(services, LearnerName)
-	if err != nil {
-		return
-	}
-
-	// filter out coordinator service
-	coordinators, err := filterReplicaServices(services, CoordinatorName)
-	if err != nil {
-		return
-	}
-
-	// filter aggregator service
-	aggregators, err = filterReplicaServices(services, AggregatorName)
-	if err != nil {
-		return
-	}
-
-	DDPLearners, err = filterReplicaServices(services, DDPLearnerName)
-	if err != nil {
-		return
-	}
-
-	if len(coordinators) > 1 {
-		err = fmt.Errorf("there must be only one coordinator")
-		return
-	}
-	if len(coordinators) < 1 {
-		return
-	}
-	coordinator = coordinators[0]
-	return
-}
-
-func filterReplicaServices(services []*corev1.Service, replicaType string) ([]*corev1.Service, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: map[string]string{ReplicaTypeLabel: replicaType},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	result := []*corev1.Service{}
-	for _, service := range services {
-		if !selector.Matches(labels.Set(service.Labels)) {
-			continue
-		}
-		result = append(result, service)
-	}
-	return result, nil
 }

@@ -6,7 +6,7 @@ kind: Kustomization
 images:
 - name: registry.sensetime.com/cloudnative4ai/di-operator
   newName: registry.sensetime.com/cloudnative4ai/di-operator
-  newTag: v0.0.1-alpha.0
+  newTag: v0.2.0-alpha.0
 - name: registry.sensetime.com/cloudnative4ai/di-server
   newName: registry.sensetime.com/cloudnative4ai/di-server
-  newTag: v0.0.1-alpha.0
+  newTag: v0.2.0-alpha.0

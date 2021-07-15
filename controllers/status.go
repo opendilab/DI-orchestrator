@@ -10,8 +10,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
-	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
+	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/common"
+	diutil "opendilab.org/di-orchestrator/utils"
 )
 
 const (
@@ -134,13 +135,13 @@ func updateReplicaStatus(pod *corev1.Pod, job *div1alpha1.DIJob, replicaType div
 	containerName := ""
 	switch replicaType {
 	case div1alpha1.ReplicaTypeCoordinator:
-		containerName = diutil.CoordinatorName
+		containerName = dicommon.CoordinatorName
 	case div1alpha1.ReplicaTypeAggregator:
-		containerName = diutil.AggregatorName
+		containerName = dicommon.AggregatorName
 	case div1alpha1.ReplicaTypeCollector:
-		containerName = diutil.CollectorName
+		containerName = dicommon.CollectorName
 	case div1alpha1.ReplicaTypeLearner:
-		containerName = diutil.LearnerName
+		containerName = dicommon.LearnerName
 	}
 	switch pod.Status.Phase {
 	case corev1.PodRunning:

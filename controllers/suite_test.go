@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The SensePhoenix authors.
+Copyright 2021 The OpenDILab authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,8 +35,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	div1alpha1 "go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1"
-	testutil "go-sensephoenix.sensetime.com/di-orchestrator/utils/testutils"
+	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	testutil "opendilab.org/di-orchestrator/utils/testutils"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -53,7 +53,7 @@ const (
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
-func TestAPIs(t *testing.T) {
+func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecsWithDefaultAndCustomReporters(t,

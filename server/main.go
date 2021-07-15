@@ -21,10 +21,10 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	dicommon "go-sensephoenix.sensetime.com/di-orchestrator/common"
-	serverdynamic "go-sensephoenix.sensetime.com/di-orchestrator/server/dynamic"
-	serverhttp "go-sensephoenix.sensetime.com/di-orchestrator/server/http"
-	diutil "go-sensephoenix.sensetime.com/di-orchestrator/utils"
+	dicommon "opendilab.org/di-orchestrator/common"
+	gpualloc "opendilab.org/di-orchestrator/common/gpuallocator"
+	serverdynamic "opendilab.org/di-orchestrator/server/dynamic"
+	serverhttp "opendilab.org/di-orchestrator/server/http"
 )
 
 var (
@@ -51,8 +51,8 @@ func main() {
 	flag.StringVar(&leaseLockName, "lease-lock-name", DefaultLeaseLockName, "The lease lock resource name")
 	flag.StringVar(&agconfigNamespace, "agconfig-namespace", DefaultAGConfigNamespace, "The AggregatorConfig namespace to manage actors and learners.")
 	flag.StringVar(&agconfigName, "agconfig-name", DefaultAGConfigName, "The AggregatorConfig name to manage actors and learners.")
-	flag.StringVar(&gpuAllocPolicy, "gpu-alloc-policy", dicommon.SimpleGPUAllocPolicy, "The policy for server to allocate gpus to pods.")
-	flag.StringVar(&serverAddr, "server-address", diutil.DefaultServerURL, "The address to connect to  server.")
+	flag.StringVar(&gpuAllocPolicy, "gpu-alloc-policy", gpualloc.SimpleGPUAllocPolicy, "The policy for server to allocate gpus to pods.")
+	flag.StringVar(&serverAddr, "server-address", dicommon.DefaultServerURL, "The address to connect to  server.")
 	flag.Parse()
 
 	kubeconfig = flag.Lookup("kubeconfig").Value.String()
@@ -83,7 +83,7 @@ func main() {
 
 	agconfig := fmt.Sprintf("%s/%s", agconfigNamespace, agconfigName)
 	diServer := serverhttp.NewDIServer(kubeClient, dynamicClient, logger, agconfig, dyi, gpuAllocPolicy)
-	diutil.DefaultServerURL = serverAddr
+	dicommon.DefaultServerURL = serverAddr
 
 	if !enableLeaderElection {
 		if err := diServer.Start(serverBindAddress); err != nil {
@@ -116,7 +116,7 @@ func main() {
 
 	// we use the Lease lock type since edits to Leases are less common
 	// and fewer objects in the cluster watch "all Leases".
-	id := fmt.Sprintf("%s.sensetime.com", uuid.New().String())
+	id := fmt.Sprintf("%s.opendilab.org", uuid.New().String())
 	lock := &resourcelock.LeaseLock{
 		LeaseMeta: metav1.ObjectMeta{
 			Name:      leaseLockName,

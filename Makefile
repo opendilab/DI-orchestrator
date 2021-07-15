@@ -1,6 +1,6 @@
 
 # di-operator version
-VERSION ?= v0.0.1-alpha.0
+VERSION ?= v0.2.0-alpha.0
 MASTER_VERSION := $(VERSION)
 
 COMMIT_SHORT_SHA=$(shell git log -n 1 | head -n 1 | sed -e 's/^commit //' | head -c 8)
@@ -58,6 +58,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG} ${SERVER_IMG_BASE}=${MASTER_SERVER_IMG}
 	./hack/update-version.sh ${MASTER_VERSION}
+	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
 
 # dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
 # used `make manifests` when commited git
@@ -65,6 +66,7 @@ dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and 
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG} ${SERVER_IMG_BASE}=${SERVER_IMG}
 	./hack/update-version.sh ${VERSION}
+	./hack/update-image-tags.sh config/manager ${VERSION}
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -81,7 +83,11 @@ lint:
 
 .PHONY: test
 test: ginkgo ## Run tests.
-	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./... 
+	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./api/v1alpha1 ./controllers ./server/http ./common/gpuallocator 
+	go tool cover -func=./api/v1alpha1/coverage.out 
+	go tool cover -func=./controllers/coverage.out 
+	go tool cover -func=./server/http/coverage.out 
+	go tool cover -func=./common/gpuallocator/coverage.out
 
 ##@ Build
 
@@ -92,13 +98,9 @@ build: generate  ## Build di-operator binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
-dev-images: build
-	docker build -t ${IMG} --target dev-di-operator .
-	docker build -t ${SERVER_IMG} -f Dockerfile.server --target dev-di-server .
-
-docker-build: build ## Build docker image with the di-operator.
+docker-build:  ## Build docker image with the di-operator.
 	docker build -t ${IMG} --target di-operator .
-	docker build -t ${SERVER_IMG} -f Dockerfile.server --target di-server .
+	docker build -t ${SERVER_IMG} --target di-server .
 
 docker-push: ## Push docker image with the di-operator.
 	docker push ${IMG}

@@ -2,7 +2,7 @@ domain: opendilab.org
 layout:
 - go.kubebuilder.io/v3
 projectName: di
-repo: go-sensephoenix.sensetime.com/di-orchestrator
+repo: opendilab.org/di-orchestrator
 resources:
 - api:
     crdVersion: v1
@@ -11,7 +11,7 @@ resources:
   domain: opendilab.org
   group: diengine
   kind: DIJob
-  path: go-sensephoenix.sensetime.com/di-orchestrator/api/v1alpha1
+  path: opendilab.org/di-orchestrator/api/v1alpha1
   version: v1alpha1
   webhooks:
     defaulting: true
@@ -23,6 +23,6 @@ resources:
   domain: opendilab.org
   group: diengine
   kind: AggregatorConfig
-  path: go-sensephoenix.sensetime.com/di-operator/api/v1alpha1
+  path: opendilab.org/di-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

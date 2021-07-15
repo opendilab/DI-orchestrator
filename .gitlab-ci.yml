@@ -1,0 +1,111 @@
+variables:
+  REGISTRY: registry.sensetime.com/cloudnative4ai
+  VERSION: v0.2.0-alpha.0
+  PROJECT: di-orchestrator
+  # dind config
+  DOCKER_HOST: tcp://localhost:2376
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+
+  
+
+# each job's `before_script` will overwrite this global settings.
+# so, we'd better config only ONE global `before_script` here.
+before_script:
+  # this is necessary.
+  - export PATH="/go/bin:/root/go/bin:${PATH}"
+  - git config --global user.name "gitlab-runner"
+  - git config --global user.email "no-exist@sensetime.com"
+  # set proxy
+  - export GOPROXY=https://goproxy.cn
+  - export GOPRIVATE=go-sensephoenix.sensetime.com
+  # set image name
+  - export PROJECT_IMAGE="${REGISTRY}/${PROJECT}:${VERSION}-${CI_COMMIT_SHORT_SHA}"
+  - export PROJECT_IMAGE_RELEASE="${REGISTRY}/${PROJECT}:${VERSION}"
+
+stages:
+  - lint
+  - test
+  - build
+  - release
+
+
+lint:
+  stage: lint
+  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  tags: 
+    - cloudnative4ai-group-runner-phoenix
+  script:
+    - make lint
+
+
+unit-test:
+  stage: test
+  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  tags: 
+    - cloudnative4ai-group-runner-phoenix
+  script:
+    - curl -L https://download.phoenix.sensetime.com/mirrors/kubebuilder/v2.3.2/kubebuilder_2.3.2_linux_amd64.tar.gz | tar -xz -C /tmp/
+    - mv /tmp/kubebuilder_2.3.2_linux_amd64 /usr/local/kubebuilder
+    - export PATH=$PATH:/usr/local/kubebuilder/bin
+    - make test
+
+build-manual:
+  stage: build
+  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  tags: 
+    - cloudnative4ai-group-runner-phoenix
+  allow_failure: false
+  when: manual
+  services:
+    - registry.sensetime.com/cloudnative4ai/docker:19.03.8-dind
+  dependencies:
+    - unit-test
+  except:
+    - main
+    - develop
+    - /^release.*$/
+  script:
+    - make docker-build
+    - make docker-push
+  after_script:
+    - docker image prune -f
+
+build-release:
+  stage: build
+  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  tags: 
+    - cloudnative4ai-group-runner-phoenix
+  allow_failure: false
+  services:
+    - registry.sensetime.com/cloudnative4ai/docker:19.03.8-dind
+  dependencies:
+    - unit-test
+  only:
+    - main
+    - develop
+    - /^release.*$/
+  script:
+    - make docker-build
+    - make docker-push
+  after_script:
+    - docker image prune -f
+
+tag:
+  stage: release
+  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  tags:
+    - cloudnative4ai-group-runner-phoenix
+  services:
+    - registry.sensetime.com/cloudnative4ai/docker:19.03.8-dind
+  allow_failure: false
+  dependencies:
+    - build-release
+  only:
+    - main
+    - /^release.*$/
+  script:
+    - make docker-release
+  after_script:
+    - docker image prune -f

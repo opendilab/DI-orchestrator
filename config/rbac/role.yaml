@@ -1,0 +1,59 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: di-operator-cluster-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - pods
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - nodes
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - diengine.opendilab.org
+  resources:
+  - aggregatorconfigs
+  - dijobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - diengine.opendilab.org
+  resources:
+  - aggregatorconfigs/finalizers
+  - dijobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - diengine.opendilab.org
+  resources:
+  - aggregatorconfigs/status
+  - dijobs/status
+  verbs:
+  - get
+  - patch
+  - update

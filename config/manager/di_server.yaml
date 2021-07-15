@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: di-server
+  namespace: di-system
+  labels:
+    control-plane: di-server
+spec:
+  selector:
+    matchLabels:
+      control-plane: di-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        control-plane: di-server
+    spec:
+      containers:
+      - command:
+        - /di-server
+        args:
+        - "--server-bind-address=:8080"
+        - "--leader-elect"
+        - "--lease-lock-namespace=di-system"
+        - "--lease-lock-name=di-server"
+        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.0-alpha.0
+        imagePullPolicy: Always
+        name: server
+        securityContext:
+          allowPrivilegeEscalation: false
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        resources:
+          limits:
+            cpu: 100m
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 500Mi
+      terminationGracePeriodSeconds: 10

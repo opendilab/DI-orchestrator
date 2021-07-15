@@ -27,7 +27,7 @@ const (
 	defaultSharedVolumeName           = "work-dir"
 
 	logTimeout            = 5 * time.Minute
-	networkFailedDuration = 5 * time.Second
+	networkFailedDuration = 10 * time.Second
 	timeout               = 20 * time.Minute
 	interval              = 3 * time.Second
 )
@@ -72,7 +72,7 @@ var _ = Describe("E2E test for nerveX", func() {
 			err = k8sClient.Delete(ctx, svc, &client.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Sleep for a few seconds before rebuilding connection")
+			By(fmt.Sprintf("Sleep for %s before rebuilding connection", networkFailedDuration.String()))
 			time.Sleep(networkFailedDuration)
 
 			By("Recreate service to rebuild connection")
@@ -88,7 +88,6 @@ var _ = Describe("E2E test for nerveX", func() {
 				}
 				return job.Status.Phase
 			}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
-
 		})
 	})
 })
@@ -101,8 +100,8 @@ func buildDIJob(jobPath, sharedVolumePath string) *div1alpha1.DIJob {
 	err = yaml.Unmarshal(yamlFile, &job)
 	Expect(err).NotTo(HaveOccurred())
 
-	// name := diutil.GenerateName(job.Name)
-	// job.SetName(name)
+	name := diutil.GenerateName(job.Name)
+	job.SetName(name)
 	job.SetNamespace(namespace)
 	for i := range job.Spec.Volumes {
 		if job.Spec.Volumes[i].Name != defaultSharedVolumeName {

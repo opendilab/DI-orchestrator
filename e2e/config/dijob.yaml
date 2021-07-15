@@ -24,13 +24,6 @@ spec:
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 2
-              memory: "5Gi"
-            limits:
-              cpu: 2
-              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -167,13 +160,6 @@ spec:
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 8
-              memory: "5Gi"
-            limits:
-              cpu: 8
-              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -194,13 +180,6 @@ spec:
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 5
-              memory: "5Gi"
-            limits:
-              cpu: 5
-              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |

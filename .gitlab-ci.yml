@@ -63,7 +63,7 @@ build-manual:
   dependencies:
     - unit-test
   except:
-    - master
+    - main
     - develop
     - /^release.*$/
   script:
@@ -83,7 +83,7 @@ build-release:
   dependencies:
     - unit-test
   only:
-    - master
+    - main
     - develop
     - /^release.*$/
   script:
@@ -103,10 +103,9 @@ tag:
   dependencies:
     - build-release
   only:
-    - master
+    - main
     - /^release.*$/
   script:
-    - make docker-build
     - make docker-release
   after_script:
     - docker image prune -f

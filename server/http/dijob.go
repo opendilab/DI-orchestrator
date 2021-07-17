@@ -150,15 +150,6 @@ func (s *DIServer) createReplicas(
 	replicaType string,
 	agtemplate *corev1.PodTemplateSpec) ([]string, error) {
 
-	var defaultPort int32
-	switch replicaType {
-	case dicommon.CollectorName:
-		defaultPort = dicommon.DefaultCollectorPort
-	case dicommon.LearnerName:
-		defaultPort = dicommon.DefaultLearnerPort
-	default:
-
-	}
 	results := []string{}
 	// create pods and services
 	for i := 0; i < resources.Replicas; i++ {
@@ -209,7 +200,7 @@ func (s *DIServer) createReplicas(
 
 				// build ddp learner pod
 				pod, svc, _, err = buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
-					jobName, namespace, replicaType, defaultPort, *replicaResource, volumes)
+					jobName, namespace, replicaType, *replicaResource, volumes)
 				if err != nil {
 					return results, err
 				}
@@ -275,7 +266,7 @@ func (s *DIServer) createReplicas(
 
 				// build ddp learner pod
 				pod, svc, _, err = buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
-					jobName, namespace, replicaType, defaultPort, resources, volumes)
+					jobName, namespace, replicaType, resources, volumes)
 				if err != nil {
 					return results, err
 				}
@@ -327,7 +318,7 @@ func buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	aggOwnRefer metav1.OwnerReference,
 	jobName, namespace, replicaType string,
-	defaultPort int32, resources commontypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
+	resources commontypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
 	pod, svc, port, err := diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
 		namespace, dicommon.DDPLearnerName, volumes)
 	if err != nil {

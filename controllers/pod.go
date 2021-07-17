@@ -45,7 +45,7 @@ func (r *DIJobReconciler) reconcilePodsAndServices(ctx context.Context, job *div
 			gpus := int(rs.GPU.Value())
 			diutil.AddPortsToService(svc, gpus, port)
 		}
-		if err := r.createService(ctx, job, svc); err != nil {
+		if err := r.createService(ctx, job, svc); err != nil && !errors.IsAlreadyExists(err) {
 			return err
 		}
 	}

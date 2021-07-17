@@ -7,6 +7,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -125,7 +126,7 @@ func (s *DIServer) getServiceByKey(key string) (*corev1.Service, error) {
 func (s *DIServer) createPodAndService(namespace string, pod *corev1.Pod, service *corev1.Service) (*corev1.Pod, error) {
 	// create pod
 	newpod, err := s.createPod(namespace, pod)
-	if err != nil {
+	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
 
@@ -143,7 +144,7 @@ func (s *DIServer) createPodAndService(namespace string, pod *corev1.Pod, servic
 	service.OwnerReferences = append(service.OwnerReferences, ownRefer)
 
 	// create service
-	if err := s.createService(namespace, service); err != nil {
+	if err := s.createService(namespace, service); err != nil && !errors.IsAlreadyExists(err) {
 		return newpod, err
 	}
 	return newpod, nil

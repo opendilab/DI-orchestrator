@@ -32,7 +32,10 @@ func (r *DIJobReconciler) reconcilePodsAndServices(ctx context.Context, job *div
 	dpset := pset.Difference(sset)
 	for dp := range dpset.Iter() {
 		pod := pmap[dp.(string)]
-		port, _ := diutil.GetDefaultPortFromPod(pod)
+		port, ok := diutil.GetDefaultPortFromPod(pod)
+		if !ok {
+			port = diutil.GetReplicaDefaultPort(pod.Labels[dicommon.ReplicaTypeLabel])
+		}
 		svc := diutil.BuildService(pod.Name, pod.Namespace, pod.OwnerReferences[0], pod.GetLabels(), port)
 		svc.SetOwnerReferences(pod.GetOwnerReferences())
 

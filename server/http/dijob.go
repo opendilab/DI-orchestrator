@@ -179,7 +179,7 @@ func (s *DIServer) createReplicas(
 			jobName := ownRefer.Name
 			// create aggregator
 			agg, aggsvc, port, err := diutil.BuildPodAndService(agtemplate, ownRefer, jobName, namespace,
-				dicommon.AggregatorName, dicommon.DefaultAggregatorPort, nil)
+				dicommon.AggregatorName, nil)
 			if err != nil {
 				return results, err
 			}
@@ -239,7 +239,7 @@ func (s *DIServer) createReplicas(
 
 			// build collector/learner pod
 			pod, svc, port, err = diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
-				namespace, replicaType, defaultPort, volumes)
+				namespace, replicaType, volumes)
 			if err != nil {
 				return results, err
 			}
@@ -251,7 +251,7 @@ func (s *DIServer) createReplicas(
 			if replicaType == dicommon.LearnerName && needAggregator(resources) {
 				// create aggregator
 				agg, aggsvc, aggport, err := diutil.BuildPodAndService(agtemplate, ownRefer, jobName, namespace,
-					dicommon.AggregatorName, dicommon.DefaultAggregatorPort, nil)
+					dicommon.AggregatorName, nil)
 				if err != nil {
 					return results, err
 				}
@@ -329,7 +329,7 @@ func buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
 	jobName, namespace, replicaType string,
 	defaultPort int32, resources commontypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
 	pod, svc, port, err := diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
-		namespace, dicommon.DDPLearnerName, defaultPort, volumes)
+		namespace, dicommon.DDPLearnerName, volumes)
 	if err != nil {
 		return nil, nil, -1, err
 	}
@@ -357,16 +357,7 @@ func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, worldSize, local
 func (s *DIServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
 	var defaultPort int32
 
-	switch replicaType {
-	case dicommon.CollectorName:
-		defaultPort = dicommon.DefaultCollectorPort
-	case dicommon.LearnerName:
-		defaultPort = dicommon.DefaultLearnerPort
-	case dicommon.AggregatorName:
-		defaultPort = dicommon.DefaultAggregatorPort
-	default:
-
-	}
+	defaultPort = diutil.GetReplicaDefaultPort(replicaType)
 
 	results := []string{}
 	for _, pod := range pods {

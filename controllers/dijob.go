@@ -43,8 +43,7 @@ func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div1alpha1
 		// build coordinator pod
 		volumes := job.Spec.Volumes
 		template := job.Spec.Coordinator.Template.DeepCopy()
-		coorpod, coorsvc, coorurl, err := buildPodAndServiceForReplica(template, job, dicommon.CoordinatorName,
-			dicommon.DefaultCoordinatorPort, volumes)
+		coorpod, coorsvc, coorurl, err := buildPodAndServiceForReplica(template, job, dicommon.CoordinatorName, volumes)
 		if err != nil {
 			msg := fmt.Sprintf("build coordinator pod for job %s failed", job.Name)
 			log.Error(err, msg)
@@ -71,7 +70,7 @@ func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div1alpha1
 }
 
 func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *div1alpha1.DIJob,
-	replicaType string, defaultPort int32, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, string, error) {
+	replicaType string, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, string, error) {
 	if string(job.Spec.PriorityClassName) != "" {
 		template.Spec.PriorityClassName = string(job.Spec.PriorityClassName)
 	}
@@ -91,7 +90,7 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *div1alp
 	}
 
 	// build pod
-	pod, svc, port, err := diutil.BuildPodAndService(template, ownRefer, job.Name, job.Namespace, replicaType, defaultPort, volumes)
+	pod, svc, port, err := diutil.BuildPodAndService(template, ownRefer, job.Name, job.Namespace, replicaType, volumes)
 	if err != nil {
 		return nil, nil, "", err
 	}

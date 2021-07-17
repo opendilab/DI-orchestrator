@@ -54,10 +54,8 @@ func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div1alpha1
 		envs[dicommon.CoordinatorURLEnv] = coorurl
 		diutil.AddEnvsToPod(coorpod, envs)
 
-		if coordinator == nil {
-			if err := r.createPodAndService(ctx, job, coorpod, coorsvc); err != nil {
-				return err
-			}
+		if err := r.createPodAndService(ctx, job, coorpod, coorsvc); err != nil {
+			return err
 		}
 
 		// update job status

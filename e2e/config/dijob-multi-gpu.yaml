@@ -1,7 +1,7 @@
 apiVersion: diengine.opendilab.org/v1alpha1
 kind: DIJob
 metadata:
-  name: cartpole-dqn
+  name: dijob-cartpole-dqn
 spec:
   group: xxx
   priorityClassName: ""
@@ -24,13 +24,6 @@ spec:
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 3
-              memory: "10Gi"
-            limits:
-              cpu: 3
-              memory: "10Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -46,7 +39,7 @@ spec:
                     stop_value=195,
                 ),
                 policy=dict(
-                    cuda=False,
+                    cuda=True,
                     model=dict(
                         obs_shape=4,
                         action_shape=2,
@@ -132,7 +125,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpus": "0",
+                                "gpus": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -143,7 +136,7 @@ spec:
                 path_data='./data',
                 path_policy='./policy',
                 communication_mode='auto',
-                learner_gpu_num=1,
+                learner_gpu_num=2,
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config
@@ -167,13 +160,6 @@ spec:
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 16
-              memory: "5Gi"
-            limits:
-              cpu: 16
-              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -194,13 +180,6 @@ spec:
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 16
-              memory: "5Gi"
-            limits:
-              cpu: 16
-              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |

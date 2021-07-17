@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -19,6 +18,7 @@ import (
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 	dicommon "opendilab.org/di-orchestrator/common"
+	commontypes "opendilab.org/di-orchestrator/common/types"
 )
 
 const (
@@ -126,73 +126,13 @@ func AddEnvsToPod(pod *corev1.Pod, envs map[string]string) {
 	}
 }
 
-func BuildPodFromTemplate(
-	template *corev1.PodTemplateSpec,
-	ownRefer metav1.OwnerReference,
-	jobName string,
-	ns, replicaType string,
-	defaultPort int32) (*corev1.Pod, int32, error) {
-	// generate name is the DIJob name
-	portEnv := ""
-	podName := ReplicaPodName(jobName, replicaType)
-	switch replicaType {
-	case dicommon.CollectorName:
-		portEnv = "COLLECTOR_PORT"
-		podName = GenerateName(podName)
-	case dicommon.LearnerName:
-		portEnv = "LEARNER_PORT"
-		podName = GenerateName(podName)
-	case dicommon.DDPLearnerName:
-		portEnv = "LEARNER_PORT"
-		podName = GenerateName(podName)
-	case dicommon.AggregatorName:
-		portEnv = "AGGREGATOR_PORT"
-		podName = GenerateName(podName)
-	case dicommon.CoordinatorName:
-		portEnv = "COORDINATOR_PORT"
-	default:
-		return nil, -1, fmt.Errorf("wrong replica type: %s", replicaType)
-	}
-
-	// setup pod template
-	template.SetName(podName)
-	template.SetNamespace(ns)
-	template.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
-
-	pod := &corev1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		Spec:       *template.Spec.DeepCopy(),
-		ObjectMeta: *template.ObjectMeta.DeepCopy(),
-	}
-
-	// add labels to pod
-	labels := GenLabels(jobName)
-	labels[dicommon.ReplicaTypeLabel] = replicaType
-	labels[dicommon.PodNameLabel] = pod.Name
-	AddLabelsToPod(pod, labels)
-
-	// get pod port
-	port, ok := GetDefaultPortFromPod(pod)
-	if !ok {
-		port = defaultPort
-		logrus.Infof("no port found, use default port for container %s port %d", dicommon.DefaultContainerName, port)
-		AddDefaultPortToPod(pod, port)
-	}
-
-	// add env
-	envs := make(map[string]string)
-	envs[portEnv] = fmt.Sprintf("%d", port)
-	AddEnvsToPod(pod, envs)
-	return pod, port, nil
-}
-
-func BuildService(labels map[string]string, port int32) *corev1.Service {
+func BuildService(name, namespace string, ownRefer metav1.OwnerReference, labels map[string]string, port int32) *corev1.Service {
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: labels,
+			Name:            name,
+			Namespace:       namespace,
+			Labels:          labels,
+			OwnerReferences: []metav1.OwnerReference{ownRefer},
 		},
 		Spec: corev1.ServiceSpec{
 			Type:      corev1.ServiceTypeClusterIP,
@@ -281,126 +221,6 @@ func ListServices(ctx context.Context, cli client.Client, job *div1alpha1.DIJob)
 	return svcs, nil
 }
 
-func ClassifyPods(pods []*corev1.Pod) (collectors []*corev1.Pod, learners []*corev1.Pod,
-	coordinator *corev1.Pod, aggregators []*corev1.Pod, DDPLearners []*corev1.Pod, err error) {
-	// filter out collectors
-	collectors, err = filterReplicaPods(pods, dicommon.CollectorName)
-	if err != nil {
-		return
-	}
-
-	// filter out leader pods
-	learners, err = filterReplicaPods(pods, dicommon.LearnerName)
-	if err != nil {
-		return
-	}
-
-	// filter out coordinator pod
-	coordinators, err := filterReplicaPods(pods, dicommon.CoordinatorName)
-	if err != nil {
-		return
-	}
-
-	// filter aggregator pod
-	aggregators, err = filterReplicaPods(pods, dicommon.AggregatorName)
-	if err != nil {
-		return
-	}
-
-	DDPLearners, err = filterReplicaPods(pods, dicommon.DDPLearnerName)
-	if err != nil {
-		return
-	}
-
-	if len(coordinators) > 1 {
-		err = fmt.Errorf("there must be only one coordinator")
-		return
-	}
-	if len(coordinators) < 1 {
-		return
-	}
-	coordinator = coordinators[0]
-	return
-}
-
-func filterReplicaPods(pods []*corev1.Pod, replicaType string) ([]*corev1.Pod, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: map[string]string{dicommon.ReplicaTypeLabel: replicaType},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	result := []*corev1.Pod{}
-	for _, pod := range pods {
-		if !selector.Matches(labels.Set(pod.Labels)) {
-			continue
-		}
-		result = append(result, pod)
-	}
-	return result, nil
-}
-
-func ClassifyServices(services []*corev1.Service) (collectors []*corev1.Service, learners []*corev1.Service,
-	coordinator *corev1.Service, aggregators []*corev1.Service, DDPLearners []*corev1.Service, err error) {
-	// filter out collectors
-	collectors, err = filterReplicaServices(services, dicommon.CollectorName)
-	if err != nil {
-		return
-	}
-
-	// filter out leader services
-	learners, err = filterReplicaServices(services, dicommon.LearnerName)
-	if err != nil {
-		return
-	}
-
-	// filter out coordinator service
-	coordinators, err := filterReplicaServices(services, dicommon.CoordinatorName)
-	if err != nil {
-		return
-	}
-
-	// filter aggregator service
-	aggregators, err = filterReplicaServices(services, dicommon.AggregatorName)
-	if err != nil {
-		return
-	}
-
-	DDPLearners, err = filterReplicaServices(services, dicommon.DDPLearnerName)
-	if err != nil {
-		return
-	}
-
-	if len(coordinators) > 1 {
-		err = fmt.Errorf("there must be only one coordinator")
-		return
-	}
-	if len(coordinators) < 1 {
-		return
-	}
-	coordinator = coordinators[0]
-	return
-}
-
-func filterReplicaServices(services []*corev1.Service, replicaType string) ([]*corev1.Service, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: map[string]string{dicommon.ReplicaTypeLabel: replicaType},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	result := []*corev1.Service{}
-	for _, service := range services {
-		if !selector.Matches(labels.Set(service.Labels)) {
-			continue
-		}
-		result = append(result, service)
-	}
-	return result, nil
-}
-
 func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	results := []*corev1.Pod{}
 	for _, pod := range pods {
@@ -416,4 +236,93 @@ func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 // IsTerminating returns true if pod's DeletionTimestamp has been set
 func IsTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
+}
+
+func AddPortsToPodAndService(pod *corev1.Pod, service *corev1.Service, total int, startPort int32) {
+	AddPortsToPod(pod, total, startPort)
+	AddPortsToService(service, total, startPort)
+}
+
+func AddPortsToPod(pod *corev1.Pod, total int, startPort int32) {
+	for i := 1; i < total; i++ {
+		pname := fmt.Sprintf("%s-%d", dicommon.DDPLearnerPortPrefix, i)
+		pport := startPort + int32(i)
+		port := corev1.ContainerPort{
+			Name:          pname,
+			ContainerPort: pport,
+		}
+		for j := range pod.Spec.Containers {
+			if pod.Spec.Containers[j].Name != dicommon.DefaultContainerName {
+				continue
+			}
+			pod.Spec.Containers[j].Ports = append(pod.Spec.Containers[j].Ports, port)
+		}
+	}
+}
+
+func AddPortsToService(service *corev1.Service, total int, startPort int32) {
+	for i := 1; i < total; i++ {
+		pname := fmt.Sprintf("%s-%d", dicommon.DDPLearnerPortPrefix, i)
+		pport := startPort + int32(i)
+		port := corev1.ServicePort{
+			Name: pname,
+			Port: pport,
+		}
+		service.Spec.Ports = append(service.Spec.Ports, port)
+	}
+}
+
+func SetPodResources(pod *corev1.Pod, resources commontypes.ResourceQuantity) {
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
+			continue
+		}
+		if pod.Spec.Containers[i].Resources.Limits == nil {
+			pod.Spec.Containers[i].Resources.Limits = make(corev1.ResourceList)
+		}
+		if pod.Spec.Containers[i].Resources.Requests == nil {
+			pod.Spec.Containers[i].Resources.Requests = make(corev1.ResourceList)
+		}
+
+		// cpu and memory must not be zero
+		if !resources.CPU.IsZero() {
+			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = resources.CPU
+			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = resources.CPU
+		}
+		if !resources.Memory.IsZero() {
+			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = resources.Memory
+			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = resources.Memory
+		}
+		if !resources.GPU.IsZero() {
+			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
+			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
+		}
+	}
+}
+
+func GetPodResources(pod *corev1.Pod) commontypes.ResourceQuantity {
+	resource := commontypes.ResourceQuantity{
+		CPU:    resource.MustParse("0"),
+		GPU:    resource.MustParse("0"),
+		Memory: resource.MustParse("0"),
+	}
+	for _, container := range pod.Spec.Containers {
+		if container.Name != dicommon.DefaultContainerName {
+			continue
+		}
+		if container.Resources.Limits == nil && container.Resources.Requests == nil {
+			break
+		}
+		if container.Resources.Requests != nil {
+			resource.CPU = container.Resources.Requests[corev1.ResourceCPU].DeepCopy()
+			resource.GPU = container.Resources.Requests[corev1.ResourceName("nvidia.com/gpu")].DeepCopy()
+			resource.Memory = container.Resources.Requests[corev1.ResourceMemory].DeepCopy()
+		}
+		if container.Resources.Limits != nil {
+			resource.CPU = container.Resources.Limits[corev1.ResourceCPU].DeepCopy()
+			resource.GPU = container.Resources.Limits[corev1.ResourceName("nvidia.com/gpu")].DeepCopy()
+			resource.Memory = container.Resources.Limits[corev1.ResourceMemory].DeepCopy()
+		}
+	}
+	return resource
 }

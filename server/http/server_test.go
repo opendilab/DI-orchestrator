@@ -19,7 +19,7 @@ import (
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 	dicommon "opendilab.org/di-orchestrator/common"
-	servertypes "opendilab.org/di-orchestrator/server/types"
+	commontypes "opendilab.org/di-orchestrator/common/types"
 	diutil "opendilab.org/di-orchestrator/utils"
 	testutil "opendilab.org/di-orchestrator/utils/testutils"
 )
@@ -42,13 +42,13 @@ var _ = Describe("Server Test", func() {
 			addr := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
 			rurl := fmt.Sprintf("http://%s/v1alpha1/replicas", addr)
 			var cn, ln int = 2, 3
-			req := servertypes.DIJobRequest{
+			req := commontypes.DIJobRequest{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
-				Collectors: servertypes.ResourceQuantity{
+				Collectors: commontypes.ResourceQuantity{
 					Replicas: cn,
 				},
-				Learners: servertypes.ResourceQuantity{
+				Learners: commontypes.ResourceQuantity{
 					Replicas: ln,
 				},
 			}
@@ -72,7 +72,7 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on POST /v1alpha1/replicas/failed")
 			furl := fmt.Sprintf("http://%s/v1alpha1/replicas/failed", addr)
-			freq := servertypes.DIJobResponse{
+			freq := commontypes.DIJobResponse{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: []string{
@@ -104,13 +104,13 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on DELETE /v1alpha1/replicas")
 			var dcn, dln int = 1, 1
-			dreq := servertypes.DIJobRequest{
+			dreq := commontypes.DIJobRequest{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
-				Collectors: servertypes.ResourceQuantity{
+				Collectors: commontypes.ResourceQuantity{
 					Replicas: dcn,
 				},
-				Learners: servertypes.ResourceQuantity{
+				Learners: commontypes.ResourceQuantity{
 					Replicas: dln,
 				},
 			}
@@ -149,13 +149,13 @@ var _ = Describe("Server Test", func() {
 			coorname := diutil.ReplicaPodName(job.Name, "coordinator")
 			rurl := fmt.Sprintf("http://%s/v1alpha1/replicas", addr)
 			var cn, ln int = 2, 3
-			req := servertypes.DIJobRequest{
+			req := commontypes.DIJobRequest{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
-				Collectors: servertypes.ResourceQuantity{
+				Collectors: commontypes.ResourceQuantity{
 					Replicas: cn,
 				},
-				Learners: servertypes.ResourceQuantity{
+				Learners: commontypes.ResourceQuantity{
 					Replicas: ln,
 				},
 			}
@@ -199,7 +199,7 @@ var _ = Describe("Server Test", func() {
 			resp, err = http.Get(gurl)
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()
-			var nresp servertypes.Response
+			var nresp commontypes.Response
 			err = json.NewDecoder(resp.Body).Decode(&nresp)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode).Should(Equal(http.StatusOK))
@@ -217,7 +217,7 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on POST /v1alpha1/replicas/failed")
 			furl := fmt.Sprintf("http://%s/v1alpha1/replicas/failed", addr)
-			freq := servertypes.DIJobResponse{
+			freq := commontypes.DIJobResponse{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: []string{
@@ -249,7 +249,7 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on POST /v1alpha1/replicas/failed with duplicate replicas")
 			fdurl := fmt.Sprintf("http://%s/v1alpha1/replicas/failed", addr)
-			fdreq := servertypes.DIJobResponse{
+			fdreq := commontypes.DIJobResponse{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
 				Collectors: []string{
@@ -283,13 +283,13 @@ var _ = Describe("Server Test", func() {
 
 			By("Send request on DELETE /v1alpha1/replicas")
 			var dcn, dln int = 1, 1
-			dreq := servertypes.DIJobRequest{
+			dreq := commontypes.DIJobRequest{
 				Namespace:   job.Namespace,
 				Coordinator: coorname,
-				Collectors: servertypes.ResourceQuantity{
+				Collectors: commontypes.ResourceQuantity{
 					Replicas: dcn,
 				},
-				Learners: servertypes.ResourceQuantity{
+				Learners: commontypes.ResourceQuantity{
 					Replicas: dln,
 				},
 			}
@@ -342,10 +342,10 @@ var _ = Describe("Server Test", func() {
 				coorname := diutil.ReplicaPodName(job.Name, "coordinator")
 				rurl := fmt.Sprintf("http://%s/v1alpha1/replicas", addr)
 				var ln int = c.ln
-				req := servertypes.DIJobRequest{
+				req := commontypes.DIJobRequest{
 					Namespace:   job.Namespace,
 					Coordinator: coorname,
-					Learners: servertypes.ResourceQuantity{
+					Learners: commontypes.ResourceQuantity{
 						Replicas: ln,
 						GPU:      resource.MustParse(strconv.Itoa(c.gpus)),
 					},
@@ -410,10 +410,10 @@ var _ = Describe("Server Test", func() {
 
 				By("Send request on DELETE /v1alpha1/replicas")
 				var dln int = 1
-				dreq := servertypes.DIJobRequest{
+				dreq := commontypes.DIJobRequest{
 					Namespace:   job.Namespace,
 					Coordinator: coorname,
-					Learners: servertypes.ResourceQuantity{
+					Learners: commontypes.ResourceQuantity{
 						Replicas: dln,
 					},
 				}
@@ -461,7 +461,7 @@ func creatDIJob(ctx context.Context, job *div1alpha1.DIJob) error {
 	return nil
 }
 
-func sendRequest(method string, rbody []byte, url string, expectedCode int, expectedSuccess bool) (*servertypes.DIJobResponse, error) {
+func sendRequest(method string, rbody []byte, url string, expectedCode int, expectedSuccess bool) (*commontypes.DIJobResponse, error) {
 
 	// Create client
 	reqs, err := http.NewRequest(method, url, bytes.NewReader(rbody))
@@ -479,9 +479,9 @@ func sendRequest(method string, rbody []byte, url string, expectedCode int, expe
 	return parseResponse(resp, expectedCode, expectedSuccess)
 }
 
-func parseResponse(resp *http.Response, expectedCode int, expectedSuccess bool) (*servertypes.DIJobResponse, error) {
+func parseResponse(resp *http.Response, expectedCode int, expectedSuccess bool) (*commontypes.DIJobResponse, error) {
 	defer resp.Body.Close()
-	var nresp servertypes.Response
+	var nresp commontypes.Response
 	err := json.NewDecoder(resp.Body).Decode(&nresp)
 	if err != nil {
 		return nil, err
@@ -490,7 +490,7 @@ func parseResponse(resp *http.Response, expectedCode int, expectedSuccess bool) 
 	Expect(resp.StatusCode).Should(Equal(expectedCode))
 	Expect(nresp.Success).Should(Equal(expectedSuccess))
 
-	var njresp servertypes.DIJobResponse
+	var njresp commontypes.DIJobResponse
 	jsonBytes, err := json.Marshal(nresp.Data)
 	if err != nil {
 		return nil, err

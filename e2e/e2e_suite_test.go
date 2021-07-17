@@ -85,4 +85,7 @@ var _ = BeforeSuite(func() {
 	if err != nil && !errors.IsAlreadyExists(err) {
 		Expect(err).NotTo(HaveOccurred())
 	}
+
+	k8sClient.DeleteAllOf(context.Background(), &div1alpha1.DIJob{},
+		client.InNamespace(namespace), client.MatchingLabels{"stability-test": "dijobs"})
 })

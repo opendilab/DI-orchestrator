@@ -20,8 +20,8 @@ import (
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 	dicommon "opendilab.org/di-orchestrator/common"
 	gpualloc "opendilab.org/di-orchestrator/common/gpuallocator"
+	commontypes "opendilab.org/di-orchestrator/common/types"
 	serverdynamic "opendilab.org/di-orchestrator/server/dynamic"
-	servertypes "opendilab.org/di-orchestrator/server/types"
 	diutil "opendilab.org/di-orchestrator/utils"
 )
 
@@ -118,7 +118,7 @@ func (s *DIServer) Replicas(w http.ResponseWriter, r *http.Request) {
 		msg = "successfully delete replicas"
 		reps, err = s.deleteReplicas(r)
 	default:
-		err = &servertypes.DIError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
+		err = &commontypes.DIError{Type: commontypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
 		log.Error(err, "method not implemented")
 	}
 
@@ -132,21 +132,21 @@ func (s *DIServer) Replicas(w http.ResponseWriter, r *http.Request) {
 
 func (s *DIServer) getReplicas(r *http.Request) (interface{}, error) {
 	// get request params from request
-	rp := servertypes.DIJobRequestParams{}
+	rp := commontypes.DIJobRequestParams{}
 	params := r.URL.Query()
 	for k, v := range params {
 		switch strings.ToLower(k) {
-		case servertypes.RequestParamTypeNamespace:
+		case commontypes.RequestParamTypeNamespace:
 			rp.Namespace = v
-		case servertypes.RequestParamTypeCoordinator:
+		case commontypes.RequestParamTypeCoordinator:
 			rp.Coordinator = v
-		case servertypes.RequestParamTypeName:
+		case commontypes.RequestParamTypeName:
 			rp.Name = v
-		case servertypes.RequestParamTypeAggregator:
+		case commontypes.RequestParamTypeAggregator:
 			rp.Aggregator = v
 		default:
 			errInfo := fmt.Sprintf("request param %s is not supported", k)
-			return nil, &servertypes.DIError{Type: servertypes.ErrorBadRequest, Message: errInfo}
+			return nil, &commontypes.DIError{Type: commontypes.ErrorBadRequest, Message: errInfo}
 		}
 	}
 
@@ -179,13 +179,13 @@ func (s *DIServer) getReplicas(r *http.Request) (interface{}, error) {
 	return reps, nil
 }
 
-func (s *DIServer) getAllReplicas() ([]servertypes.DIJobResponse, error) {
+func (s *DIServer) getAllReplicas() ([]commontypes.DIJobResponse, error) {
 	nsl, err := s.KubeClient.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	results := []servertypes.DIJobResponse{}
+	results := []commontypes.DIJobResponse{}
 	for _, ns := range nsl.Items {
 		reps, err := s.getNamespacedReplicas(ns.Name)
 		if err != nil {
@@ -196,7 +196,7 @@ func (s *DIServer) getAllReplicas() ([]servertypes.DIJobResponse, error) {
 	return results, nil
 }
 
-func (s *DIServer) getNamespacedReplicas(namespace string) ([]servertypes.DIJobResponse, error) {
+func (s *DIServer) getNamespacedReplicas(namespace string) ([]commontypes.DIJobResponse, error) {
 	log := s.Log.WithName("DIServer")
 
 	// construct label selector to list coordinators in namespace
@@ -218,7 +218,7 @@ func (s *DIServer) getNamespacedReplicas(namespace string) ([]servertypes.DIJobR
 		return nil, err
 	}
 
-	results := []servertypes.DIJobResponse{}
+	results := []commontypes.DIJobResponse{}
 	for _, pod := range pods {
 		result, err := s.getNamespacedReplicasByCoordinator(namespace, pod.Name)
 		if err != nil {
@@ -231,14 +231,14 @@ func (s *DIServer) getNamespacedReplicas(namespace string) ([]servertypes.DIJobR
 	return results, nil
 }
 
-func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName string) (servertypes.DIJobResponse, error) {
+func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName string) (commontypes.DIJobResponse, error) {
 	log := s.Log.WithName("DIServer")
 
 	// get ownReference of the request coordinator
 	diJob, err := s.getDIJob(namespace, coordinatorName)
 	if err != nil {
 		log.Error(err, "failed to get owner reference")
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 
 	// list pods that belong to the DIJob
@@ -246,12 +246,12 @@ func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName
 		MatchLabels: diutil.GenLabels(diJob.Name),
 	})
 	if err != nil {
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 	collectors, learners, _, aggregators, _, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 
 	// get access urls
@@ -272,7 +272,7 @@ func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName
 		learnerURLs = append(learnerURLs, url)
 	}
 
-	rep := servertypes.DIJobResponse{
+	rep := commontypes.DIJobResponse{
 		Namespace:   namespace,
 		Coordinator: coordinatorName,
 		Collectors:  collectorURLs,
@@ -283,14 +283,14 @@ func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName
 	return rep, nil
 }
 
-func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorName string) (servertypes.DIJobResponse, error) {
+func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorName string) (commontypes.DIJobResponse, error) {
 	log := s.Log.WithName("DIServer")
 
 	// get ownReference of the request coordinator
 	diJob, err := s.getDIJob(namespace, aggregatorName)
 	if err != nil {
 		log.Error(err, "failed to get owner reference")
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 
 	// list pods that belong to the DIJob
@@ -298,12 +298,12 @@ func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorNam
 		MatchLabels: diutil.GenLabels(diJob.Name),
 	})
 	if err != nil {
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 	_, _, _, _, DDPLearners, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 
 	// get access urls
@@ -335,7 +335,7 @@ func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorNam
 		}
 	}
 
-	rep := servertypes.DIJobResponse{
+	rep := commontypes.DIJobResponse{
 		Namespace:   namespace,
 		Coordinator: aggregatorName,
 		Learners:    ddpLearnerURLs,
@@ -344,26 +344,26 @@ func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorNam
 }
 
 // add replicas api
-func (s *DIServer) addReplicas(r *http.Request) (servertypes.DIJobResponse, error) {
+func (s *DIServer) addReplicas(r *http.Request) (commontypes.DIJobResponse, error) {
 	log := s.Log.WithName("DIServer")
 	// get request body
-	var njreq servertypes.DIJobRequest
+	var njreq commontypes.DIJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
-		return servertypes.DIJobResponse{}, &servertypes.DIError{Type: servertypes.ErrorBadRequest, Message: errMsg}
+		return commontypes.DIJobResponse{}, &commontypes.DIError{Type: commontypes.ErrorBadRequest, Message: errMsg}
 	}
 
 	// get ownReference of request coordinator
 	diJob, err := s.getDIJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 
 	// create collectors and learners
 	collectors, learners, err := s.createCollectorsAndLearnersForDIJob(&njreq, diJob)
 	if err != nil {
-		return servertypes.DIJobResponse{
+		return commontypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -372,7 +372,7 @@ func (s *DIServer) addReplicas(r *http.Request) (servertypes.DIJobResponse, erro
 	}
 	log.Info("create replicas", "collectors", collectors, "learners", learners)
 
-	rep := servertypes.DIJobResponse{
+	rep := commontypes.DIJobResponse{
 		Namespace:   njreq.Namespace,
 		Coordinator: njreq.Coordinator,
 		Collectors:  collectors,
@@ -383,20 +383,20 @@ func (s *DIServer) addReplicas(r *http.Request) (servertypes.DIJobResponse, erro
 }
 
 // delete replicas api
-func (s *DIServer) deleteReplicas(r *http.Request) (servertypes.DIJobResponse, error) {
+func (s *DIServer) deleteReplicas(r *http.Request) (commontypes.DIJobResponse, error) {
 	log := s.Log.WithName("DIServer")
 	// get request body
-	var njreq servertypes.DIJobRequest
+	var njreq commontypes.DIJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
-		return servertypes.DIJobResponse{}, &servertypes.DIError{Type: servertypes.ErrorBadRequest, Message: errMsg}
+		return commontypes.DIJobResponse{}, &commontypes.DIError{Type: commontypes.ErrorBadRequest, Message: errMsg}
 	}
 
 	// get ownReference of the request coordinator
 	diJob, err := s.getDIJob(njreq.Namespace, njreq.Coordinator)
 	if err != nil {
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 
 	// list pods that belong to the DIJob
@@ -404,17 +404,17 @@ func (s *DIServer) deleteReplicas(r *http.Request) (servertypes.DIJobResponse, e
 		MatchLabels: diutil.GenLabels(diJob.Name),
 	})
 	if err != nil {
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 	collectors, learners, _, aggs, _, err := s.listReplicaPodsWithSelector(njreq.Namespace, labelSelector)
 	if err != nil {
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 
 	// delete collector pods
 	delCollectors, err := s.deleteSpecifiedReplicas(collectors, njreq.Namespace, njreq.Collectors.Replicas, dicommon.CollectorName)
 	if err != nil {
-		return servertypes.DIJobResponse{
+		return commontypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  delCollectors,
@@ -425,7 +425,7 @@ func (s *DIServer) deleteReplicas(r *http.Request) (servertypes.DIJobResponse, e
 	// delete learner pods
 	delLearners, err := s.deleteSpecifiedReplicas(learners, njreq.Namespace, njreq.Learners.Replicas, dicommon.LearnerName)
 	if err != nil {
-		return servertypes.DIJobResponse{
+		return commontypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  delCollectors,
@@ -437,7 +437,7 @@ func (s *DIServer) deleteReplicas(r *http.Request) (servertypes.DIJobResponse, e
 	if len(delLearners) <= 0 {
 		delAggs, err := s.deleteSpecifiedReplicas(aggs, njreq.Namespace, njreq.Learners.Replicas, dicommon.AggregatorName)
 		if err != nil {
-			return servertypes.DIJobResponse{
+			return commontypes.DIJobResponse{
 				Namespace:   njreq.Namespace,
 				Coordinator: njreq.Coordinator,
 				Collectors:  delCollectors,
@@ -449,7 +449,7 @@ func (s *DIServer) deleteReplicas(r *http.Request) (servertypes.DIJobResponse, e
 
 	log.Info("delete replicas", "collectors", delCollectors, "learners", delLearners)
 
-	rep := servertypes.DIJobResponse{
+	rep := commontypes.DIJobResponse{
 		Namespace:   njreq.Namespace,
 		Coordinator: njreq.Coordinator,
 		Collectors:  delCollectors,
@@ -471,7 +471,7 @@ func (s *DIServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
 		msg = "successfully recreate replicas"
 		reps, err = s.replicasFailed(r)
 	default:
-		err = &servertypes.DIError{Type: servertypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
+		err = &commontypes.DIError{Type: commontypes.ErrorNotImplemented, Message: fmt.Sprintf("%s not implemented", r.Method)}
 		log.Error(err, "method not implemented")
 	}
 
@@ -482,31 +482,31 @@ func (s *DIServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *DIServer) replicasFailed(r *http.Request) (servertypes.DIJobResponse, error) {
+func (s *DIServer) replicasFailed(r *http.Request) (commontypes.DIJobResponse, error) {
 	log := s.Log.WithName("DIServer")
 
 	// parse request body
-	var njreq servertypes.DIJobResponse
+	var njreq commontypes.DIJobResponse
 	err := json.NewDecoder(r.Body).Decode(&njreq)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to decode request body: %v", err)
-		return servertypes.DIJobResponse{}, &servertypes.DIError{Type: servertypes.ErrorBadRequest, Message: errMsg}
+		return commontypes.DIJobResponse{}, &commontypes.DIError{Type: commontypes.ErrorBadRequest, Message: errMsg}
 	}
 	log.Info("failed replicas request body: ", "request", njreq)
 
 	// get collector pods and services
 	cpods, err := s.getPodsByNames(njreq.Namespace, njreq.Collectors)
 	if err != nil {
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 	csvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Collectors)
 	if err != nil {
-		return servertypes.DIJobResponse{}, err
+		return commontypes.DIJobResponse{}, err
 	}
 
 	collectors, err := s.recreateReplicas(cpods, csvcs, njreq.Namespace)
 	if err != nil {
-		return servertypes.DIJobResponse{
+		return commontypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -516,7 +516,7 @@ func (s *DIServer) replicasFailed(r *http.Request) (servertypes.DIJobResponse, e
 
 	lpods, err := s.getPodsByNames(njreq.Namespace, njreq.Learners)
 	if err != nil {
-		return servertypes.DIJobResponse{
+		return commontypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -525,7 +525,7 @@ func (s *DIServer) replicasFailed(r *http.Request) (servertypes.DIJobResponse, e
 	}
 	lsvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Learners)
 	if err != nil {
-		return servertypes.DIJobResponse{
+		return commontypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -535,7 +535,7 @@ func (s *DIServer) replicasFailed(r *http.Request) (servertypes.DIJobResponse, e
 
 	learners, err := s.recreateReplicas(lpods, lsvcs, njreq.Namespace)
 	if err != nil {
-		return servertypes.DIJobResponse{
+		return commontypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
 			Coordinator: njreq.Coordinator,
 			Collectors:  collectors,
@@ -545,7 +545,7 @@ func (s *DIServer) replicasFailed(r *http.Request) (servertypes.DIJobResponse, e
 
 	log.Info("recreate replicas", "collectors", collectors, "learners", learners)
 
-	rep := servertypes.DIJobResponse{
+	rep := commontypes.DIJobResponse{
 		Namespace:   njreq.Namespace,
 		Coordinator: njreq.Coordinator,
 		Collectors:  collectors,
@@ -554,25 +554,25 @@ func (s *DIServer) replicasFailed(r *http.Request) (servertypes.DIJobResponse, e
 	return rep, nil
 }
 
-func (s *DIServer) buildResponse(reps interface{}, msg string, err error) (servertypes.Response, int) {
+func (s *DIServer) buildResponse(reps interface{}, msg string, err error) (commontypes.Response, int) {
 	log := s.Log.WithName("DIServer")
 
 	var success bool = true
-	var code int = servertypes.CodeSuccess
+	var code int = commontypes.CodeSuccess
 	var statusCode int = http.StatusOK
 	if err != nil {
 		success = false
-		code = servertypes.CodeFailed
+		code = commontypes.CodeFailed
 		msg = err.Error()
 
 		// define status code
-		if servertypes.IsNotFound(err) {
+		if commontypes.IsNotFound(err) {
 			statusCode = http.StatusNotFound
-		} else if servertypes.IsAlreadyExists(err) {
+		} else if commontypes.IsAlreadyExists(err) {
 			statusCode = http.StatusConflict
-		} else if servertypes.IsBadRequest(err) {
+		} else if commontypes.IsBadRequest(err) {
 			statusCode = http.StatusBadRequest
-		} else if servertypes.IsNotImplemented(err) {
+		} else if commontypes.IsNotImplemented(err) {
 			statusCode = http.StatusNotImplemented
 		} else {
 			statusCode = http.StatusInternalServerError
@@ -582,7 +582,7 @@ func (s *DIServer) buildResponse(reps interface{}, msg string, err error) (serve
 	}
 
 	// build response
-	rep := servertypes.Response{
+	rep := commontypes.Response{
 		Success: success,
 		Code:    code,
 		Message: msg,
@@ -591,7 +591,7 @@ func (s *DIServer) buildResponse(reps interface{}, msg string, err error) (serve
 	return rep, statusCode
 }
 
-func writeResponse(w http.ResponseWriter, rep servertypes.Response, statusCode int) error {
+func writeResponse(w http.ResponseWriter, rep commontypes.Response, statusCode int) error {
 	w.Header().Set("Conten-Type", "application/json")
 	w.WriteHeader(statusCode)
 	repJSON, err := json.Marshal(rep)

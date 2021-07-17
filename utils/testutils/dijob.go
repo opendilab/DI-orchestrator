@@ -149,8 +149,8 @@ func WaitForAllReplicas(ctx context.Context, k8sClient client.Client, job *div1a
 			return false, err
 		}
 
-		// if there are only coordinator and aggregator, skip
-		if len(pods) <= 2 {
+		// if there are only coordinator, keep waiting
+		if len(pods) <= 1 {
 			return false, nil
 		}
 

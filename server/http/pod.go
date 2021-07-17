@@ -8,14 +8,13 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	dicommon "opendilab.org/di-orchestrator/common"
-	servertypes "opendilab.org/di-orchestrator/server/types"
+	commontypes "opendilab.org/di-orchestrator/common/types"
 	diutil "opendilab.org/di-orchestrator/utils"
 )
 
@@ -61,7 +60,7 @@ func (s *DIServer) getPodByKey(key string) (*corev1.Pod, error) {
 	}
 	if !exists {
 		errMsg := fmt.Sprintf("pod: %s not exists in cache", key)
-		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		return nil, &commontypes.DIError{Type: commontypes.ErrorNotFound, Message: errMsg}
 	}
 
 	podUn := obj.(*unstructured.Unstructured)
@@ -110,7 +109,7 @@ func (s *DIServer) getServiceByKey(key string) (*corev1.Service, error) {
 	}
 	if !exists {
 		errMsg := fmt.Sprintf("service: %s not exists in cache", key)
-		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		return nil, &commontypes.DIError{Type: commontypes.ErrorNotFound, Message: errMsg}
 	}
 
 	serviceUn := obj.(*unstructured.Unstructured)
@@ -121,32 +120,6 @@ func (s *DIServer) getServiceByKey(key string) (*corev1.Service, error) {
 		return nil, fmt.Errorf(errMsg)
 	}
 	return &service, nil
-}
-
-func (s *DIServer) buildPodAndService(
-	template *corev1.PodTemplateSpec,
-	ownRefer metav1.OwnerReference,
-	jobName string,
-	namespace, replicaType string,
-	port int32,
-	resources servertypes.ResourceQuantity,
-	volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
-	// build pod
-	pod, port, err := diutil.BuildPodFromTemplate(template, ownRefer, jobName, namespace, replicaType, port)
-	if err != nil {
-		return nil, nil, -1, err
-	}
-	// set pod resources
-	s.setPodResources(pod, resources)
-
-	// add volumes
-	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
-
-	// build service
-	svc := diutil.BuildService(pod.GetLabels(), port)
-	svc.SetOwnerReferences([]metav1.OwnerReference{ownRefer})
-	svc.Name = pod.Name
-	return pod, svc, port, nil
 }
 
 func (s *DIServer) createPodAndService(namespace string, pod *corev1.Pod, service *corev1.Service) (*corev1.Pod, error) {
@@ -180,7 +153,7 @@ func (s *DIServer) createPod(namespace string, pod *corev1.Pod) (*corev1.Pod, er
 	newpod, err := s.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
 	if err != nil {
 		if k8serrors.IsAlreadyExists(err) {
-			return newpod, &servertypes.DIError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
+			return newpod, &commontypes.DIError{Type: commontypes.ErrorAlreadyExists, Message: err.Error()}
 		}
 		return nil, err
 	}
@@ -191,7 +164,7 @@ func (s *DIServer) createService(namespace string, service *corev1.Service) erro
 	_, err := s.KubeClient.CoreV1().Services(namespace).Create(context.Background(), service, metav1.CreateOptions{})
 	if err != nil {
 		if k8serrors.IsAlreadyExists(err) {
-			return &servertypes.DIError{Type: servertypes.ErrorAlreadyExists, Message: err.Error()}
+			return &commontypes.DIError{Type: commontypes.ErrorAlreadyExists, Message: err.Error()}
 		}
 		return err
 	}
@@ -225,61 +198,6 @@ func (s *DIServer) deleteService(namespace, name string) error {
 		return err
 	}
 	return nil
-}
-
-func (s *DIServer) setPodResources(pod *corev1.Pod, resources servertypes.ResourceQuantity) {
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
-			continue
-		}
-		if pod.Spec.Containers[i].Resources.Limits == nil {
-			pod.Spec.Containers[i].Resources.Limits = make(corev1.ResourceList)
-		}
-		if pod.Spec.Containers[i].Resources.Requests == nil {
-			pod.Spec.Containers[i].Resources.Requests = make(corev1.ResourceList)
-		}
-
-		// cpu and memory must not be zero
-		if !resources.CPU.IsZero() {
-			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = resources.CPU
-			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = resources.CPU
-		}
-		if !resources.Memory.IsZero() {
-			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = resources.Memory
-			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = resources.Memory
-		}
-		if !resources.GPU.IsZero() {
-			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
-			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
-		}
-	}
-}
-
-func (s *DIServer) getPodResources(pod *corev1.Pod, containerName string) servertypes.ResourceQuantity {
-	resource := servertypes.ResourceQuantity{
-		CPU:    resource.MustParse("0"),
-		GPU:    resource.MustParse("0"),
-		Memory: resource.MustParse("0"),
-	}
-	for _, container := range pod.Spec.Containers {
-		if container.Name != containerName {
-			continue
-		}
-		if container.Resources.Limits == nil && container.Resources.Requests == nil {
-			break
-		}
-		if container.Resources.Requests != nil {
-			resource.CPU = container.Resources.Requests[corev1.ResourceCPU].DeepCopy()
-			resource.GPU = container.Resources.Requests[corev1.ResourceName("nvidia.com/gpu")].DeepCopy()
-			resource.Memory = container.Resources.Requests[corev1.ResourceMemory].DeepCopy()
-		}
-		if container.Resources.Limits != nil {
-			resource.CPU = container.Resources.Limits[corev1.ResourceCPU].DeepCopy()
-			resource.GPU = container.Resources.Limits[corev1.ResourceName("nvidia.com/gpu")].DeepCopy()
-			resource.Memory = container.Resources.Limits[corev1.ResourceMemory].DeepCopy()
-		}
-	}
-	return resource
 }
 
 func (s *DIServer) listReplicaPodsWithSelector(namespace string, labelSelector labels.Selector) (

@@ -1,7 +1,7 @@
 apiVersion: diengine.opendilab.org/v1alpha1
 kind: DIJob
 metadata:
-  name: cartpole-dqn
+  name: dijob-cartpole-dqn
 spec:
   group: xxx
   priorityClassName: ""
@@ -17,20 +17,23 @@ spec:
   coordinator:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
           image: diorchestrator/ding:v0.1.0-df39b81c
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 3
-              memory: "10Gi"
-            limits:
-              cpu: 3
-              memory: "10Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -132,7 +135,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpus": "0",
+                                "gpus": "1",
                                 "replicas": 1,
                             },
                         ),
@@ -160,20 +163,23 @@ spec:
   collector:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
           image: diorchestrator/ding:v0.1.0-df39b81c
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 16
-              memory: "5Gi"
-            limits:
-              cpu: 16
-              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -187,20 +193,23 @@ spec:
   learner:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
           image: diorchestrator/ding:v0.1.0-df39b81c
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 16
-              memory: "5Gi"
-            limits:
-              cpu: 16
-              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |

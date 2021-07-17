@@ -12,7 +12,7 @@ import (
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 	dicommon "opendilab.org/di-orchestrator/common"
-	servertypes "opendilab.org/di-orchestrator/server/types"
+	commontypes "opendilab.org/di-orchestrator/common/types"
 	diutil "opendilab.org/di-orchestrator/utils"
 )
 
@@ -35,7 +35,7 @@ func (s *DIServer) getDIJob(namespace, modulePodName string) (*div1alpha1.DIJob,
 	}
 	if !ownByDI {
 		errMsg := fmt.Sprintf("module %s is not owned by any DIJob", modulePodName)
-		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		return nil, &commontypes.DIError{Type: commontypes.ErrorNotFound, Message: errMsg}
 	}
 
 	// get DIJob
@@ -49,7 +49,7 @@ func (s *DIServer) getDIJob(namespace, modulePodName string) (*div1alpha1.DIJob,
 	for _, ref := range ownRefers {
 		if ref.Kind == div1alpha1.KindDIJob && ref.UID != diJob.UID {
 			errMsg := fmt.Sprintf("coordinator %s is owned by stale DIJob", modulePodName)
-			return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
+			return nil, &commontypes.DIError{Type: commontypes.ErrorNotFound, Message: errMsg}
 		}
 	}
 
@@ -65,7 +65,7 @@ func (s *DIServer) getDIJobByKey(key string) (*div1alpha1.DIJob, error) {
 
 	if !exists {
 		errMsg := fmt.Sprintf("DIJob: %s not exists in cache", key)
-		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		return nil, &commontypes.DIError{Type: commontypes.ErrorNotFound, Message: errMsg}
 	}
 	diUn := obj.(*unstructured.Unstructured)
 	var diJob div1alpha1.DIJob
@@ -87,7 +87,7 @@ func (s *DIServer) getAGConfigByKey(key string) (*div1alpha1.AggregatorConfig, e
 
 	if !exists {
 		errMsg := fmt.Sprintf("AGConfig: %s not exists in cache", key)
-		return nil, &servertypes.DIError{Type: servertypes.ErrorNotFound, Message: errMsg}
+		return nil, &commontypes.DIError{Type: commontypes.ErrorNotFound, Message: errMsg}
 	}
 	agUn := obj.(*unstructured.Unstructured)
 	var agconfig div1alpha1.AggregatorConfig
@@ -101,7 +101,7 @@ func (s *DIServer) getAGConfigByKey(key string) (*div1alpha1.AggregatorConfig, e
 }
 
 func (s *DIServer) createCollectorsAndLearnersForDIJob(
-	njreq *servertypes.DIJobRequest,
+	njreq *commontypes.DIJobRequest,
 	job *div1alpha1.DIJob) ([]string, []string, error) {
 
 	// get agconfig to fetch aggregator definition
@@ -145,7 +145,7 @@ func (s *DIServer) createReplicas(
 	template *corev1.PodTemplateSpec,
 	volumes []corev1.Volume,
 	ownRefer metav1.OwnerReference,
-	resources servertypes.ResourceQuantity,
+	resources commontypes.ResourceQuantity,
 	namespace string,
 	replicaType string,
 	agtemplate *corev1.PodTemplateSpec) ([]string, error) {
@@ -178,7 +178,8 @@ func (s *DIServer) createReplicas(
 		if replicaType == dicommon.LearnerName && needMultiDDPLearnerPod {
 			jobName := ownRefer.Name
 			// create aggregator
-			agg, aggsvc, port, err := s.buildAggregatorPod(agtemplate, ownRefer, jobName, namespace)
+			agg, aggsvc, port, err := diutil.BuildPodAndService(agtemplate, ownRefer, jobName, namespace,
+				dicommon.AggregatorName, dicommon.DefaultAggregatorPort, nil)
 			if err != nil {
 				return results, err
 			}
@@ -207,7 +208,7 @@ func (s *DIServer) createReplicas(
 				replicaResource.GPU = resource.MustParse(fmt.Sprintf("%d", gpus))
 
 				// build ddp learner pod
-				pod, svc, _, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+				pod, svc, _, err = buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
 					jobName, namespace, replicaType, defaultPort, *replicaResource, volumes)
 				if err != nil {
 					return results, err
@@ -237,16 +238,20 @@ func (s *DIServer) createReplicas(
 			jobName := ownRefer.Name
 
 			// build collector/learner pod
-			pod, svc, port, err = s.buildPodAndService(template.DeepCopy(), ownRefer, jobName,
-				namespace, replicaType, defaultPort, resources, volumes)
+			pod, svc, port, err = diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
+				namespace, replicaType, defaultPort, volumes)
 			if err != nil {
 				return results, err
 			}
+			// set pod resources
+			diutil.SetPodResources(pod, resources)
+
 			svcName = svc.Name
 
 			if replicaType == dicommon.LearnerName && needAggregator(resources) {
 				// create aggregator
-				agg, aggsvc, aggport, err := s.buildAggregatorPod(agtemplate, ownRefer, jobName, namespace)
+				agg, aggsvc, aggport, err := diutil.BuildPodAndService(agtemplate, ownRefer, jobName, namespace,
+					dicommon.AggregatorName, dicommon.DefaultAggregatorPort, nil)
 				if err != nil {
 					return results, err
 				}
@@ -269,7 +274,7 @@ func (s *DIServer) createReplicas(
 				}
 
 				// build ddp learner pod
-				pod, svc, _, err = s.buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+				pod, svc, _, err = buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
 					jobName, namespace, replicaType, defaultPort, resources, volumes)
 				if err != nil {
 					return results, err
@@ -299,7 +304,7 @@ func (s *DIServer) createReplicas(
 	return results, nil
 }
 
-func (s *DIServer) needMultiDDPLearnerPod(resource servertypes.ResourceQuantity) (bool, error) {
+func (s *DIServer) needMultiDDPLearnerPod(resource commontypes.ResourceQuantity) (bool, error) {
 	if err := s.SyncNodes(); err != nil {
 		return false, err
 	}
@@ -314,71 +319,28 @@ func (s *DIServer) needMultiDDPLearnerPod(resource servertypes.ResourceQuantity)
 	return false, nil
 }
 
-func needAggregator(resource servertypes.ResourceQuantity) bool {
+func needAggregator(resource commontypes.ResourceQuantity) bool {
 	return resource.GPU.Value() > 1
 }
 
-func (s *DIServer) buildAggregatorPod(
-	template *corev1.PodTemplateSpec, ownRefer metav1.OwnerReference,
-	jobName, namespace string) (*corev1.Pod, *corev1.Service, int32, error) {
-	// create aggregator
-	aresource := servertypes.ResourceQuantity{}
-	pod, svc, port, err := s.buildPodAndService(template, ownRefer, jobName, namespace,
-		dicommon.AggregatorName, dicommon.DefaultAggregatorPort, aresource, nil)
-	if err != nil {
-		return nil, nil, -1, err
-	}
-
-	// add env
-	envs := make(map[string]string)
-	envs[dicommon.PodNamespaceEnv] = pod.Namespace
-	envs[dicommon.PodNameEnv] = pod.Name
-	envs[dicommon.ServerURLEnv] = dicommon.DefaultServerURL
-	diutil.AddEnvsToPod(pod, envs)
-
-	return pod, svc, port, nil
-}
-
-func (s *DIServer) buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
+func buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	aggOwnRefer metav1.OwnerReference,
 	jobName, namespace, replicaType string,
-	defaultPort int32, resources servertypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
-	// make sure aggregator is the controller of ddp learners
-	aggOwnRefer.Controller = func(c bool) *bool { return &c }(true)
-	ownRefer.Controller = func(c bool) *bool { return &c }(false)
-
-	pod, svc, port, err := s.buildPodAndService(template.DeepCopy(), aggOwnRefer, jobName,
-		namespace, dicommon.DDPLearnerName, defaultPort, resources, volumes)
+	defaultPort int32, resources commontypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
+	pod, svc, port, err := diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
+		namespace, dicommon.DDPLearnerName, defaultPort, volumes)
 	if err != nil {
 		return nil, nil, -1, err
 	}
+	diutil.SetPodResources(pod, resources)
 
-	// set owner reference of DIJob to aggregator
-	pod.OwnerReferences = append(pod.OwnerReferences, ownRefer)
-	svc.OwnerReferences = append(svc.OwnerReferences, ownRefer)
+	// set owner reference of DIJob to ddp learner
+	pod.OwnerReferences = append(pod.OwnerReferences, aggOwnRefer)
+	svc.OwnerReferences = append(svc.OwnerReferences, aggOwnRefer)
 
 	// create port for all the GPU processes
-	for j := 1; j < int(resources.GPU.Value()); j++ {
-		pname := fmt.Sprintf("%s-%d", dicommon.DDPLearnerPortPrefix, j)
-		pport := port + int32(j)
-		lsport := corev1.ServicePort{
-			Name: pname,
-			Port: pport,
-		}
-		svc.Spec.Ports = append(svc.Spec.Ports, lsport)
-
-		lcport := corev1.ContainerPort{
-			Name:          pname,
-			ContainerPort: pport,
-		}
-		for i := range pod.Spec.Containers {
-			if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
-				continue
-			}
-			pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, lcport)
-		}
-	}
+	diutil.AddPortsToPodAndService(pod, svc, int(resources.GPU.Value()), port)
 	return pod, svc, port, nil
 }
 

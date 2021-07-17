@@ -16,10 +16,9 @@ func BuildPodAndService(
 	ownRefer metav1.OwnerReference,
 	jobName string,
 	namespace, replicaType string,
-	port int32,
 	volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
 	// build pod
-	pod, port, err := BuildPodFromTemplate(template, ownRefer, jobName, namespace, replicaType, port)
+	pod, port, err := BuildPodFromTemplate(template, ownRefer, jobName, namespace, replicaType)
 	if err != nil {
 		return nil, nil, -1, err
 	}
@@ -43,29 +42,10 @@ func BuildPodFromTemplate(
 	template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	jobName string,
-	ns, replicaType string,
-	defaultPort int32) (*corev1.Pod, int32, error) {
+	ns, replicaType string) (*corev1.Pod, int32, error) {
 	// generate name is the DIJob name
-	portEnv := ""
 	podName := ReplicaPodName(jobName, replicaType)
-	switch replicaType {
-	case dicommon.CollectorName:
-		portEnv = "COLLECTOR_PORT"
-		podName = GenerateName(podName)
-	case dicommon.LearnerName:
-		portEnv = "LEARNER_PORT"
-		podName = GenerateName(podName)
-	case dicommon.DDPLearnerName:
-		portEnv = "LEARNER_PORT"
-		podName = GenerateName(podName)
-	case dicommon.AggregatorName:
-		portEnv = "AGGREGATOR_PORT"
-		podName = GenerateName(podName)
-	case dicommon.CoordinatorName:
-		portEnv = "COORDINATOR_PORT"
-	default:
-		return nil, -1, fmt.Errorf("wrong replica type: %s", replicaType)
-	}
+	podName, portEnv, defaultPort := GenerateReplicaInfo(replicaType, podName)
 
 	// setup pod template
 	template.SetName(podName)
@@ -220,4 +200,48 @@ func filterReplicaServices(services []*corev1.Service, replicaType string) ([]*c
 		result = append(result, service)
 	}
 	return result, nil
+}
+
+func GenerateReplicaInfo(replicaType, podName string) (string, string, int32) {
+	var portEnv string
+	var defaultPort int32
+	switch replicaType {
+	case dicommon.CollectorName:
+		portEnv = "COLLECTOR_PORT"
+		podName = GenerateName(podName)
+	case dicommon.LearnerName:
+		portEnv = "LEARNER_PORT"
+		podName = GenerateName(podName)
+	case dicommon.DDPLearnerName:
+		portEnv = "LEARNER_PORT"
+		podName = GenerateName(podName)
+	case dicommon.AggregatorName:
+		portEnv = "AGGREGATOR_PORT"
+		podName = GenerateName(podName)
+	case dicommon.CoordinatorName:
+		portEnv = "COORDINATOR_PORT"
+	default:
+		portEnv = "COORDINATOR_PORT"
+	}
+	defaultPort = GetReplicaDefaultPort(replicaType)
+	return podName, portEnv, defaultPort
+}
+
+func GetReplicaDefaultPort(replicaType string) int32 {
+	var defaultPort int32
+	switch replicaType {
+	case dicommon.CollectorName:
+		defaultPort = dicommon.DefaultCollectorPort
+	case dicommon.LearnerName:
+		defaultPort = dicommon.DefaultLearnerPort
+	case dicommon.DDPLearnerName:
+		defaultPort = dicommon.DefaultLearnerPort
+	case dicommon.AggregatorName:
+		defaultPort = dicommon.DefaultAggregatorPort
+	case dicommon.CoordinatorName:
+		defaultPort = dicommon.DefaultCoordinatorPort
+	default:
+		defaultPort = dicommon.DefaultCoordinatorPort
+	}
+	return defaultPort
 }

@@ -7,7 +7,6 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
@@ -77,31 +76,18 @@ func (r *DIJobReconciler) createPodAndService(ctx context.Context, job *div1alph
 }
 
 func (r *DIJobReconciler) createPod(ctx context.Context, job *div1alpha1.DIJob, pod *corev1.Pod) error {
-	if err := r.Create(ctx, pod, &client.CreateOptions{}); err != nil {
+	if err := r.Create(ctx, pod, &client.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
 		msg := fmt.Sprintf("Failed to create pod: %s error: %v", pod.Name, err)
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, FailedCreateReason, msg)
 		return fmt.Errorf("failed to create pod: %v", err)
 	}
-	// pod should be the controller of service
-	ownRefer := metav1.OwnerReference{
-		APIVersion: corev1.SchemeGroupVersion.Version,
-		Kind:       "Pod",
-		Name:       pod.Name,
-		UID:        pod.GetUID(),
-		Controller: func(c bool) *bool { return &c }(true),
-	}
-	for i := range pod.OwnerReferences {
-		pod.OwnerReferences[i].Controller = func(c bool) *bool { return &c }(false)
-	}
-	pod.OwnerReferences = append(pod.OwnerReferences, ownRefer)
-
 	msg := fmt.Sprintf("Create pod: %s", pod.Name)
 	r.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulCreateReason, msg)
 	return nil
 }
 
 func (r *DIJobReconciler) createService(ctx context.Context, job *div1alpha1.DIJob, service *corev1.Service) error {
-	if err := r.Create(ctx, service, &client.CreateOptions{}); err != nil {
+	if err := r.Create(ctx, service, &client.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
 		msg := fmt.Sprintf("Failed to create service: %s error: %v", service.Name, err)
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, FailedCreateReason, msg)
 		return fmt.Errorf("failed to create service: %v", err)

@@ -18,12 +18,17 @@ endif
 # Image URL to use all building/pushing image targets
 IMG_BASE ?= diorchestrator/di-operator
 SERVER_IMG_BASE ?= diorchestrator/di-server
+WEBHOOK_IMG_BASE ?= diorchestrator/di-webhook
 
 IMG ?= ${IMG_BASE}:${VERSION}
 MASTER_IMG ?= ${IMG_BASE}:${MASTER_VERSION}
 
 SERVER_IMG ?= ${SERVER_IMG_BASE}:${VERSION}
 MASTER_SERVER_IMG ?= ${SERVER_IMG_BASE}:${MASTER_VERSION}
+
+WEBHOOK_IMG ?= ${WEBHOOK_IMG_BASE}:${VERSION}
+MASTER_WEBHOOK_IMG ?= ${WEBHOOK_IMG_BASE}:${MASTER_VERSION}
+
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
@@ -56,14 +61,14 @@ help: ## Display this help.
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG} ${SERVER_IMG_BASE}=${MASTER_SERVER_IMG}
+	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG} ${SERVER_IMG_BASE}=${MASTER_SERVER_IMG} ${WEBHOOK_IMG_BASE}=${MASTER_WEBHOOK_IMG}
 	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
 
 # dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
 # used `make manifests` when commited git
 dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG} ${SERVER_IMG_BASE}=${SERVER_IMG}
+	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG} ${SERVER_IMG_BASE}=${SERVER_IMG} ${WEBHOOK_IMG_BASE}=${WEBHOOK_IMG}
 	./hack/update-image-tags.sh config/manager ${VERSION}
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -96,21 +101,32 @@ build: generate  ## Build di-operator binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
-docker-build:  ## Build docker image with the di-operator.
+operator-image:
 	docker build -t ${IMG} --target di-operator .
+
+webhook-image:
+	docker build -t ${WEBHOOK_IMG} --target di-webhook .
+
+server-image:
 	docker build -t ${SERVER_IMG} --target di-server .
+
+docker-build: operator-image webhook-image server-image ## Build docker image with the di-operator.
 
 docker-push: ## Push docker image with the di-operator.
 	docker push ${IMG}
 	docker push ${SERVER_IMG}
+	docker push ${WEBHOOK_IMG}
 
 docker-release: ## Release docker image with the di-operator.
 	docker pull ${IMG}
 	docker pull ${SERVER_IMG}
+	docker pull ${WEBHOOK_IMG}
 	docker tag ${IMG} ${MASTER_IMG}
 	docker tag ${SERVER_IMG} ${MASTER_SERVER_IMG}
+	docker tag ${WEBHOOK_IMG} ${MASTER_WEBHOOK_IMG}
 	docker push ${MASTER_IMG} 
 	docker push ${MASTER_SERVER_IMG}
+	docker push ${MASTER_WEBHOOK_IMG}
 
 ##@ Deployment
 

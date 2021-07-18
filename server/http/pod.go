@@ -7,8 +7,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -126,7 +125,7 @@ func (s *DIServer) getServiceByKey(key string) (*corev1.Service, error) {
 func (s *DIServer) createPodAndService(namespace string, pod *corev1.Pod, service *corev1.Service) (*corev1.Pod, error) {
 	// create pod
 	newpod, err := s.createPod(namespace, pod)
-	if err != nil && !errors.IsAlreadyExists(err) {
+	if err != nil {
 		return nil, err
 	}
 
@@ -144,7 +143,7 @@ func (s *DIServer) createPodAndService(namespace string, pod *corev1.Pod, servic
 	service.OwnerReferences = append(service.OwnerReferences, ownRefer)
 
 	// create service
-	if err := s.createService(namespace, service); err != nil && !errors.IsAlreadyExists(err) {
+	if err := s.createService(namespace, service); err != nil {
 		return newpod, err
 	}
 	return newpod, nil
@@ -152,10 +151,7 @@ func (s *DIServer) createPodAndService(namespace string, pod *corev1.Pod, servic
 
 func (s *DIServer) createPod(namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
 	newpod, err := s.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
-	if err != nil {
-		if k8serrors.IsAlreadyExists(err) {
-			return newpod, &commontypes.DIError{Type: commontypes.ErrorAlreadyExists, Message: err.Error()}
-		}
+	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
 	return newpod, nil
@@ -163,10 +159,7 @@ func (s *DIServer) createPod(namespace string, pod *corev1.Pod) (*corev1.Pod, er
 
 func (s *DIServer) createService(namespace string, service *corev1.Service) error {
 	_, err := s.KubeClient.CoreV1().Services(namespace).Create(context.Background(), service, metav1.CreateOptions{})
-	if err != nil {
-		if k8serrors.IsAlreadyExists(err) {
-			return &commontypes.DIError{Type: commontypes.ErrorAlreadyExists, Message: err.Error()}
-		}
+	if err != nil && !errors.IsAlreadyExists(err) {
 		return err
 	}
 	return nil
@@ -187,7 +180,7 @@ func (s *DIServer) deletePodAndService(namespace, name string) error {
 
 func (s *DIServer) deletePod(namespace, name string) error {
 	if err := s.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), name,
-		metav1.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !k8serrors.IsNotFound(err) {
+		metav1.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	return nil
@@ -195,7 +188,7 @@ func (s *DIServer) deletePod(namespace, name string) error {
 
 func (s *DIServer) deleteService(namespace, name string) error {
 	if err := s.KubeClient.CoreV1().Services(namespace).Delete(context.Background(), name,
-		metav1.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !k8serrors.IsNotFound(err) {
+		metav1.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 	return nil

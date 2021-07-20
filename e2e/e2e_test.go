@@ -32,7 +32,7 @@ const (
 	interval              = 3 * time.Second
 )
 
-var _ = Describe("E2E test for nerveX", func() {
+var _ = Describe("E2E test for DI-engine", func() {
 	Context("When DIJob meets network exception", func() {
 		It("Should reconnect after each module is available again", func() {
 			testCases := []string{"coordinator", "collector", "learner", "aggregator", "ddp-learner"}

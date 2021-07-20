@@ -153,83 +153,20 @@ func (s *DIServer) createReplicas(
 	results := []string{}
 	// create pods and services
 	for i := 0; i < resources.Replicas; i++ {
-		var pod *corev1.Pod
-		var svc *corev1.Service
-		var port int32
-		var podList []*corev1.Pod
-		var svcList []*corev1.Service
-
-		// check if we need to create multiple pods for learner
-		needMultiDDPLearnerPod, err := s.needMultiDDPLearnerPod(resources)
-		if err != nil {
-			return results, err
-		}
-
-		// if we need to create multiple ddp learner pods, we also need to create aggregator pod
-		if replicaType == dicommon.LearnerName && needMultiDDPLearnerPod {
+		if replicaType == dicommon.LearnerName && needAggregator(resources) {
 			jobName := ownRefer.Name
-			// create aggregator
-			agg, aggsvc, port, err := diutil.BuildPodAndService(agtemplate, ownRefer, jobName, namespace,
-				dicommon.AggregatorName, nil)
+			// create aggregator and ddp learners
+			result, err := s.createAggregatorAndDDPLearners(template.DeepCopy(), agtemplate, ownRefer,
+				jobName, namespace, replicaType, resources, volumes)
 			if err != nil {
 				return results, err
 			}
-
-			newagg, err := s.createPodAndService(namespace, agg, aggsvc)
-			if err != nil {
-				return results, err
-			}
-			aggOwnRefer := metav1.OwnerReference{
-				APIVersion: corev1.SchemeGroupVersion.Version,
-				Kind:       "Pod",
-				Name:       newagg.Name,
-				UID:        newagg.UID,
-				Controller: func(c bool) *bool { return &c }(false),
-			}
-
-			result := diutil.ConcatURL(aggsvc.Name, namespace, port)
 			results = append(results, result)
-
-			// allocate gpus
-			worldSize := int(resources.GPU.Value())
-			gpuSlice := s.gpuAllocator.Allocate(worldSize)
-			startRank := 0
-			for j, gpus := range gpuSlice {
-				replicaResource := resources.DeepCopy()
-				replicaResource.GPU = resource.MustParse(fmt.Sprintf("%d", gpus))
-
-				// build ddp learner pod
-				pod, svc, _, err = buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
-					jobName, namespace, replicaType, *replicaResource, volumes)
-				if err != nil {
-					return results, err
-				}
-
-				// append pod and svc to list
-				podList = append(podList, pod)
-				svcList = append(svcList, svc)
-
-				// add ddp envs to ddp learner
-				masterAddr := svcList[0].Name
-				if j == 0 {
-					masterAddr = "localhost"
-					// set access port for ddp master port
-					mport := corev1.ServicePort{
-						Name: "master-port",
-						Port: int32(dicommon.DefaultMasterPort),
-					}
-					svcList[0].Spec.Ports = append(svcList[0].Spec.Ports, mport)
-				}
-				addDDPEnvsToDDPLearner(pod, masterAddr, worldSize, gpus, startRank)
-				startRank += gpus
-			}
-
 		} else {
-			var svcName string
 			jobName := ownRefer.Name
 
-			// build collector/learner pod
-			pod, svc, port, err = diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
+			// build collector pod
+			pod, _, port, err := diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
 				namespace, replicaType, volumes)
 			if err != nil {
 				return results, err
@@ -237,59 +174,12 @@ func (s *DIServer) createReplicas(
 			// set pod resources
 			diutil.SetPodResources(pod, resources)
 
-			svcName = svc.Name
-
-			if replicaType == dicommon.LearnerName && needAggregator(resources) {
-				// create aggregator
-				agg, aggsvc, aggport, err := diutil.BuildPodAndService(agtemplate, ownRefer, jobName, namespace,
-					dicommon.AggregatorName, nil)
-				if err != nil {
-					return results, err
-				}
-
-				// set logic learner access svc and port
-				port = aggport
-				svcName = aggsvc.Name
-
-				newagg, err := s.createPodAndService(namespace, agg, aggsvc)
-				if err != nil {
-					return results, err
-				}
-
-				aggOwnRefer := metav1.OwnerReference{
-					APIVersion: corev1.SchemeGroupVersion.Version,
-					Kind:       "Pod",
-					Name:       newagg.Name,
-					UID:        newagg.UID,
-					Controller: func(c bool) *bool { return &c }(false),
-				}
-
-				// build ddp learner pod
-				pod, svc, _, err = buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
-					jobName, namespace, replicaType, resources, volumes)
-				if err != nil {
-					return results, err
-				}
-
-				// add ddp envs to ddp learner pod
-				masterAddr := "localhost"
-				worldSize := int(resources.GPU.Value())
-				addDDPEnvsToDDPLearner(pod, masterAddr, worldSize, worldSize, 0)
-			}
-
-			podList = append(podList, pod)
-			svcList = append(svcList, svc)
-			result := diutil.ConcatURL(svcName, namespace, port)
-			results = append(results, result)
-		}
-
-		for i := 0; i < len(podList); i++ {
-			pod := podList[i]
-			svc := svcList[i]
-			// create pod
-			if _, err := s.createPodAndService(namespace, pod, svc); err != nil {
+			if _, err := s.createPod(namespace, pod); err != nil {
 				return results, err
 			}
+
+			result := diutil.ConcatURL(pod.Name, namespace, port)
+			results = append(results, result)
 		}
 	}
 	return results, nil
@@ -314,25 +204,121 @@ func needAggregator(resource commontypes.ResourceQuantity) bool {
 	return resource.GPU.Value() > 1
 }
 
+func (s *DIServer) createAggregatorAndDDPLearners(template, agtemplate *corev1.PodTemplateSpec,
+	ownRefer metav1.OwnerReference,
+	jobName, namespace, replicaType string,
+	resources commontypes.ResourceQuantity, volumes []corev1.Volume,
+) (string, error) {
+	// create aggregator
+	agg, _, port, err := diutil.BuildPodAndService(agtemplate, ownRefer, jobName, namespace,
+		dicommon.AggregatorName, nil)
+	if err != nil {
+		return "", err
+	}
+
+	newagg, err := s.createPod(namespace, agg)
+	if err != nil {
+		return "", err
+	}
+	aggOwnRefer := metav1.OwnerReference{
+		APIVersion: corev1.SchemeGroupVersion.Version,
+		Kind:       "Pod",
+		Name:       newagg.Name,
+		UID:        newagg.UID,
+		Controller: func(c bool) *bool { return &c }(false),
+	}
+
+	replicaURL := diutil.ConcatURL(agg.Name, namespace, port)
+
+	// check if we need to create multiple pods for learner
+	needMultiDDPLearnerPod, err := s.needMultiDDPLearnerPod(resources)
+	if err != nil {
+		return replicaURL, err
+	}
+
+	if needMultiDDPLearnerPod {
+		// allocate gpus
+		worldSize := int(resources.GPU.Value())
+		gpuSlice := s.gpuAllocator.Allocate(worldSize)
+		startRank := 0
+		var masterPod *corev1.Pod
+		for j, gpus := range gpuSlice {
+			replicaResource := resources.DeepCopy()
+			replicaResource.GPU = resource.MustParse(fmt.Sprintf("%d", gpus))
+
+			// build ddp learner pod
+			pod, _, err := buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+				jobName, namespace, replicaType, *replicaResource, volumes)
+			if err != nil {
+				return replicaURL, err
+			}
+
+			// add ddp envs to ddp learner
+			var masterAddr string
+			if j == 0 {
+				masterPod = pod
+				masterAddr = "localhost"
+				// set access port for ddp master
+				mport := corev1.ContainerPort{
+					Name:          "master-port",
+					ContainerPort: dicommon.DefaultMasterPort,
+				}
+				diutil.AddPortToPod(pod, mport)
+				// set labels for ddp master
+				labels := map[string]string{dicommon.DDPLearnerTypeLabel: dicommon.DDPLearnerTypeMaster}
+				diutil.AddLabelsToPod(pod, labels)
+			} else {
+				masterAddr = masterPod.Name
+				// set labels for ddp worker
+				labels := map[string]string{dicommon.DDPLearnerTypeLabel: dicommon.DDPLearnerTypeWorker}
+				diutil.AddLabelsToPod(pod, labels)
+			}
+			addDDPEnvsToDDPLearner(pod, masterAddr, worldSize, gpus, startRank)
+			startRank += gpus
+
+			if _, err := s.createPod(namespace, pod); err != nil {
+				return replicaURL, err
+			}
+		}
+	} else {
+		// build ddp learner pod
+		pod, _, err := buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+			jobName, namespace, replicaType, resources, volumes)
+		if err != nil {
+			return replicaURL, err
+		}
+
+		// add ddp envs to ddp learner pod
+		masterAddr := "localhost"
+		worldSize := int(resources.GPU.Value())
+		addDDPEnvsToDDPLearner(pod, masterAddr, worldSize, worldSize, 0)
+
+		if _, err := s.createPod(namespace, pod); err != nil {
+			return replicaURL, err
+		}
+	}
+
+	return replicaURL, nil
+}
+
 func buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
 	ownRefer metav1.OwnerReference,
 	aggOwnRefer metav1.OwnerReference,
 	jobName, namespace, replicaType string,
-	resources commontypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, int32, error) {
-	pod, svc, port, err := diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
+	resources commontypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, int32, error) {
+	pod, _, port, err := diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
 		namespace, dicommon.DDPLearnerName, volumes)
 	if err != nil {
-		return nil, nil, -1, err
+		return nil, -1, err
 	}
 	diutil.SetPodResources(pod, resources)
 
-	// set owner reference of DIJob to ddp learner
+	// set owner reference of aggregator to ddp learner
 	pod.OwnerReferences = append(pod.OwnerReferences, aggOwnRefer)
-	svc.OwnerReferences = append(svc.OwnerReferences, aggOwnRefer)
 
 	// create port for all the GPU processes
-	diutil.AddPortsToPodAndService(pod, svc, int(resources.GPU.Value()), port)
-	return pod, svc, port, nil
+	diutil.AddGPUPortsToPod(pod, int(resources.GPU.Value()), port)
+	return pod, port, nil
 }
 
 func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, worldSize, localWorldSize, startRank int) {
@@ -346,9 +332,7 @@ func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, worldSize, local
 }
 
 func (s *DIServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
-	var defaultPort int32
-
-	defaultPort = diutil.GetReplicaDefaultPort(replicaType)
+	var defaultPort int32 = diutil.GetReplicaDefaultPort(replicaType)
 
 	results := []string{}
 	for _, pod := range pods {

@@ -248,7 +248,7 @@ func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName
 	if err != nil {
 		return commontypes.DIJobResponse{}, err
 	}
-	collectors, learners, _, aggregators, _, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
+	collectors, learners, _, aggregators, _, err := s.listReplicaPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
 		return commontypes.DIJobResponse{}, err
@@ -257,18 +257,18 @@ func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName
 	// get access urls
 	collectorURLs := []string{}
 	learnerURLs := []string{}
-	for _, svc := range collectors {
-		url := diutil.GetServiceAccessURL(svc)
+	for _, pod := range collectors {
+		url := diutil.GetPodAccessURL(pod, dicommon.DefaultCollectorPort)
 		collectorURLs = append(collectorURLs, url)
 	}
-	for _, svc := range learners {
-		url := diutil.GetServiceAccessURL(svc)
+	for _, pod := range learners {
+		url := diutil.GetPodAccessURL(pod, dicommon.DefaultLearnerPort)
 		learnerURLs = append(learnerURLs, url)
 	}
 
 	// aggregators are also considered to be learners in view of coordinator
-	for _, svc := range aggregators {
-		url := diutil.GetServiceAccessURL(svc)
+	for _, pod := range aggregators {
+		url := diutil.GetPodAccessURL(pod, dicommon.DefaultAggregatorPort)
 		learnerURLs = append(learnerURLs, url)
 	}
 
@@ -300,7 +300,7 @@ func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorNam
 	if err != nil {
 		return commontypes.DIJobResponse{}, err
 	}
-	_, _, _, _, DDPLearners, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
+	_, _, _, _, DDPLearners, err := s.listReplicaPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
 		return commontypes.DIJobResponse{}, err
@@ -308,8 +308,8 @@ func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorNam
 
 	// get access urls
 	ddpLearnerURLs := []string{}
-	for _, svc := range DDPLearners {
-		owners := svc.GetOwnerReferences()
+	for _, pod := range DDPLearners {
+		owners := pod.GetOwnerReferences()
 		owns := false
 		for _, owner := range owners {
 			if owner.Name == aggregatorName {
@@ -322,16 +322,21 @@ func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorNam
 		}
 
 		// build access urls to ddp learners
-		url := diutil.GetServiceAccessURL(svc)
+		url := diutil.GetPodAccessURL(pod, dicommon.DefaultLearnerPort)
 		ddpLearnerURLs = append(ddpLearnerURLs, url)
 
 		// append all gpu process access urls to response
-		for _, port := range svc.Spec.Ports {
-			if !strings.HasPrefix(port.Name, dicommon.DDPLearnerPortPrefix) {
+		for _, container := range pod.Spec.Containers {
+			if container.Name != dicommon.DefaultContainerName {
 				continue
 			}
-			url := diutil.ConcatURL(svc.Name, namespace, port.Port)
-			ddpLearnerURLs = append(ddpLearnerURLs, url)
+			for _, port := range container.Ports {
+				if !strings.HasPrefix(container.Name, dicommon.DDPLearnerPortPrefix) {
+					continue
+				}
+				url := diutil.ConcatURL(pod.Name, namespace, port.ContainerPort)
+				ddpLearnerURLs = append(ddpLearnerURLs, url)
+			}
 		}
 	}
 

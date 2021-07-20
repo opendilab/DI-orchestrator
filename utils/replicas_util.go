@@ -72,7 +72,8 @@ func BuildPodFromTemplate(
 	if !ok {
 		port = defaultPort
 		logrus.Infof("no port found, use default port for container %s port %d", dicommon.DefaultContainerName, port)
-		AddDefaultPortToPod(pod, port)
+		portObj := corev1.ContainerPort{Name: dicommon.DefaultPortName, ContainerPort: port}
+		AddPortToPod(pod, portObj)
 	}
 
 	// add env

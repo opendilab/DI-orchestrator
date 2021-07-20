@@ -42,7 +42,11 @@ func (r *DIJobReconciler) reconcilePodsAndServices(ctx context.Context, job *div
 		if pod.Labels[dicommon.ReplicaTypeLabel] == dicommon.DDPLearnerName {
 			rs := diutil.GetPodResources(pod)
 			gpus := int(rs.GPU.Value())
-			diutil.AddPortsToService(svc, gpus, port)
+			diutil.AddGPUPortsToService(svc, gpus, port)
+		}
+		if pod.Labels[dicommon.DDPLearnerTypeLabel] == dicommon.DDPLearnerTypeMaster {
+			mport := corev1.ServicePort{Name: "master-port", Port: dicommon.DefaultMasterPort}
+			svc.Spec.Ports = append(svc.Spec.Ports, mport)
 		}
 		if err := r.createService(ctx, job, svc); err != nil && !errors.IsAlreadyExists(err) {
 			return err

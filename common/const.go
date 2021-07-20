@@ -6,6 +6,7 @@ const (
 	ControllerNameLabel = "controller-name"
 	ReplicaTypeLabel    = "replica-type"
 	PodNameLabel        = "pod-name"
+	DDPLearnerTypeLabel = "ddp-learner-type"
 
 	ControllerName  = "di-operator"
 	CollectorName   = "collector"
@@ -15,8 +16,7 @@ const (
 	CoordinatorName = "coordinator"
 
 	DefaultContainerName = "di-container"
-
-	DefaultPortName = "di-port"
+	DefaultPortName      = "di-port"
 
 	DefaultCollectorPort   = 22270
 	DefaultLearnerPort     = 22271
@@ -24,6 +24,8 @@ const (
 	DefaultCoordinatorPort = 22273
 
 	DDPLearnerPortPrefix = "gpu-port"
+	DDPLearnerTypeMaster = "ddp-learner-master"
+	DDPLearnerTypeWorker = "ddp-learner-worker"
 
 	PodNamespaceEnv   = "KUBERNETES_POD_NAMESPACE"
 	PodNameEnv        = "KUBERNETES_POD_NAME"

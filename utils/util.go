@@ -76,7 +76,7 @@ func GetDefaultPortFromPod(pod *corev1.Pod) (int32, bool) {
 	return -1, false
 }
 
-func AddDefaultPortToPod(pod *corev1.Pod, port int32) {
+func AddPortToPod(pod *corev1.Pod, port corev1.ContainerPort) {
 	for i := range pod.Spec.Containers {
 		if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
 			continue
@@ -84,11 +84,7 @@ func AddDefaultPortToPod(pod *corev1.Pod, port int32) {
 		if pod.Spec.Containers[i].Ports == nil {
 			pod.Spec.Containers[i].Ports = []corev1.ContainerPort{}
 		}
-		portObj := corev1.ContainerPort{
-			Name:          dicommon.DefaultPortName,
-			ContainerPort: port,
-		}
-		pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, portObj)
+		pod.Spec.Containers[i].Ports = append(pod.Spec.Containers[i].Ports, port)
 	}
 }
 
@@ -238,12 +234,7 @@ func IsTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }
 
-func AddPortsToPodAndService(pod *corev1.Pod, service *corev1.Service, total int, startPort int32) {
-	AddPortsToPod(pod, total, startPort)
-	AddPortsToService(service, total, startPort)
-}
-
-func AddPortsToPod(pod *corev1.Pod, total int, startPort int32) {
+func AddGPUPortsToPod(pod *corev1.Pod, total int, startPort int32) {
 	for i := 1; i < total; i++ {
 		pname := fmt.Sprintf("%s-%d", dicommon.DDPLearnerPortPrefix, i)
 		pport := startPort + int32(i)
@@ -251,16 +242,11 @@ func AddPortsToPod(pod *corev1.Pod, total int, startPort int32) {
 			Name:          pname,
 			ContainerPort: pport,
 		}
-		for j := range pod.Spec.Containers {
-			if pod.Spec.Containers[j].Name != dicommon.DefaultContainerName {
-				continue
-			}
-			pod.Spec.Containers[j].Ports = append(pod.Spec.Containers[j].Ports, port)
-		}
+		AddPortToPod(pod, port)
 	}
 }
 
-func AddPortsToService(service *corev1.Service, total int, startPort int32) {
+func AddGPUPortsToService(service *corev1.Service, total int, startPort int32) {
 	for i := 1; i < total; i++ {
 		pname := fmt.Sprintf("%s-%d", dicommon.DDPLearnerPortPrefix, i)
 		pport := startPort + int32(i)

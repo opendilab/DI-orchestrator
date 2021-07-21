@@ -7,7 +7,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
@@ -77,13 +76,7 @@ var _ = Describe("DIJob Specification", func() {
 					dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
 
 					// build owner reference
-					ownRefer := metav1.OwnerReference{
-						APIVersion: div1alpha1.GroupVersion.String(),
-						Kind:       div1alpha1.KindDIJob,
-						Name:       dijob.Name,
-						UID:        dijob.GetUID(),
-						Controller: func(c bool) *bool { return &c }(true),
-					}
+					ownRefer := diutil.NewOwnerReference(div1alpha1.GroupVersion.String(), div1alpha1.KindDIJob, dijob.Name, dijob.UID, true)
 					By(fmt.Sprintf("ownRefer: %s %s", ownRefer.APIVersion, ownRefer.Kind))
 					colStatus := make([]int, 3)
 					for _, col := range c.collectors {

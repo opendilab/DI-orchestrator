@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
@@ -115,13 +116,7 @@ func (s *DIServer) createCollectorsAndLearnersForDIJob(
 	agtemplate := agconfig.Spec.Aggregator.Template.DeepCopy()
 
 	// build owner reference
-	ownRefer := metav1.OwnerReference{
-		APIVersion: job.APIVersion,
-		Kind:       job.Kind,
-		Name:       job.Name,
-		UID:        job.GetUID(),
-		Controller: func(c bool) *bool { return &c }(true),
-	}
+	ownRefer := diutil.NewOwnerReference(job.APIVersion, job.Kind, job.Name, job.UID, true)
 
 	volumes := job.Spec.Volumes
 	// create collectors
@@ -220,20 +215,27 @@ func (s *DIServer) createAggregatorAndDDPLearners(template, agtemplate *corev1.P
 	if err != nil {
 		return "", err
 	}
-	aggOwnRefer := metav1.OwnerReference{
-		APIVersion: corev1.SchemeGroupVersion.Version,
-		Kind:       "Pod",
-		Name:       newagg.Name,
-		UID:        newagg.UID,
-		Controller: func(c bool) *bool { return &c }(false),
-	}
+	aggOwnRefer := diutil.NewOwnerReference(corev1.SchemeGroupVersion.String(), "Pod", newagg.Name, newagg.UID, false)
 
 	replicaURL := diutil.ConcatURL(agg.Name, namespace, port)
 
 	// check if we need to create multiple pods for learner
+	if err := s.createDDPLearnerPods(template, ownRefer, aggOwnRefer,
+		jobName, namespace, resources, volumes); err != nil {
+		return replicaURL, err
+	}
+
+	return replicaURL, nil
+}
+
+func (s *DIServer) createDDPLearnerPods(template *corev1.PodTemplateSpec,
+	ownRefer, aggOwnRefer metav1.OwnerReference,
+	jobName, namespace string,
+	resources commontypes.ResourceQuantity, volumes []corev1.Volume,
+) error {
 	needMultiDDPLearnerPod, err := s.needMultiDDPLearnerPod(resources)
 	if err != nil {
-		return replicaURL, err
+		return err
 	}
 
 	if needMultiDDPLearnerPod {
@@ -248,9 +250,9 @@ func (s *DIServer) createAggregatorAndDDPLearners(template, agtemplate *corev1.P
 
 			// build ddp learner pod
 			pod, _, err := buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
-				jobName, namespace, replicaType, *replicaResource, volumes)
+				jobName, namespace, *replicaResource, volumes)
 			if err != nil {
-				return replicaURL, err
+				return err
 			}
 
 			// add ddp envs to ddp learner
@@ -277,15 +279,15 @@ func (s *DIServer) createAggregatorAndDDPLearners(template, agtemplate *corev1.P
 			startRank += gpus
 
 			if _, err := s.createPod(namespace, pod); err != nil {
-				return replicaURL, err
+				return err
 			}
 		}
 	} else {
 		// build ddp learner pod
 		pod, _, err := buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
-			jobName, namespace, replicaType, resources, volumes)
+			jobName, namespace, resources, volumes)
 		if err != nil {
-			return replicaURL, err
+			return err
 		}
 
 		// add ddp envs to ddp learner pod
@@ -294,17 +296,15 @@ func (s *DIServer) createAggregatorAndDDPLearners(template, agtemplate *corev1.P
 		addDDPEnvsToDDPLearner(pod, masterAddr, worldSize, worldSize, 0)
 
 		if _, err := s.createPod(namespace, pod); err != nil {
-			return replicaURL, err
+			return err
 		}
 	}
-
-	return replicaURL, nil
+	return nil
 }
 
 func buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
-	ownRefer metav1.OwnerReference,
-	aggOwnRefer metav1.OwnerReference,
-	jobName, namespace, replicaType string,
+	ownRefer, aggOwnRefer metav1.OwnerReference,
+	jobName, namespace string,
 	resources commontypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, int32, error) {
 	pod, _, port, err := diutil.BuildPodAndService(template.DeepCopy(), ownRefer, jobName,
 		namespace, dicommon.DDPLearnerName, volumes)
@@ -332,8 +332,6 @@ func addDDPEnvsToDDPLearner(pod *corev1.Pod, masterAddr string, worldSize, local
 }
 
 func (s *DIServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string, replicas int, replicaType string) ([]string, error) {
-	var defaultPort int32 = diutil.GetReplicaDefaultPort(replicaType)
-
 	results := []string{}
 	for _, pod := range pods {
 		// break if enough
@@ -342,10 +340,11 @@ func (s *DIServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string,
 		}
 
 		// delete pods and services
-		if err := s.deletePodAndService(namespace, pod.Name); err != nil {
+		if err := s.deletePod(namespace, pod.Name); err != nil {
 			return results, err
 		}
 
+		var defaultPort int32 = diutil.GetReplicaDefaultPort(replicaType)
 		result := diutil.GetPodAccessURL(pod, defaultPort)
 		results = append(results, result)
 	}
@@ -353,67 +352,69 @@ func (s *DIServer) deleteSpecifiedReplicas(pods []*corev1.Pod, namespace string,
 	return results, nil
 }
 
-func (s *DIServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.Service, namespace string) ([]string, error) {
+func (s *DIServer) recreateReplicas(pods []*corev1.Pod, namespace string) ([]string, error) {
 	var results []string
 	for i := range pods {
 		oldPod := pods[i]
 		replicaType := oldPod.Labels[dicommon.ReplicaTypeLabel]
-		var defaultPort int32
-		var needDDPLearner bool = false
-		switch replicaType {
-		case dicommon.CollectorName:
-			defaultPort = dicommon.DefaultCollectorPort
-		case dicommon.LearnerName:
-			defaultPort = dicommon.DefaultLearnerPort
-		case dicommon.DDPLearnerName:
-			defaultPort = dicommon.DefaultLearnerPort
-		case dicommon.AggregatorName:
-			defaultPort = dicommon.DefaultAggregatorPort
-			needDDPLearner = true
-		default:
-			return results, fmt.Errorf("unknown replica type")
-		}
 
-		// build new ddp learners
-		var ddppods []*corev1.Pod
-		var ddpsvcs []*corev1.Service
-		var err error
-		if needDDPLearner {
-			aggregatorName := oldPod.Name
-			ddppods, ddpsvcs, err = s.rebuildDDPLearners(namespace, aggregatorName)
-			if err != nil {
-				return results, err
-			}
+		// get ownReference of the request aggregator
+		job, err := s.getDIJob(namespace, oldPod.Name)
+		if err != nil {
+			return results, err
 		}
 
 		// delete pods and services
-		if err := s.deletePodAndService(namespace, oldPod.Name); err != nil {
+		if err := s.deletePod(namespace, oldPod.Name); err != nil {
 			return results, err
 		}
 
-		oldService := services[i]
-		pod, svc := rebuildPodAndService(oldPod, oldService)
+		pod := diutil.RebuildPod(oldPod)
+		port, ok := diutil.GetDefaultPortFromPod(pod)
+		if !ok {
+			port = diutil.GetReplicaDefaultPort(replicaType)
+		}
 
-		if _, err := s.createPodAndService(namespace, pod, svc); err != nil {
+		newpod, err := s.createPod(namespace, pod)
+		if err != nil {
 			return results, err
 		}
 
-		var portvalue int32 = defaultPort
-		for _, port := range svc.Spec.Ports {
-			if port.Name == dicommon.DefaultPortName {
-				portvalue = port.Port
-			}
-		}
-		result := diutil.ConcatURL(svc.Name, namespace, portvalue)
+		result := diutil.ConcatURL(pod.Name, namespace, port)
 		results = append(results, result)
 
+		// build new ddp learners
+		needDDPLearner := replicaType == dicommon.AggregatorName
 		if needDDPLearner {
-			for j := range ddppods {
-				newPod := ddppods[j]
-				newSvc := ddpsvcs[j]
-				if _, err := s.createPodAndService(namespace, newPod, newSvc); err != nil {
-					return results, err
+			aggregatorName := oldPod.Name
+			// get ddp learners of the request aggregator
+			ddppods, err := s.getDDPLearners(namespace, job.Name, aggregatorName)
+			if err != nil {
+				return results, err
+			}
+			// delete the ddp learners
+			err = s.deletePods(ddppods)
+			if err != nil {
+				return results, err
+			}
+
+			// recreate ddp learners
+			template := job.Spec.Learner.Template
+			ownRefer := diutil.NewOwnerReference(job.APIVersion, job.Kind, job.Name, job.UID, true)
+			aggOwnRefer := diutil.NewOwnerReference(corev1.SchemeGroupVersion.String(), "Pod", newpod.Name, newpod.UID, false)
+			var resources commontypes.ResourceQuantity
+			if len(ddppods) > 0 {
+				ddppod := ddppods[0]
+				resources = diutil.GetPodResources(ddppod)
+				gpus, ok := diutil.GetEnvFromPod(ddppod, dicommon.WorldSize)
+				if !ok {
+					gpus = "0"
 				}
+				resources.GPU = resource.MustParse(gpus)
+			}
+			err = s.createDDPLearnerPods(template.DeepCopy(), ownRefer, aggOwnRefer, job.Name, namespace, resources, job.Spec.Volumes)
+			if err != nil {
+				return results, err
 			}
 		}
 	}
@@ -421,67 +422,28 @@ func (s *DIServer) recreateReplicas(pods []*corev1.Pod, services []*corev1.Servi
 	return results, nil
 }
 
-func (s *DIServer) rebuildDDPLearners(namespace, aggregatorName string) ([]*corev1.Pod, []*corev1.Service, error) {
-	ddppods, ddpsvcs, err := s.getDDPLearners(namespace, aggregatorName)
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(ddppods) != len(ddpsvcs) {
-		return nil, nil, fmt.Errorf("the number of ddp learner pods and services must be the same")
-	}
-
-	var pods []*corev1.Pod
-	var svcs []*corev1.Service
-	for i := range ddppods {
-		oldPod := ddppods[i]
-		oldService := ddpsvcs[i]
-		pod, svc := rebuildPodAndService(oldPod, oldService)
-		pods = append(pods, pod)
-		svcs = append(svcs, svc)
-
-		// add env
-		masterAddr := svcs[0].Name
-		if i == 0 {
-			masterAddr = "localhost"
-		}
-		for j := range pod.Spec.Containers {
-			if pod.Spec.Containers[j].Name != dicommon.DefaultContainerName {
-				continue
-			}
-			for k := range pod.Spec.Containers[i].Env {
-				if pod.Spec.Containers[i].Env[k].Name == dicommon.MasterAddr {
-					pod.Spec.Containers[i].Env[k].Value = masterAddr
-				}
-			}
-		}
-
-		// delete old pod and service
-		s.deletePodAndService(namespace, oldPod.Name)
-	}
-	return pods, svcs, nil
-}
-
-func (s *DIServer) getDDPLearners(namespace, aggregatorName string) ([]*corev1.Pod, []*corev1.Service, error) {
-	log := s.Log.WithName("DIServer")
-
-	// get ownReference of the request coordinator
-	diJob, err := s.getDIJob(namespace, aggregatorName)
-	if err != nil {
-		log.Error(err, "failed to get owner reference")
-		return nil, nil, err
-	}
-
+func (s *DIServer) getDDPLearners(namespace, jobName, aggregatorName string) ([]*corev1.Pod, error) {
 	// list pods that belong to the DIJob
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: diutil.GenLabels(diJob.Name),
+		MatchLabels: diutil.GenLabels(jobName),
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
+	ddppods, err := s.getDDPLearnerPods(namespace, aggregatorName, labelSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	return ddppods, nil
+}
+
+func (s *DIServer) getDDPLearnerPods(namespace, aggregatorName string, labelSelector labels.Selector) ([]*corev1.Pod, error) {
+	log := s.Log.WithName("getDDPLearnerPods")
 	_, _, _, _, DDPLearners, err := s.listReplicaPodsWithSelector(namespace, labelSelector)
 	if err != nil {
 		log.Error(err, "failed to list collectors and learners")
-		return nil, nil, err
+		return nil, err
 	}
 
 	var ddppods []*corev1.Pod
@@ -499,28 +461,5 @@ func (s *DIServer) getDDPLearners(namespace, aggregatorName string) ([]*corev1.P
 		}
 		ddppods = append(ddppods, pod)
 	}
-
-	_, _, _, _, DDPLearnerServices, err := s.listReplicaServicesWithSelector(namespace, labelSelector)
-	if err != nil {
-		log.Error(err, "failed to list collectors and learners")
-		return nil, nil, err
-	}
-
-	var ddpsvcs []*corev1.Service
-	for _, pod := range DDPLearnerServices {
-		owners := pod.GetOwnerReferences()
-		owns := false
-		for _, owner := range owners {
-			if owner.Name == aggregatorName {
-				owns = true
-				break
-			}
-		}
-		if !owns {
-			continue
-		}
-		ddpsvcs = append(ddpsvcs, pod)
-	}
-
-	return ddppods, ddpsvcs, nil
+	return ddppods, nil
 }

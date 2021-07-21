@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -245,4 +246,49 @@ func GetReplicaDefaultPort(replicaType string) int32 {
 		defaultPort = dicommon.DefaultCoordinatorPort
 	}
 	return defaultPort
+}
+
+func RebuildPodAndService(oldPod *corev1.Pod, oldSvc *corev1.Service) (*corev1.Pod, *corev1.Service) {
+	pod := RebuildPod(oldPod)
+	svc := RebuildService(oldSvc, pod.Name, pod.GetLabels())
+	return pod, svc
+}
+
+func RebuildPod(oldPod *corev1.Pod) *corev1.Pod {
+	var pod *corev1.Pod = &corev1.Pod{}
+	parts := strings.Split(oldPod.Name, "-")
+	generateName := strings.Join(parts[:len(parts)-1], "-")
+	name := GenerateName(generateName)
+
+	pod.SetName(name)
+	pod.SetOwnerReferences(oldPod.GetOwnerReferences())
+	pod.Spec = oldPod.DeepCopy().Spec
+	pod.Spec.NodeName = ""
+
+	labels := oldPod.GetLabels()
+	labels[dicommon.PodNameLabel] = name
+	AddLabelsToPod(pod, labels)
+
+	// update pod env
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
+			continue
+		}
+		for j := range pod.Spec.Containers[i].Env {
+			if pod.Spec.Containers[i].Env[j].Name == dicommon.PodNameEnv {
+				pod.Spec.Containers[i].Env[j].Value = pod.Name
+			}
+		}
+	}
+	return pod
+}
+
+func RebuildService(oldService *corev1.Service, name string, labels map[string]string) *corev1.Service {
+	var svc *corev1.Service = &corev1.Service{}
+	svc.SetName(name)
+	svc.SetOwnerReferences(oldService.GetOwnerReferences())
+	svc.Spec = oldService.DeepCopy().Spec
+	svc.SetLabels(labels)
+	svc.Spec.Selector = labels
+	return svc
 }

@@ -122,6 +122,20 @@ func AddEnvsToPod(pod *corev1.Pod, envs map[string]string) {
 	}
 }
 
+func GetEnvFromPod(pod *corev1.Pod, envName string) (string, bool) {
+	for _, container := range pod.Spec.Containers {
+		if container.Name != dicommon.DefaultContainerName {
+			continue
+		}
+		for _, env := range container.Env {
+			if env.Name == envName {
+				return env.Value, true
+			}
+		}
+	}
+	return "", false
+}
+
 func BuildService(name, namespace string, ownRefer metav1.OwnerReference, labels map[string]string, port int32) *corev1.Service {
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -311,4 +325,14 @@ func GetPodResources(pod *corev1.Pod) commontypes.ResourceQuantity {
 		}
 	}
 	return resource
+}
+
+func NewOwnerReference(apiVersion, kind, name string, uid types.UID, controller bool) metav1.OwnerReference {
+	return metav1.OwnerReference{
+		APIVersion: apiVersion,
+		Kind:       kind,
+		Name:       name,
+		UID:        uid,
+		Controller: &controller,
+	}
 }

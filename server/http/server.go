@@ -100,7 +100,7 @@ func (s *DIServer) SyncNodes() error {
 }
 
 func (s *DIServer) Replicas(w http.ResponseWriter, r *http.Request) {
-	log := s.Log.WithName("DIServer")
+	log := s.Log.WithName("Replicas")
 
 	var reps interface{}
 	var err error
@@ -197,7 +197,7 @@ func (s *DIServer) getAllReplicas() ([]commontypes.DIJobResponse, error) {
 }
 
 func (s *DIServer) getNamespacedReplicas(namespace string) ([]commontypes.DIJobResponse, error) {
-	log := s.Log.WithName("DIServer")
+	log := s.Log.WithName("getNamespacedReplicas")
 
 	// construct label selector to list coordinators in namespace
 	lbs := map[string]string{
@@ -232,7 +232,7 @@ func (s *DIServer) getNamespacedReplicas(namespace string) ([]commontypes.DIJobR
 }
 
 func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName string) (commontypes.DIJobResponse, error) {
-	log := s.Log.WithName("DIServer")
+	log := s.Log.WithName("getNamespacedReplicasByCoordinator")
 
 	// get ownReference of the request coordinator
 	diJob, err := s.getDIJob(namespace, coordinatorName)
@@ -284,7 +284,7 @@ func (s *DIServer) getNamespacedReplicasByCoordinator(namespace, coordinatorName
 }
 
 func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorName string) (commontypes.DIJobResponse, error) {
-	log := s.Log.WithName("DIServer")
+	log := s.Log.WithName("getNamespacedDDPLearnersByAggregator")
 
 	// get ownReference of the request coordinator
 	diJob, err := s.getDIJob(namespace, aggregatorName)
@@ -331,7 +331,7 @@ func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorNam
 				continue
 			}
 			for _, port := range container.Ports {
-				if !strings.HasPrefix(container.Name, dicommon.DDPLearnerPortPrefix) {
+				if !strings.HasPrefix(port.Name, dicommon.DDPLearnerPortPrefix) {
 					continue
 				}
 				url := diutil.ConcatURL(pod.Name, namespace, port.ContainerPort)
@@ -345,12 +345,14 @@ func (s *DIServer) getNamespacedDDPLearnersByAggregator(namespace, aggregatorNam
 		Coordinator: aggregatorName,
 		Learners:    ddpLearnerURLs,
 	}
+
+	log.Info("get ddp learners", "learners", ddpLearnerURLs)
 	return rep, nil
 }
 
 // add replicas api
 func (s *DIServer) addReplicas(r *http.Request) (commontypes.DIJobResponse, error) {
-	log := s.Log.WithName("DIServer")
+	log := s.Log.WithName("addReplicas")
 	// get request body
 	var njreq commontypes.DIJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
@@ -389,7 +391,7 @@ func (s *DIServer) addReplicas(r *http.Request) (commontypes.DIJobResponse, erro
 
 // delete replicas api
 func (s *DIServer) deleteReplicas(r *http.Request) (commontypes.DIJobResponse, error) {
-	log := s.Log.WithName("DIServer")
+	log := s.Log.WithName("deleteReplicas")
 	// get request body
 	var njreq commontypes.DIJobRequest
 	err := json.NewDecoder(r.Body).Decode(&njreq)
@@ -466,7 +468,7 @@ func (s *DIServer) deleteReplicas(r *http.Request) (commontypes.DIJobResponse, e
 
 // ReplicasFailed will delete the failed replicas reported by caller, and recreate the same number of replicas
 func (s *DIServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
-	log := s.Log.WithName("DIServer")
+	log := s.Log.WithName("ReplicasFailed")
 
 	var reps interface{}
 	var err error
@@ -488,7 +490,7 @@ func (s *DIServer) ReplicasFailed(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *DIServer) replicasFailed(r *http.Request) (commontypes.DIJobResponse, error) {
-	log := s.Log.WithName("DIServer")
+	log := s.Log.WithName("replicasFailed")
 
 	// parse request body
 	var njreq commontypes.DIJobResponse
@@ -504,12 +506,8 @@ func (s *DIServer) replicasFailed(r *http.Request) (commontypes.DIJobResponse, e
 	if err != nil {
 		return commontypes.DIJobResponse{}, err
 	}
-	csvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Collectors)
-	if err != nil {
-		return commontypes.DIJobResponse{}, err
-	}
 
-	collectors, err := s.recreateReplicas(cpods, csvcs, njreq.Namespace)
+	collectors, err := s.recreateReplicas(cpods, njreq.Namespace)
 	if err != nil {
 		return commontypes.DIJobResponse{
 			Namespace:   njreq.Namespace,
@@ -528,17 +526,8 @@ func (s *DIServer) replicasFailed(r *http.Request) (commontypes.DIJobResponse, e
 			Learners:    nil,
 		}, err
 	}
-	lsvcs, err := s.getServicesByNames(njreq.Namespace, njreq.Learners)
-	if err != nil {
-		return commontypes.DIJobResponse{
-			Namespace:   njreq.Namespace,
-			Coordinator: njreq.Coordinator,
-			Collectors:  collectors,
-			Learners:    nil,
-		}, err
-	}
 
-	learners, err := s.recreateReplicas(lpods, lsvcs, njreq.Namespace)
+	learners, err := s.recreateReplicas(lpods, njreq.Namespace)
 	if err != nil {
 		return commontypes.DIJobResponse{
 			Namespace:   njreq.Namespace,

@@ -210,13 +210,7 @@ var _ = Describe("DIJob Controller", func() {
 				dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
 
 				// build owner reference
-				ownRefer := metav1.OwnerReference{
-					APIVersion: div1alpha1.GroupVersion.String(),
-					Kind:       div1alpha1.KindDIJob,
-					Name:       dijob.Name,
-					UID:        dijob.GetUID(),
-					Controller: func(c bool) *bool { return &c }(true),
-				}
+				ownRefer := diutil.NewOwnerReference(div1alpha1.GroupVersion.String(), div1alpha1.KindDIJob, dijob.Name, dijob.UID, true)
 
 				By(fmt.Sprintf("Create replicas for DIJob %s", dijob.Name))
 				colStatus := make([]int, 3)

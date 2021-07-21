@@ -97,11 +97,12 @@ test: ginkgo ## Run tests.
 ##@ Build
 
 build: generate  ## Build di-operator binary.
-	go build -o bin/di-operator main.go
-	go build -o bin/di-server server/main.go
+	go build -o bin/di-operator cmd/operator/main.go
+	go build -o bin/di-server cmd/server/main.go
+	go build -o bin/di-webhook cmd/webhook/main.go
 
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./main.go
+	go run ./cmd/operator/main.go
 
 operator-image:
 	docker build -t ${IMG} --target di-operator .
@@ -113,6 +114,11 @@ server-image:
 	docker build -t ${SERVER_IMG} --target di-server .
 
 docker-build: operator-image webhook-image server-image ## Build docker image with the di-operator.
+
+dev-images: build
+	docker build -t ${IMG} -f Dockerfile.dev --target di-operator .
+	docker build -t ${WEBHOOK_IMG} -f Dockerfile.dev --target di-webhook .
+	docker build -t ${SERVER_IMG} -f Dockerfile.dev --target di-server .
 
 docker-push: ## Push docker image with the di-operator.
 	docker push ${IMG}

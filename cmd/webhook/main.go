@@ -32,8 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	dicommon "opendilab.org/di-orchestrator/common"
-	"opendilab.org/di-orchestrator/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -50,14 +48,13 @@ func init() {
 }
 
 func main() {
-	var metricsAddr, probeAddr, serverAddr string
+	var metricsAddr, probeAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&serverAddr, "server-address", dicommon.DefaultServerURL, "The address to access  server.")
 
 	opts := zap.Options{
 		Development: true,
@@ -73,24 +70,10 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "12841a5d.opendilab.org",
+		LeaderElectionID:       "67841a5d.opendilab.org",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
-	// set DefaultDIServerURL
-	dicommon.DefaultServerURL = serverAddr
-
-	reconciler := &controllers.DIJobReconciler{
-		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("DIJob"),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("di-orchestrator"),
-	}
-	if err = reconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DIJob")
 		os.Exit(1)
 	}
 

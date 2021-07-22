@@ -39,7 +39,7 @@ spec:
                     stop_value=195,
                 ),
                 policy=dict(
-                    cuda=False,
+                    cuda=True,
                     model=dict(
                         obs_shape=4,
                         action_shape=2,
@@ -125,7 +125,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpus": "1",
+                                "gpus": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -136,7 +136,7 @@ spec:
                 path_data='./data',
                 path_policy='./policy',
                 communication_mode='auto',
-                learner_gpu_num=1,
+                learner_gpu_num=2,
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config

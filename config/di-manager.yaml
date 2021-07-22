@@ -16294,7 +16294,7 @@ spec:
   - port: 443
     targetPort: 9443
   selector:
-    control-plane: di-operator
+    control-plane: di-webhook
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -16329,10 +16329,6 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
-        ports:
-        - containerPort: 9443
-          name: webhook-server
-          protocol: TCP
         readinessProbe:
           httpGet:
             path: /readyz
@@ -16348,16 +16344,7 @@ spec:
             memory: 500Mi
         securityContext:
           allowPrivilegeEscalation: false
-        volumeMounts:
-        - mountPath: /tmp/k8s-webhook-server/serving-certs
-          name: cert
-          readOnly: true
       terminationGracePeriodSeconds: 10
-      volumes:
-      - name: cert
-        secret:
-          defaultMode: 420
-          secretName: di-webhook-server-cert
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -16403,6 +16390,65 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
       terminationGracePeriodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: di-webhook
+  name: di-webhook
+  namespace: di-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: di-webhook
+  template:
+    metadata:
+      labels:
+        control-plane: di-webhook
+    spec:
+      containers:
+      - command:
+        - /di-webhook
+        image: registry.sensetime.com/cloudnative4ai/di-webhook:v0.2.0-alpha.0
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: webhook
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 30m
+            memory: 100Mi
+          requests:
+            cpu: 30m
+            memory: 100Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: di-webhook-server-cert
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate

@@ -118,7 +118,7 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// initialize DIJob status
 	initializeDIJobReplicaStatus(job)
 
-	if err := r.reconcilePods(ctx, job, pods); err != nil {
+	if err := r.reconcileReplicas(ctx, job, pods, services); err != nil {
 		log.Error(err, "failed to reconcile pods", "job", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
@@ -189,6 +189,13 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				OwnerType:    &div1alpha1.DIJob{},
 			},
 			builder.Predicates{},
+		).
+		Watches(
+			&source.Kind{Type: &corev1.Service{}},
+			&handler.EnqueueRequestForOwner{
+				IsController: true,
+				OwnerType:    &div1alpha1.DIJob{},
+			},
 		).
 		Complete(r)
 }

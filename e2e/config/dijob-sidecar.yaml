@@ -17,7 +17,17 @@ spec:
   coordinator:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
           image: diorchestrator/ding:v0.1.0-df39b81c
           imagePullPolicy: Always
@@ -153,7 +163,17 @@ spec:
   collector:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
           image: diorchestrator/ding:v0.1.0-df39b81c
           imagePullPolicy: Always
@@ -173,7 +193,17 @@ spec:
   learner:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
           image: diorchestrator/ding:v0.1.0-df39b81c
           imagePullPolicy: Always

@@ -32,23 +32,23 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-serve
 FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-operator
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /tmp
+WORKDIR /
 COPY --from=builder /workspace/di-operator .
 
-ENTRYPOINT ["/tmp/di-operator"]
+ENTRYPOINT ["/di-operator"]
 
 FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-webhook
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /tmp
+WORKDIR /
 COPY --from=builder /workspace/di-webhook .
 
-ENTRYPOINT ["/tmp/di-webhook"]
+ENTRYPOINT ["/di-webhook"]
 
 FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-server
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /tmp
+WORKDIR /
 COPY --from=builder /workspace/di-server .
 
-ENTRYPOINT ["/tmp/di-server"]
+ENTRYPOINT ["/di-server"]

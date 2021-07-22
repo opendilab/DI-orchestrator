@@ -30,23 +30,23 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-serve
 FROM redhat/ubi8:latest as di-operator
 LABEL maintainer="opendilab.contact.gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /tmp
+WORKDIR /
 COPY --from=builder /workspace/di-operator .
 
-ENTRYPOINT ["/tmp/di-operator"]
+ENTRYPOINT ["/di-operator"]
 
 FROM redhat/ubi8:latest as di-webhook
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /tmp
+WORKDIR /
 COPY --from=builder /workspace/di-webhook .
 
-ENTRYPOINT ["/tmp/di-webhook"]
+ENTRYPOINT ["/di-webhook"]
 
 FROM redhat/ubi8:latest as di-server
 LABEL maintainer="opendilab.contact.gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /tmp
+WORKDIR /
 COPY --from=builder /workspace/di-server .
 
-ENTRYPOINT ["/tmp/di-server"]
+ENTRYPOINT ["/di-server"]

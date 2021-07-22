@@ -5,23 +5,23 @@
 FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-operator
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /tmp
+WORKDIR /
 COPY ./bin/di-operator  .
 
-ENTRYPOINT ["/tmp/di-operator"]
+ENTRYPOINT ["/di-operator"]
 
 FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-webhook
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /tmp
+WORKDIR /
 COPY ./bin/di-webhook .
 
-ENTRYPOINT ["/tmp/di-webhook"]
+ENTRYPOINT ["/di-webhook"]
 
 FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-server
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-WORKDIR /tmp
+WORKDIR /
 COPY ./bin/di-server .
 
-ENTRYPOINT ["/tmp/di-server"]
+ENTRYPOINT ["/di-server"]

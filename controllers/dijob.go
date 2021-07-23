@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 	dicommon "opendilab.org/di-orchestrator/common"
 	diutil "opendilab.org/di-orchestrator/utils"
@@ -79,13 +78,7 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *div1alp
 	}
 
 	// build owner reference
-	ownRefer := metav1.OwnerReference{
-		APIVersion: job.APIVersion,
-		Kind:       job.Kind,
-		Name:       job.Name,
-		UID:        job.GetUID(),
-		Controller: func(c bool) *bool { return &c }(true),
-	}
+	ownRefer := diutil.NewOwnerReference(job.APIVersion, job.Kind, job.Name, job.UID, true)
 
 	// build pod
 	pod, svc, port, err := diutil.BuildPodAndService(template, ownRefer, job.Name, job.Namespace, replicaType, volumes)

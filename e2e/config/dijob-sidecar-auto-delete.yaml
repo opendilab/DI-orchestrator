@@ -20,6 +20,13 @@ spec:
         shareProcessNamespace: true
         containers:
         - name: shell
+          command: ["sh", "-c"]
+          args: 
+          - |
+            sleep 30s;
+            ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef" | awk 'NR<2';
+            kill -9 $(ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef"|awk 'NR<2 {print $1}');
+            exit 0;
           image: busybox
           imagePullPolicy: IfNotPresent
           securityContext:
@@ -166,6 +173,13 @@ spec:
         shareProcessNamespace: true
         containers:
         - name: shell
+          command: ["sh", "-c"]
+          args: 
+          - |
+            sleep 30s;
+            ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef" | awk 'NR<2';
+            kill -9 $(ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef"|awk 'NR<2 {print $1}');
+            exit 0;
           image: busybox
           imagePullPolicy: IfNotPresent
           securityContext:
@@ -196,6 +210,13 @@ spec:
         shareProcessNamespace: true
         containers:
         - name: shell
+          command: ["sh", "-c"]
+          args: 
+          - |
+            sleep 30s;
+            ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef" | awk 'NR<2';
+            kill -9 $(ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef"|awk 'NR<2 {print $1}');
+            exit 0;
           image: busybox
           imagePullPolicy: IfNotPresent
           securityContext:

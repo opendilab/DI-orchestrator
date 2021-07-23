@@ -249,7 +249,7 @@ func (s *DIServer) createDDPLearnerPods(template *corev1.PodTemplateSpec,
 			replicaResource.GPU = resource.MustParse(fmt.Sprintf("%d", gpus))
 
 			// build ddp learner pod
-			pod, _, err := buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+			pod, _, err := buildDDPLearnerPod(template, ownRefer, aggOwnRefer,
 				jobName, namespace, *replicaResource, volumes)
 			if err != nil {
 				return err
@@ -284,7 +284,7 @@ func (s *DIServer) createDDPLearnerPods(template *corev1.PodTemplateSpec,
 		}
 	} else {
 		// build ddp learner pod
-		pod, _, err := buildDDPLearnerPodAndService(template, ownRefer, aggOwnRefer,
+		pod, _, err := buildDDPLearnerPod(template, ownRefer, aggOwnRefer,
 			jobName, namespace, resources, volumes)
 		if err != nil {
 			return err
@@ -302,7 +302,7 @@ func (s *DIServer) createDDPLearnerPods(template *corev1.PodTemplateSpec,
 	return nil
 }
 
-func buildDDPLearnerPodAndService(template *corev1.PodTemplateSpec,
+func buildDDPLearnerPod(template *corev1.PodTemplateSpec,
 	ownRefer, aggOwnRefer metav1.OwnerReference,
 	jobName, namespace string,
 	resources commontypes.ResourceQuantity, volumes []corev1.Volume) (*corev1.Pod, int32, error) {

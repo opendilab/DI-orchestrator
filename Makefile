@@ -64,6 +64,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG} ${SERVER_IMG_BASE}=${MASTER_SERVER_IMG} ${WEBHOOK_IMG_BASE}=${MASTER_WEBHOOK_IMG}
 	./hack/update-version.sh ${MASTER_VERSION}
 	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
+	./hack/update-image-tags.sh config/v1.15.5 ${MASTER_VERSION}
 
 # dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
 # used `make manifests` when commited git
@@ -72,6 +73,7 @@ dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and 
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG} ${SERVER_IMG_BASE}=${SERVER_IMG} ${WEBHOOK_IMG_BASE}=${WEBHOOK_IMG}
 	./hack/update-version.sh ${VERSION}
 	./hack/update-image-tags.sh config/manager ${VERSION}
+	./hack/update-image-tags.sh config/v1.15.5 ${VERSION}
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."

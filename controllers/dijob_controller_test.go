@@ -7,12 +7,14 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 	dicommon "opendilab.org/di-orchestrator/common"
+	commontypes "opendilab.org/di-orchestrator/common/types"
 	diutil "opendilab.org/di-orchestrator/utils"
 	testutil "opendilab.org/di-orchestrator/utils/testutils"
 )
@@ -221,6 +223,58 @@ var _ = Describe("DIJob Controller", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
+		It("Should build right gpu ports and master port when the pod is ddp learner", func() {
+			type replica struct {
+				name           string
+				ddpLearnerType string
+				gpus           int
+				expectedPorts  int
+			}
+
+			testCases := []replica{
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeMaster, gpus: 4, expectedPorts: 5},
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeWorker, gpus: 6, expectedPorts: 6},
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeMaster, gpus: 1, expectedPorts: 2},
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeMaster, gpus: 0, expectedPorts: 2},
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeWorker, gpus: 0, expectedPorts: 1},
+			}
+			for i := range testCases {
+				c := testCases[i]
+				By(fmt.Sprintf("Create %dth DIJob", i+1))
+				var err error
+				ctx := context.Background()
+				jobTmpl := testutil.NewDIJob()
+				dijob, _ := createDIJob(ctx, k8sClient, jobTmpl)
+
+				// build owner reference
+				ownRefer := diutil.NewOwnerReference(div1alpha1.GroupVersion.String(), div1alpha1.KindDIJob, dijob.Name, dijob.UID, true)
+
+				By(fmt.Sprintf("Create replicas for DIJob %s", dijob.Name))
+				pod := buildPod(c.name, dijob.Name, dicommon.DDPLearnerName, ownRefer)
+				pod.Labels[dicommon.DDPLearnerTypeLabel] = c.ddpLearnerType
+				resources := commontypes.ResourceQuantity{GPU: resource.MustParse(fmt.Sprint(c.gpus))}
+				diutil.SetPodResources(pod, resources)
+
+				err = k8sClient.Create(ctx, pod, &client.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Checking the # of service's ports are as expected")
+				Eventually(func() int {
+					svcs, err := diutil.ListServices(ctx, k8sClient, &dijob)
+					Expect(err).NotTo(HaveOccurred())
+
+					_, _, _, _, DDPLearners, err := diutil.ClassifyServices(svcs)
+					Expect(err).NotTo(HaveOccurred())
+					if len(DDPLearners) == 0 {
+						return -1
+					}
+					return len(DDPLearners[0].Spec.Ports)
+				}, timeout, interval).Should(Equal(c.expectedPorts))
+
+				err = testutil.CleanUpJob(ctx, k8sClient, &dijob)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
 	})
 })
 
@@ -256,13 +310,23 @@ func createAndUpdatePodPhase(
 	ctx context.Context, k8sClient client.Client,
 	name, jobName string, status corev1.PodPhase, replicaType string,
 	ownRefer metav1.OwnerReference, statuses []int) {
+	pod := buildPod(name, jobName, replicaType, ownRefer)
+	createPodAndUpdatePhase(ctx, k8sClient, pod, status, statuses)
+}
 
+func buildPod(name, jobName string, replicaType string,
+	ownRefer metav1.OwnerReference) *corev1.Pod {
 	pod := testutil.NewPod(name, jobName, ownRefer)
 	labs := diutil.GenLabels(jobName)
 	labs[dicommon.ReplicaTypeLabel] = replicaType
 	labs[dicommon.PodNameLabel] = pod.Name
 	pod.SetLabels(labs)
 
+	return pod
+}
+
+func createPodAndUpdatePhase(ctx context.Context, k8sClient client.Client,
+	pod *corev1.Pod, status corev1.PodPhase, statuses []int) {
 	err := k8sClient.Create(ctx, pod, &client.CreateOptions{})
 	Expect(err).NotTo(HaveOccurred())
 

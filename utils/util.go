@@ -261,6 +261,7 @@ func AddGPUPortsToPod(pod *corev1.Pod, total int, startPort int32) {
 }
 
 func AddGPUPortsToService(service *corev1.Service, total int, startPort int32) {
+	// gpu 0's port has already been created
 	for i := 1; i < total; i++ {
 		pname := fmt.Sprintf("%s-%d", dicommon.DDPLearnerPortPrefix, i)
 		pport := startPort + int32(i)

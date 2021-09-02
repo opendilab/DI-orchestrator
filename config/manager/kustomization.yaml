@@ -7,10 +7,10 @@ kind: Kustomization
 images:
 - name: diorchestrator/di-operator
   newName: diorchestrator/di-operator
-  newTag: v0.2.0-alpha.0
+  newTag: v0.2.0-rc.0
 - name: diorchestrator/di-server
   newName: diorchestrator/di-server
-  newTag: v0.2.0-alpha.0
-- name: registry.sensetime.com/cloudnative4ai/di-webhook
-  newName: registry.sensetime.com/cloudnative4ai/di-webhook
-  newTag: v0.2.0-alpha.0
+  newTag: v0.2.0-rc.0
+- name: diorchestrator/di-webhook
+  newName: diorchestrator/di-webhook
+  newTag: v0.2.0-rc.0

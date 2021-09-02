@@ -55,6 +55,7 @@ spec:
             description: AggregatorConfigSpec defines the desired state of AggregatorConfig
             properties:
               aggregator:
+                description: AggregatorSpec defines the desired state of aggregator
                 properties:
                   template:
                     description: PodTemplateSpec describes the data a pod should have when created from a template
@@ -16320,7 +16321,7 @@ spec:
         - --leader-elect
         command:
         - /di-operator
-        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.2.0-alpha.0
+        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.2.0-rc.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16371,7 +16372,7 @@ spec:
         - --lease-lock-name=di-server
         command:
         - /di-server
-        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.0-alpha.0
+        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.0-rc.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16411,7 +16412,7 @@ spec:
       containers:
       - command:
         - /di-webhook
-        image: registry.sensetime.com/cloudnative4ai/di-webhook:v0.2.0-alpha.0
+        image: registry.sensetime.com/cloudnative4ai/di-webhook:v0.2.0-rc.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

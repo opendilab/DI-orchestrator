@@ -2,7 +2,7 @@
 
 # Use distroless as minimal base image to package the di-operator binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-operator
+FROM redhat/ubi8:latest as di-operator
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /
@@ -10,7 +10,7 @@ COPY ./bin/di-operator  .
 
 ENTRYPOINT ["/di-operator"]
 
-FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-webhook
+FROM redhat/ubi8:latest as di-webhook
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /
@@ -18,7 +18,7 @@ COPY ./bin/di-webhook .
 
 ENTRYPOINT ["/di-webhook"]
 
-FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-server
+FROM redhat/ubi8:latest as di-server
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /

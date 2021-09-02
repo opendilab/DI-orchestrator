@@ -408,22 +408,6 @@ var _ = Describe("Server Test", func() {
 					Expect(portCount).Should(Equal(c.expectedDDPLPorts))
 				}
 
-				By("Send request on DELETE /v1alpha1/replicas")
-				var dln int = 1
-				dreq := commontypes.DIJobRequest{
-					Namespace:   job.Namespace,
-					Coordinator: coorname,
-					Learners: commontypes.ResourceQuantity{
-						Replicas: dln,
-					},
-				}
-				drbody, err := json.Marshal(dreq)
-				Expect(err).NotTo(HaveOccurred())
-
-				ddiresp, err := sendRequest(http.MethodDelete, drbody, rurl, http.StatusOK, true)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(len(ddiresp.Learners)).Should(Equal(dln))
-
 				err = testutil.CleanUpJob(ctx, k8sClient, job.DeepCopy())
 				Expect(err).NotTo(HaveOccurred())
 			}

@@ -139,7 +139,7 @@ func (r *DIJobReconciler) deletePodsAndServices(ctx context.Context, job *div1al
 		}
 	}
 
-	if job.Spec.CleanPodPolicy != div1alpha1.CleanPodPolicyALL &&
+	if job.Spec.CleanPodPolicy != div1alpha1.CleanPodPolicyAll &&
 		job.Spec.CleanPodPolicy != div1alpha1.CleanPodPolicyRunning {
 		return nil
 	}

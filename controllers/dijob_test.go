@@ -20,7 +20,7 @@ var _ = Describe("DIJob Specification", func() {
 	Context("When creating a DIJob with different CleanPodPolicy", func() {
 		It("Should execute different pods deletion policy with different CleanPodPolicy", func() {
 			cleanPodPolicies := []div1alpha1.CleanPodPolicy{
-				div1alpha1.CleanPodPolicyALL,
+				div1alpha1.CleanPodPolicyAll,
 				div1alpha1.CleanPodPolicyRunning,
 				div1alpha1.CleanPodPolicyNone,
 			}
@@ -116,7 +116,7 @@ var _ = Describe("DIJob Specification", func() {
 					By("Checking all the pods and services are deleted")
 
 					switch policy {
-					case div1alpha1.CleanPodPolicyALL:
+					case div1alpha1.CleanPodPolicyAll:
 						Eventually(func() int {
 							pods, err := diutil.ListPods(ctx, k8sClient, &dijob)
 							if err != nil {

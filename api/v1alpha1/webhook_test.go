@@ -23,7 +23,7 @@ var _ = Describe("Webhook test", func() {
 			}
 			testCases := []testCase{
 				{cleanPodPolicy: CleanPodPolicyRunning, expectCleanPodPolicy: CleanPodPolicyRunning},
-				{cleanPodPolicy: CleanPodPolicyALL, expectCleanPodPolicy: CleanPodPolicyALL},
+				{cleanPodPolicy: CleanPodPolicyAll, expectCleanPodPolicy: CleanPodPolicyAll},
 				{cleanPodPolicy: CleanPodPolicyNone, expectCleanPodPolicy: CleanPodPolicyNone},
 				{cleanPodPolicy: CleanPodPolicy(""), expectCleanPodPolicy: CleanPodPolicyRunning},
 				{cleanPodPolicy: CleanPodPolicy("hello"), expectCleanPodPolicy: CleanPodPolicy("will be refused by webhook")},
@@ -42,7 +42,7 @@ var _ = Describe("Webhook test", func() {
 				err = k8sClient.Create(ctx, job, &client.CreateOptions{})
 				if err != nil {
 					if c.cleanPodPolicy != CleanPodPolicyRunning && c.cleanPodPolicy != CleanPodPolicyNone &&
-						c.cleanPodPolicy != CleanPodPolicyALL {
+						c.cleanPodPolicy != CleanPodPolicyAll {
 						Expect(err.Error()).To(ContainSubstring("Invalid CleanPodPolicy"))
 						continue
 					} else {
@@ -69,7 +69,7 @@ var _ = Describe("Webhook test", func() {
 			}
 			testCases := []testCase{
 				{cleanPodPolicy: CleanPodPolicyRunning, expectCleanPodPolicy: CleanPodPolicyRunning},
-				{cleanPodPolicy: CleanPodPolicyALL, expectCleanPodPolicy: CleanPodPolicyALL},
+				{cleanPodPolicy: CleanPodPolicyAll, expectCleanPodPolicy: CleanPodPolicyAll},
 				{cleanPodPolicy: CleanPodPolicyNone, expectCleanPodPolicy: CleanPodPolicyNone},
 				{cleanPodPolicy: CleanPodPolicy(""), expectCleanPodPolicy: CleanPodPolicyRunning},
 				{cleanPodPolicy: CleanPodPolicy("hello"), expectCleanPodPolicy: CleanPodPolicy("will be refused by webhook")},
@@ -90,7 +90,7 @@ var _ = Describe("Webhook test", func() {
 				err = k8sClient.Update(ctx, job, &client.UpdateOptions{})
 				if err != nil {
 					if c.cleanPodPolicy != CleanPodPolicyRunning && c.cleanPodPolicy != CleanPodPolicyNone &&
-						c.cleanPodPolicy != CleanPodPolicyALL {
+						c.cleanPodPolicy != CleanPodPolicyAll {
 						Expect(err.Error()).To(ContainSubstring("Invalid CleanPodPolicy"))
 						continue
 					} else {

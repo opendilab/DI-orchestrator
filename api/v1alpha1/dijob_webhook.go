@@ -59,10 +59,10 @@ func (r *DIJob) ValidateCreate() error {
 	dijoblog.Info("validate create", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
-	if r.Spec.CleanPodPolicy != CleanPodPolicyALL && r.Spec.CleanPodPolicy != CleanPodPolicyNone &&
+	if r.Spec.CleanPodPolicy != CleanPodPolicyAll && r.Spec.CleanPodPolicy != CleanPodPolicyNone &&
 		r.Spec.CleanPodPolicy != CleanPodPolicyRunning {
 		return fmt.Errorf("Invalid CleanPodPolicy %s, expected in [%s, %s, %s]",
-			r.Spec.CleanPodPolicy, CleanPodPolicyNone, CleanPodPolicyRunning, CleanPodPolicyALL)
+			r.Spec.CleanPodPolicy, CleanPodPolicyNone, CleanPodPolicyRunning, CleanPodPolicyAll)
 	}
 	return nil
 }
@@ -72,10 +72,10 @@ func (r *DIJob) ValidateUpdate(old runtime.Object) error {
 	dijoblog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
-	if r.Spec.CleanPodPolicy != CleanPodPolicyALL && r.Spec.CleanPodPolicy != CleanPodPolicyNone &&
+	if r.Spec.CleanPodPolicy != CleanPodPolicyAll && r.Spec.CleanPodPolicy != CleanPodPolicyNone &&
 		r.Spec.CleanPodPolicy != CleanPodPolicyRunning {
 		return fmt.Errorf("Invalid CleanPodPolicy %s, expected in [%s, %s, %s]",
-			r.Spec.CleanPodPolicy, CleanPodPolicyNone, CleanPodPolicyRunning, CleanPodPolicyALL)
+			r.Spec.CleanPodPolicy, CleanPodPolicyNone, CleanPodPolicyRunning, CleanPodPolicyAll)
 	}
 	return nil
 }

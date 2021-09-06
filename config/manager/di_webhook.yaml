@@ -1,35 +1,26 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  labels:
-    control-plane: di-operator
-  name: di-system
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: di-operator
+  name: di-webhook
   namespace: di-system
   labels:
-    control-plane: di-operator
+    control-plane: di-webhook
 spec:
   selector:
     matchLabels:
-      control-plane: di-operator
+      control-plane: di-webhook
   replicas: 1
   template:
     metadata:
       labels:
-        control-plane: di-operator
+        control-plane: di-webhook
     spec:
       containers:
       - command:
-        - /di-operator
-        args:
-        - "--server-address=http://di-server.di-system:8080"
-        image: diorchestrator/di-operator:v0.2.0-rc.0
+        - /di-webhook
+        image: diorchestrator/di-webhook:v0.2.0-rc.0
         imagePullPolicy: Always
-        name: manager
+        name: webhook
         securityContext:
           allowPrivilegeEscalation: false
         livenessProbe:
@@ -46,9 +37,9 @@ spec:
           periodSeconds: 10
         resources:
           limits:
-            cpu: 100m
-            memory: 500Mi
+            cpu: 30m
+            memory: 100Mi
           requests:
-            cpu: 100m
-            memory: 500Mi
+            cpu: 30m
+            memory: 100Mi
       terminationGracePeriodSeconds: 10

@@ -1,7 +1,7 @@
 apiVersion: diengine.opendilab.org/v1alpha1
 kind: DIJob
 metadata:
-  name: qbert-dqn
+  name: dijob-cartpole-dqn
 spec:
   group: xxx
   priorityClassName: ""
@@ -13,57 +13,54 @@ spec:
       sizeLimit: 128Mi
   - name: work-dir
     hostPath:
-      path: /data/nfs/ding/qbert
+      path: /data/nfs/ding/cartpole
   coordinator:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
-          image: diorchestrator/ding:v0.1.1-3b98cb70
+          image: diorchestrator/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 3
-              memory: "10Gi"
-            limits:
-              cpu: 3
-              memory: "10Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
-            cat <<EOF > qbert_dqn_config_k8s.py
+            cat <<EOF > cartpole_dqn_config_k8s.py
             from easydict import EasyDict
 
-            qbert_dqn_config = dict(
+            cartpole_dqn_config = dict(
                 env=dict(
-                    collector_env_num=16,
+                    collector_env_num=8,
                     collector_episode_num=2,
-                    evaluator_env_num=8,
+                    evaluator_env_num=5,
                     evaluator_episode_num=1,
-                    stop_value=30000,
-                    env_id='QbertNoFrameskip-v4',
-                    frame_stack=4,
-                    manager=dict(
-                        shared_memory=False,
-                    ),
+                    stop_value=195,
                 ),
                 policy=dict(
-                    cuda=True,
-                    priority=True,
+                    cuda=False,
                     model=dict(
-                        obs_shape=[4, 84, 84],
-                        action_shape=6,
-                        encoder_hidden_size_list=[128, 128, 512],
+                        obs_shape=4,
+                        action_shape=2,
+                        encoder_hidden_size_list=[128, 128, 64],
+                        dueling=True,
                     ),
                     nstep=3,
-                    discount_factor=0.99,
+                    discount_factor=0.97,
                     learn=dict(
-                        multi_gpu=True,
                         batch_size=32,
-                        learning_rate=0.0001,
+                        learning_rate=0.001,
                         learner=dict(
                             learner_num=1,
                             send_policy_freq=1,
@@ -76,35 +73,36 @@ spec:
                             update_policy_second=3,
                         ),
                     ),
-                    eval=dict(evaluator=dict(eval_freq=500, )),
+                    eval=dict(evaluator=dict(eval_freq=50, )),
                     other=dict(
                         eps=dict(
                             type='exp',
-                            start=1.,
-                            end=0.05,
-                            decay=250000,
+                            start=0.95,
+                            end=0.1,
+                            decay=100000,
                         ),
                         replay_buffer=dict(
-                            replay_buffer_size=400000,
-                            enable_track_used_data=True,
+                            replay_buffer_size=100000,
+                            enable_track_used_data=False,
                         ),
                         commander=dict(
+                            # increase collector task space when get rs from server
                             collector_task_space=0,
                             learner_task_space=1,
-                            eval_interval=30,
+                            eval_interval=5,
                         ),
                     ),
                 ),
             )
-            qbert_dqn_config = EasyDict(qbert_dqn_config)
-            main_config = qbert_dqn_config
+            cartpole_dqn_config = EasyDict(cartpole_dqn_config)
+            main_config = cartpole_dqn_config
 
-            qbert_dqn_create_config = dict(
+            cartpole_dqn_create_config = dict(
                 env=dict(
-                    type='atari',
-                    import_names=['dizoo.atari.envs.atari_env'],
+                    type='cartpole',
+                    import_names=['dizoo.classic_control.cartpole.envs.cartpole_env'],
                 ),
-                env_manager=dict(type='subprocess'),
+                env_manager=dict(type='base'),
                 policy=dict(type='dqn_command'),
                 learner=dict(type='base', import_names=['ding.worker.learner.base_learner']),
                 collector=dict(
@@ -124,10 +122,10 @@ spec:
                     import_names=['ding.worker.collector.comm.flask_fs_collector'],
                 ),
             )
-            qbert_dqn_create_config = EasyDict(qbert_dqn_create_config)
-            create_config = qbert_dqn_create_config
+            cartpole_dqn_create_config = EasyDict(cartpole_dqn_create_config)
+            create_config = cartpole_dqn_create_config
 
-            qbert_dqn_system_config = dict(
+            cartpole_dqn_system_config = dict(
                 coordinator=dict(
                     operator_server=dict(
                         system_addr='di-server.di-system:8080',
@@ -150,45 +148,42 @@ spec:
                 communication_mode='auto',
                 learner_gpu_num=2,
             )
-            qbert_dqn_system_config = EasyDict(qbert_dqn_system_config)
-            system_config = qbert_dqn_system_config
+            cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
+            system_config = cartpole_dqn_system_config
             EOF
 
-            # if code has been changed in the mount path, we have to reinstall ding cli
-            # pip install --no-cache-dir -e .;
-
-            ding -m dist --module config -P k8s -c qbert_dqn_config_k8s.py -s 0;
-            ding -m dist --module coordinator -c qbert_dqn_config_k8s.py.pkl -s 0 --disable-flask-log 0 -cdp $COORDINATOR_PORT
+            ding -m dist --module config -P k8s -c ./cartpole_dqn_config_k8s.py -s 0;
+            ding -m dist --module coordinator -c ./cartpole_dqn_config_k8s.py.pkl -s 0 -cdp $COORDINATOR_PORT
           ports:
           - name: di-port
-            containerPort: 22273
+            containerPort: 22270
           volumeMounts:
           - name: work-dir
             mountPath: /ding
   collector:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
-          image: diorchestrator/ding:v0.1.1-3b98cb70
+          image: diorchestrator/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 16
-              memory: "10Gi"
-            limits:
-              cpu: 16
-              memory: "10Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
-            # if code has been changed in the mount path, we have to reinstall ding cli
-            # pip install --no-cache-dir -e .;
-
-            ding -m dist --module collector -c qbert_dqn_config_k8s.py.pkl -s 0 -clp $COLLECTOR_PORT --disable-flask-log 0
+            ding -m dist --module collector -c ./cartpole_dqn_config_k8s.py.pkl -s 0 -clp $COLLECTOR_PORT
           ports:
           - name: di-port
             containerPort: 22270
@@ -198,30 +193,30 @@ spec:
   learner:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
-          image: diorchestrator/ding:v0.1.1-3b98cb70
+          image: diorchestrator/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
-          resources:
-            requests:
-              cpu: 16
-              memory: "20Gi"
-            limits:
-              cpu: 16
-              memory: "20Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
-            # if code has been changed in the mount path, we have to reinstall ding cli
-            # pip install --no-cache-dir -e .;
-
-            ding -m dist --module spawn_learner -c qbert_dqn_config_k8s.py.pkl -s 0 -lp $LEARNER_PORT --disable-flask-log 0
+            ding -m dist --module spawn_learner -c ./cartpole_dqn_config_k8s.py.pkl -s 0 -lp $LEARNER_PORT
           ports:
           - name: di-port
-            containerPort: 22271
+            containerPort: 22270
           volumeMounts:
           - name: cache-volume
             mountPath: /dev/shm

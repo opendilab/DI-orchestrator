@@ -41,6 +41,15 @@ func (in *ResourceQuantity) DeepCopy() *ResourceQuantity {
 	return out
 }
 
+func NewResourceQuantity(replicas int, cpu, gpu, memory string) *ResourceQuantity {
+	return &ResourceQuantity{
+		Replicas: replicas,
+		CPU:      resource.MustParse(cpu),
+		GPU:      resource.MustParse(gpu),
+		Memory:   resource.MustParse(memory),
+	}
+}
+
 type Response struct {
 	Success bool        `json:"success"`
 	Code    int         `json:"code"`

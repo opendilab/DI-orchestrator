@@ -11,17 +11,19 @@ ARG GOPROXY=https://goproxy.cn
 RUN go mod download
 
 # Copy the go source
-COPY main.go main.go
+COPY cmd/ cmd/
 COPY api/ api/
 COPY common/ common/
 COPY controllers/ controllers/
 COPY server/ server/
 COPY utils/ utils/
 
-# Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-operator main.go
-# Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-server server/main.go
+# Build operator
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-operator cmd/operator/main.go
+# Build webhook
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-webhook cmd/webhook/main.go
+# Build server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-server cmd/server/main.go
 
 # Use distroless as minimal base image to package the di-operator binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
@@ -32,6 +34,14 @@ WORKDIR /
 COPY --from=builder /workspace/di-operator .
 
 ENTRYPOINT ["/di-operator"]
+
+FROM redhat/ubi8:latest as di-webhook
+LABEL maintainer="opendilab.contact@gmail.com"
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+WORKDIR /
+COPY --from=builder /workspace/di-webhook .
+
+ENTRYPOINT ["/di-webhook"]
 
 FROM redhat/ubi8:latest as di-server
 LABEL maintainer="opendilab.contact.gmail.com"

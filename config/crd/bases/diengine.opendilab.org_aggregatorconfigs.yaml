@@ -43,6 +43,7 @@ spec:
             description: AggregatorConfigSpec defines the desired state of AggregatorConfig
             properties:
               aggregator:
+                description: AggregatorSpec defines the desired state of aggregator
                 properties:
                   template:
                     description: PodTemplateSpec describes the data a pod should have

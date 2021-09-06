@@ -7,7 +7,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
@@ -21,7 +20,7 @@ var _ = Describe("DIJob Specification", func() {
 	Context("When creating a DIJob with different CleanPodPolicy", func() {
 		It("Should execute different pods deletion policy with different CleanPodPolicy", func() {
 			cleanPodPolicies := []div1alpha1.CleanPodPolicy{
-				div1alpha1.CleanPodPolicyALL,
+				div1alpha1.CleanPodPolicyAll,
 				div1alpha1.CleanPodPolicyRunning,
 				div1alpha1.CleanPodPolicyNone,
 			}
@@ -77,13 +76,7 @@ var _ = Describe("DIJob Specification", func() {
 					dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
 
 					// build owner reference
-					ownRefer := metav1.OwnerReference{
-						APIVersion: div1alpha1.GroupVersion.String(),
-						Kind:       div1alpha1.KindDIJob,
-						Name:       dijob.Name,
-						UID:        dijob.GetUID(),
-						Controller: func(c bool) *bool { return &c }(true),
-					}
+					ownRefer := diutil.NewOwnerReference(div1alpha1.GroupVersion.String(), div1alpha1.KindDIJob, dijob.Name, dijob.UID, true)
 					By(fmt.Sprintf("ownRefer: %s %s", ownRefer.APIVersion, ownRefer.Kind))
 					colStatus := make([]int, 3)
 					for _, col := range c.collectors {
@@ -123,7 +116,7 @@ var _ = Describe("DIJob Specification", func() {
 					By("Checking all the pods and services are deleted")
 
 					switch policy {
-					case div1alpha1.CleanPodPolicyALL:
+					case div1alpha1.CleanPodPolicyAll:
 						Eventually(func() int {
 							pods, err := diutil.ListPods(ctx, k8sClient, &dijob)
 							if err != nil {
@@ -171,7 +164,7 @@ var _ = Describe("DIJob Specification", func() {
 					}
 
 					By("Clean up pods")
-					err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy(), timeout, interval)
+					err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy())
 					Expect(err).NotTo(HaveOccurred())
 				}
 			}

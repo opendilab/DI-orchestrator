@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: diorchestrator/ding:v0.1.1-3b98cb70
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -162,18 +162,18 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: diorchestrator/ding:v0.1.1-3b98cb70
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
           resources:
             requests:
-              cpu: 8
-              memory: "10Gi"
+              cpu: 16
+              memory: "5Gi"
             limits:
-              cpu: 8
-              memory: "10Gi"
+              cpu: 16
+              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
@@ -189,22 +189,22 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: diorchestrator/ding:v0.1.1-3b98cb70
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
           resources:
             requests:
-              cpu: 8
-              memory: "20Gi"
+              cpu: 16
+              memory: "5Gi"
             limits:
-              cpu: 8
-              memory: "20Gi"
+              cpu: 16
+              memory: "5Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
-            ding -m dist --module learner -c ./cartpole_dqn_config_k8s.py.pkl -s 0 -lp $LEARNER_PORT
+            ding -m dist --module spawn_learner -c ./cartpole_dqn_config_k8s.py.pkl -s 0 -lp $LEARNER_PORT
           ports:
           - name: di-port
             containerPort: 22270

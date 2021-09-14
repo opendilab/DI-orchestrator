@@ -1,4 +1,4 @@
-[![Go](https://github.com/opendilab/DI-orchestrator/actions/workflows/go.yaml/badge.svg?branch=main)](https://github.com/opendilab/DI-orchestrator/actions/workflows/go.yaml)
+[![Go](https://github.com/opendilab/DI-orchestrator/actions/workflows/go.yaml/badge.svg?branch=main)](https://github.com/opendilab/DI-orchestrator/actions/workflows/go.yaml) [![Publish Releases to Hub](https://github.com/opendilab/DI-orchestrator/actions/workflows/release.yaml/badge.svg)](https://github.com/opendilab/DI-orchestrator/actions/workflows/release.yaml)
 # DI Orchestrator
 DI Orchestrator is designed to manage DI (Decision Intelligence) jobs using Kubernetes Custom Resource and Operator. 
 

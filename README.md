@@ -10,20 +10,23 @@ kubectl create -f ./config/certmanager/cert-manager.yaml
 ```
 
 ### Install DI Orchestrator
-DI Orchestrator consists of two components: `di-operator` and `di-server`. Install `di-operator` and `di-server` with the following command.
+DI Orchestrator consists of three components: `di-operator`, `di-webhook` and `di-server`. Install them with the following command.
 ```bash
 kubectl create -f ./config/di-manager.yaml
 ```
 
-`di-operator` and `di-server` will be installed in `di-system` namespace. 
+`di-operator`, `di-webhook` and `di-server` will be installed in `di-system` namespace. 
 ```bash
 $ kubectl get pod -n di-system
 NAME                               READY   STATUS    RESTARTS   AGE
-di-operator-57cc65d5c9-5vnvn   1/1     Running   0          59s
-di-server-7b86ff8df4-jfgmp     1/1     Running   0          59s
+di-operator-57cc65d5c9-5vnvn       1/1     Running   0          59s
+di-server-7b86ff8df4-jfgmp         1/1     Running   0          59s
+di-webhook-45jgi23fhc-9yght        1/1     Running   0          59s
 ```
 
-Install global components of DIJob defined in AggregatorConfig:
+### Install AggregatorConfig
+Since all DIJobs share the same configuration of aggregator, we define aggregator template in AggregatorConfig.
+Install AggregatorConfig with the following command:
 ```bash
 kubectl create -f config/samples/agconfig.yaml -n di-system
 ```

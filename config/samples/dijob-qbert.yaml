@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.1-3b98cb70
+          image: diorchestrator/ding:v0.1.1
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -158,7 +158,7 @@ spec:
             # pip install --no-cache-dir -e .;
 
             ding -m dist --module config -P k8s -c qbert_dqn_config_k8s.py -s 0;
-            ding -m dist --module coordinator -c qbert_dqn_config_k8s.py.pkl -s 0 --disable-flask-log 0 -cdp $COORDINATOR_PORT
+            ding -m dist --module coordinator -c /ding/qbert_dqn_config_k8s.py.pkl -s 0 --disable-flask-log 0 -cdp $COORDINATOR_PORT
           ports:
           - name: di-port
             containerPort: 22273
@@ -170,7 +170,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.1-3b98cb70
+          image: diorchestrator/ding:v0.1.1
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -188,7 +188,7 @@ spec:
             # if code has been changed in the mount path, we have to reinstall ding cli
             # pip install --no-cache-dir -e .;
 
-            ding -m dist --module collector -c qbert_dqn_config_k8s.py.pkl -s 0 -clp $COLLECTOR_PORT --disable-flask-log 0
+            ding -m dist --module collector -c /ding/qbert_dqn_config_k8s.py.pkl -s 0 -clp $COLLECTOR_PORT --disable-flask-log 0
           ports:
           - name: di-port
             containerPort: 22270
@@ -200,7 +200,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.1-3b98cb70
+          image: diorchestrator/ding:v0.1.1
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -218,7 +218,7 @@ spec:
             # if code has been changed in the mount path, we have to reinstall ding cli
             # pip install --no-cache-dir -e .;
 
-            ding -m dist --module spawn_learner -c qbert_dqn_config_k8s.py.pkl -s 0 -lp $LEARNER_PORT --disable-flask-log 0
+            ding -m dist --module spawn_learner -c /ding/qbert_dqn_config_k8s.py.pkl -s 0 -lp $LEARNER_PORT --disable-flask-log 0
           ports:
           - name: di-port
             containerPort: 22271

@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.1-3b98cb70
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -170,7 +170,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.1-3b98cb70
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -200,7 +200,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.1-3b98cb70
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED

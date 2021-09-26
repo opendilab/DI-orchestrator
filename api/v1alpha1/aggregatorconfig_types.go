@@ -32,7 +32,7 @@ type AggregatorConfigSpec struct {
 	Aggregator AggregatorSpec `json:"aggregator,"`
 }
 
-//
+// AggregatorSpec defines the desired state of aggregator
 type AggregatorSpec struct {
 	Template corev1.PodTemplateSpec `json:"template,"`
 }

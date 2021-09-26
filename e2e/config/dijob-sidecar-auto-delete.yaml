@@ -17,9 +17,26 @@ spec:
   coordinator:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          command: ["sh", "-c"]
+          args: 
+          - |
+            sleep 30s;
+            ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef" | awk 'NR<2';
+            kill -9 $(ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef"|awk 'NR<2 {print $1}');
+            exit 0;
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -153,9 +170,26 @@ spec:
   collector:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          command: ["sh", "-c"]
+          args: 
+          - |
+            sleep 30s;
+            ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef" | awk 'NR<2';
+            kill -9 $(ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef"|awk 'NR<2 {print $1}');
+            exit 0;
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -173,9 +207,26 @@ spec:
   learner:
     template:
       spec:
+        shareProcessNamespace: true
         containers:
+        - name: shell
+          command: ["sh", "-c"]
+          args: 
+          - |
+            sleep 30s;
+            ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef" | awk 'NR<2';
+            kill -9 $(ps -ef |grep "/opt/conda/bin/ding"| grep -v "ps -ef"|awk 'NR<2 {print $1}');
+            exit 0;
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED

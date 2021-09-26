@@ -1,12 +1,16 @@
 resources:
 - di_operator.yaml
 - di_server.yaml
+- di_webhook.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: registry.sensetime.com/cloudnative4ai/di-operator
   newName: registry.sensetime.com/cloudnative4ai/di-operator
-  newTag: v0.2.0-alpha.0
+  newTag: v0.2.0-rc.0
 - name: registry.sensetime.com/cloudnative4ai/di-server
   newName: registry.sensetime.com/cloudnative4ai/di-server
-  newTag: v0.2.0-alpha.0
+  newTag: v0.2.0-rc.0
+- name: registry.sensetime.com/cloudnative4ai/di-webhook
+  newName: registry.sensetime.com/cloudnative4ai/di-webhook
+  newTag: v0.2.0-rc.0

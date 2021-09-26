@@ -3,17 +3,18 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 	dicommon "opendilab.org/di-orchestrator/common"
+	commontypes "opendilab.org/di-orchestrator/common/types"
 	diutil "opendilab.org/di-orchestrator/utils"
 	testutil "opendilab.org/di-orchestrator/utils/testutils"
 )
@@ -27,69 +28,41 @@ var _ = Describe("DIJob Controller", func() {
 			ctx := context.Background()
 			jobTmpl := testutil.NewDIJob()
 			dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
+			replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
+			podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 
 			By("Update coordinator to Running")
-			for _, replicaName := range []string{
-				diutil.ReplicaPodName(dijob.Name, "coordinator"),
-			} {
-				podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
-				err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodRunning)
-				Expect(err).NotTo(HaveOccurred())
-			}
+			err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodRunning)
+			Expect(err).NotTo(HaveOccurred())
 
-			var createdDIjob div1alpha1.DIJob
 			By("Checking the created DIJob has enough coordinator")
-			for _, rtype := range []div1alpha1.ReplicaType{div1alpha1.ReplicaTypeCoordinator} {
-				Eventually(func() int {
-					err := k8sClient.Get(ctx, jobKey, &createdDIjob)
-					if err != nil {
-						return -1
-					}
-					if createdDIjob.Status.ReplicaStatus == nil {
-						return -1
-					}
-					return int(createdDIjob.Status.ReplicaStatus[rtype].Active)
-				}, timeout, interval).Should(Equal(1))
+			coorStatus := make([]int, 3)
+			coorStatus[0] = 1
+			replicasStatuses := map[div1alpha1.ReplicaType][]int{
+				div1alpha1.ReplicaTypeCoordinator: coorStatus,
 			}
+			checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
 
 			By("Checking the created DIJob is in Running state")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, jobKey, &createdDIjob)
-				if err != nil {
-					return false
-				}
-				return createdDIjob.Status.Phase == div1alpha1.JobRunning
-			}, duration, interval).Should(BeTrue())
+			checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha1.JobRunning)
 
 			By("Update coordinator to Succeeded")
-			for _, replicaName := range []string{
-				diutil.ReplicaPodName(createdDIjob.Name, "coordinator"),
-			} {
-				podKey := types.NamespacedName{Namespace: createdDIjob.Namespace, Name: replicaName}
-				err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
-				Expect(err).NotTo(HaveOccurred())
-			}
+			err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
+			Expect(err).NotTo(HaveOccurred())
 
 			By("Checking the job is succeeded")
-			Eventually(func() div1alpha1.Phase {
-				err := k8sClient.Get(ctx, jobKey, &createdDIjob)
-				if err != nil {
-					return div1alpha1.JobUnknown
-				}
-				return createdDIjob.Status.Phase
-			}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
+			checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha1.JobSucceeded)
 
 			By("Checking the coordinator is succeeded")
-			Eventually(func() int {
-				err := k8sClient.Get(ctx, jobKey, &createdDIjob)
-				if err != nil {
-					return -1
-				}
-				return int(createdDIjob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Succeeded)
-			}, timeout, interval).Should(Equal(1))
+			coorStatus = make([]int, 3)
+			coorStatus[2] = 1
+			replicasStatuses = map[div1alpha1.ReplicaType][]int{
+				div1alpha1.ReplicaTypeCoordinator: coorStatus,
+			}
+			checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
 
 			By("Cleaning up")
-			err = testutil.CleanUpJob(ctx, k8sClient, createdDIjob.DeepCopy())
+			err = testutil.CleanUpJob(ctx, k8sClient, &dijob)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -111,53 +84,33 @@ var _ = Describe("DIJob Controller", func() {
 				ctx := context.Background()
 				jobTmpl := testutil.NewDIJob()
 				dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
+				replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
+				podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 
 				By("Update coordinator status")
-				for _, replicaName := range []string{
-					diutil.ReplicaPodName(dijob.Name, "coordinator"),
-				} {
-					podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
-					if strings.HasSuffix(replicaName, "coordinator") {
-						err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, c.coorStatus)
-					}
-					Expect(err).NotTo(HaveOccurred())
-				}
+				err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, c.coorStatus)
+				Expect(err).NotTo(HaveOccurred())
 
 				By("Checking the created DIJob has enough coordinator")
-				Eventually(func() int {
-					err := k8sClient.Get(ctx, jobKey, &dijob)
-					if err != nil {
-						return -1
-					}
-					if dijob.Status.ReplicaStatus == nil {
-						return -1
-					}
-
-					// get phase
-					var phase corev1.PodPhase = c.coorStatus
-					count := 0
-					switch phase {
-					case corev1.PodRunning:
-						count = int(dijob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Active)
-					case corev1.PodFailed:
-						count = int(dijob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Failed)
-					case corev1.PodSucceeded:
-						count = int(dijob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Succeeded)
-					}
-					return count
-				}, timeout, interval).Should(Equal(1))
+				coorStatus := make([]int, 3)
+				switch c.coorStatus {
+				case corev1.PodRunning:
+					coorStatus[0] = 1
+				case corev1.PodFailed:
+					coorStatus[1] = 1
+				case corev1.PodSucceeded:
+					coorStatus[2] = 1
+				}
+				replicasStatuses := map[div1alpha1.ReplicaType][]int{
+					div1alpha1.ReplicaTypeCoordinator: coorStatus,
+				}
+				checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
 
 				By("Checking the created DIJob's state")
-				Eventually(func() div1alpha1.Phase {
-					err := k8sClient.Get(ctx, jobKey, &dijob)
-					if err != nil {
-						return div1alpha1.JobUnknown
-					}
-					return dijob.Status.Phase
-				}, timeout, interval).Should(Equal(c.expectStatus))
+				checkDIJobPhase(ctx, k8sClient, jobKey, c.expectStatus)
 
 				By("Cleaning up")
-				err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy())
+				err = testutil.CleanUpJob(ctx, k8sClient, &dijob)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -208,15 +161,11 @@ var _ = Describe("DIJob Controller", func() {
 				ctx := context.Background()
 				jobTmpl := testutil.NewDIJob()
 				dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
+				replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
+				podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 
 				// build owner reference
-				ownRefer := metav1.OwnerReference{
-					APIVersion: div1alpha1.GroupVersion.String(),
-					Kind:       div1alpha1.KindDIJob,
-					Name:       dijob.Name,
-					UID:        dijob.GetUID(),
-					Controller: func(c bool) *bool { return &c }(true),
-				}
+				ownRefer := diutil.NewOwnerReference(div1alpha1.GroupVersion.String(), div1alpha1.KindDIJob, dijob.Name, dijob.UID, true)
 
 				By(fmt.Sprintf("Create replicas for DIJob %s", dijob.Name))
 				colStatus := make([]int, 3)
@@ -230,92 +179,99 @@ var _ = Describe("DIJob Controller", func() {
 				}
 
 				By("Checking the ReplicaStatus is as expected")
-				for _, rtype := range []div1alpha1.ReplicaType{
-					div1alpha1.ReplicaTypeCollector,
-					div1alpha1.ReplicaTypeLearner,
-				} {
-					var status []int
-					switch rtype {
-					case div1alpha1.ReplicaTypeCollector:
-						status = colStatus
-					case div1alpha1.ReplicaTypeLearner:
-						status = lrStatus
-					}
-					Eventually(func() []int {
-						err = k8sClient.Get(ctx, jobKey, &dijob)
-						if err != nil {
-							return nil
-						}
-						result := make([]int, 3)
-						result[0] = int(dijob.Status.ReplicaStatus[rtype].Active)
-						result[1] = int(dijob.Status.ReplicaStatus[rtype].Failed)
-						result[2] = int(dijob.Status.ReplicaStatus[rtype].Succeeded)
-						return result
-					}, timeout, interval).Should(Equal(status))
+				replicasStatuses := map[div1alpha1.ReplicaType][]int{
+					div1alpha1.ReplicaTypeCollector: colStatus,
+					div1alpha1.ReplicaTypeLearner:   lrStatus,
 				}
+				checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
+
+				By("Checking the services are as expected")
+				Eventually(func() int {
+					svcs, err := diutil.ListServices(ctx, k8sClient, &dijob)
+					Expect(err).NotTo(HaveOccurred())
+					return len(svcs)
+				}, timeout, interval).Should(Equal(1 + len(c.collectors) + len(c.learners)))
 
 				By("Update coordinator to Succeeded")
-				for _, replicaName := range []string{
-					diutil.ReplicaPodName(dijob.Name, "coordinator"),
-				} {
-					podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
-					err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
-					Expect(err).NotTo(HaveOccurred())
-				}
+				err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
+				Expect(err).NotTo(HaveOccurred())
 
 				By("Checking the job is successfully succeeded")
-				Eventually(func() div1alpha1.Phase {
-					err := k8sClient.Get(ctx, jobKey, &dijob)
-					if err != nil {
-						return div1alpha1.JobUnknown
-					}
-					return dijob.Status.Phase
-				}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
-
-				By("Checking the coordinator is succeeded")
-				Eventually(func() int {
-					err := k8sClient.Get(ctx, jobKey, &dijob)
-					if err != nil {
-						return -1
-					}
-					return int(dijob.Status.ReplicaStatus[div1alpha1.ReplicaTypeCoordinator].Succeeded)
-				}, timeout, interval).Should(Equal(1))
-
-				colStatus1 := make([]int, 3)
-				lrStatus1 := make([]int, 3)
-				colStatus1[0] = 0
-				colStatus1[1] = colStatus[1]
-				colStatus1[2] = colStatus[0] + colStatus[2]
-				lrStatus1[0] = 0
-				lrStatus1[1] = lrStatus[1]
-				lrStatus1[2] = lrStatus[0] + lrStatus[2]
+				checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha1.JobSucceeded)
 
 				By("Checking the ReplicaStatus is as expected")
-				for _, rtype := range []div1alpha1.ReplicaType{
-					div1alpha1.ReplicaTypeCollector,
-					div1alpha1.ReplicaTypeLearner,
-				} {
-					var status []int
-					switch rtype {
-					case div1alpha1.ReplicaTypeCollector:
-						status = colStatus1
-					case div1alpha1.ReplicaTypeLearner:
-						status = lrStatus1
-					}
-					Eventually(func() []int {
-						err = k8sClient.Get(ctx, jobKey, &dijob)
-						if err != nil {
-							return nil
-						}
-						result := make([]int, 3)
-						result[0] = int(dijob.Status.ReplicaStatus[rtype].Active)
-						result[1] = int(dijob.Status.ReplicaStatus[rtype].Failed)
-						result[2] = int(dijob.Status.ReplicaStatus[rtype].Succeeded)
-						return result
-					}, timeout, interval).Should(Equal(status))
-				}
+				coorStatus := make([]int, 3)
+				coorStatus[2] = 1
 
-				err = testutil.CleanUpJob(ctx, k8sClient, dijob.DeepCopy())
+				colFinishedStatus := make([]int, 3)
+				lrFinishedStatus := make([]int, 3)
+				colFinishedStatus[0] = 0
+				colFinishedStatus[1] = colStatus[1]
+				colFinishedStatus[2] = colStatus[0] + colStatus[2]
+				lrFinishedStatus[0] = 0
+				lrFinishedStatus[1] = lrStatus[1]
+				lrFinishedStatus[2] = lrStatus[0] + lrStatus[2]
+
+				replicasStatuses = map[div1alpha1.ReplicaType][]int{
+					div1alpha1.ReplicaTypeCoordinator: coorStatus,
+					div1alpha1.ReplicaTypeCollector:   colFinishedStatus,
+					div1alpha1.ReplicaTypeLearner:     lrFinishedStatus,
+				}
+				checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
+
+				err = testutil.CleanUpJob(ctx, k8sClient, &dijob)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+		It("Should build right gpu ports and master port when the pod is ddp learner", func() {
+			type replica struct {
+				name           string
+				ddpLearnerType string
+				gpus           int
+				expectedPorts  int
+			}
+
+			testCases := []replica{
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeMaster, gpus: 4, expectedPorts: 5},
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeWorker, gpus: 6, expectedPorts: 6},
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeMaster, gpus: 1, expectedPorts: 2},
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeMaster, gpus: 0, expectedPorts: 2},
+				{name: "job-ddp-learner-sdf", ddpLearnerType: dicommon.DDPLearnerTypeWorker, gpus: 0, expectedPorts: 1},
+			}
+			for i := range testCases {
+				c := testCases[i]
+				By(fmt.Sprintf("Create %dth DIJob", i+1))
+				var err error
+				ctx := context.Background()
+				jobTmpl := testutil.NewDIJob()
+				dijob, _ := createDIJob(ctx, k8sClient, jobTmpl)
+
+				// build owner reference
+				ownRefer := diutil.NewOwnerReference(div1alpha1.GroupVersion.String(), div1alpha1.KindDIJob, dijob.Name, dijob.UID, true)
+
+				By(fmt.Sprintf("Create replicas for DIJob %s", dijob.Name))
+				pod := buildPod(c.name, dijob.Name, dicommon.DDPLearnerName, ownRefer)
+				pod.Labels[dicommon.DDPLearnerTypeLabel] = c.ddpLearnerType
+				resources := commontypes.ResourceQuantity{GPU: resource.MustParse(fmt.Sprint(c.gpus))}
+				diutil.SetPodResources(pod, resources)
+
+				err = k8sClient.Create(ctx, pod, &client.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Checking the # of service's ports are as expected")
+				Eventually(func() int {
+					svcs, err := diutil.ListServices(ctx, k8sClient, &dijob)
+					Expect(err).NotTo(HaveOccurred())
+
+					_, _, _, _, DDPLearners, err := diutil.ClassifyServices(svcs)
+					Expect(err).NotTo(HaveOccurred())
+					if len(DDPLearners) == 0 {
+						return -1
+					}
+					return len(DDPLearners[0].Spec.Ports)
+				}, timeout, interval).Should(Equal(c.expectedPorts))
+
+				err = testutil.CleanUpJob(ctx, k8sClient, &dijob)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -335,10 +291,7 @@ func createDIJob(ctx context.Context, k8sClient client.Client, dijob *div1alpha1
 	createdDIjob := div1alpha1.DIJob{}
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, key, &createdDIjob)
-		if err != nil {
-			return false
-		}
-		return true
+		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
 	By("Checking coordinator are created")
@@ -347,10 +300,7 @@ func createDIJob(ctx context.Context, k8sClient client.Client, dijob *div1alpha1
 	podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 	Eventually(func() bool {
 		err = k8sClient.Get(ctx, podKey, &pod)
-		if err != nil {
-			return false
-		}
-		return true
+		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
 	return createdDIjob, key
@@ -360,13 +310,23 @@ func createAndUpdatePodPhase(
 	ctx context.Context, k8sClient client.Client,
 	name, jobName string, status corev1.PodPhase, replicaType string,
 	ownRefer metav1.OwnerReference, statuses []int) {
+	pod := buildPod(name, jobName, replicaType, ownRefer)
+	createPodAndUpdatePhase(ctx, k8sClient, pod, status, statuses)
+}
 
+func buildPod(name, jobName string, replicaType string,
+	ownRefer metav1.OwnerReference) *corev1.Pod {
 	pod := testutil.NewPod(name, jobName, ownRefer)
 	labs := diutil.GenLabels(jobName)
 	labs[dicommon.ReplicaTypeLabel] = replicaType
 	labs[dicommon.PodNameLabel] = pod.Name
 	pod.SetLabels(labs)
 
+	return pod
+}
+
+func createPodAndUpdatePhase(ctx context.Context, k8sClient client.Client,
+	pod *corev1.Pod, status corev1.PodPhase, statuses []int) {
 	err := k8sClient.Create(ctx, pod, &client.CreateOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
@@ -380,5 +340,37 @@ func createAndUpdatePodPhase(
 		statuses[1]++
 	case corev1.PodSucceeded:
 		statuses[2]++
+	}
+}
+
+func checkDIJobPhase(ctx context.Context, k8sClient client.Client, jobKey types.NamespacedName, phase div1alpha1.Phase) {
+	var dijob div1alpha1.DIJob
+	Eventually(func() div1alpha1.Phase {
+		err := k8sClient.Get(ctx, jobKey, &dijob)
+		if err != nil {
+			return div1alpha1.JobUnknown
+		}
+		return dijob.Status.Phase
+	}, timeout, interval).Should(Equal(phase))
+}
+
+func checkReplicasStatuses(ctx context.Context, k8sClient client.Client, jobKey types.NamespacedName, replicasStatuses map[div1alpha1.ReplicaType][]int) {
+	for rtype, status := range replicasStatuses {
+		var dijob div1alpha1.DIJob
+		Eventually(func() []int {
+			err := k8sClient.Get(ctx, jobKey, &dijob)
+			if err != nil {
+				return nil
+			}
+			if dijob.Status.ReplicaStatus == nil {
+				return nil
+			}
+
+			result := make([]int, 3)
+			result[0] = int(dijob.Status.ReplicaStatus[rtype].Active)
+			result[1] = int(dijob.Status.ReplicaStatus[rtype].Failed)
+			result[2] = int(dijob.Status.ReplicaStatus[rtype].Succeeded)
+			return result
+		}, timeout, interval).Should(Equal(status))
 	}
 }

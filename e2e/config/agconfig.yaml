@@ -8,8 +8,17 @@ spec:
     template:
       spec:
         containers:
+        - name: shell
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+              - SYS_PTRACE
+          stdin: true
+          tty: true
         - name: di-container
-          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.1-3b98cb70
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED

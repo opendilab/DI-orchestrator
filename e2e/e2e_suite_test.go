@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	testutil "opendilab.org/di-orchestrator/utils/testutils"
 )
 
 func TestE2E(t *testing.T) {
@@ -80,9 +79,18 @@ var _ = BeforeSuite(func() {
 	clientset, err = kubernetes.NewForConfig(cfg)
 	Expect(err).NotTo(HaveOccurred())
 
-	agconfig := testutil.NewAggregatorConfig()
-	err = k8sClient.Create(context.Background(), agconfig, &client.CreateOptions{})
+	agconfig := buildAGConfig("./config/agconfig.yaml")
+	err = k8sClient.Update(context.Background(), agconfig, &client.UpdateOptions{})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		Expect(err).NotTo(HaveOccurred())
 	}
+
+	k8sClient.DeleteAllOf(context.Background(), &div1alpha1.DIJob{},
+		client.InNamespace(namespace), client.MatchingLabels{"stability-test": "dijobs"})
+})
+
+var _ = AfterSuite(func() {
+	agconfig := buildAGConfig("../config/samples/agconfig.yaml")
+	err := k8sClient.Update(context.Background(), agconfig, &client.UpdateOptions{})
+	Expect(err).NotTo(HaveOccurred())
 })

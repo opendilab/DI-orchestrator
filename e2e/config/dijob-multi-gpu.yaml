@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -39,7 +39,7 @@ spec:
                     stop_value=195,
                 ),
                 policy=dict(
-                    cuda=False,
+                    cuda=True,
                     model=dict(
                         obs_shape=4,
                         action_shape=2,
@@ -125,7 +125,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpus": "1",
+                                "gpus": "2",
                                 "replicas": 1,
                             },
                         ),
@@ -136,7 +136,7 @@ spec:
                 path_data='./data',
                 path_policy='./policy',
                 communication_mode='auto',
-                learner_gpu_num=1,
+                learner_gpu_num=2,
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config
@@ -155,7 +155,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -175,7 +175,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.0-75c41277
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED

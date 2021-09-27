@@ -9,7 +9,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.1-3b98cb70
+          image: diorchestrator/ding:v0.1.1
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED

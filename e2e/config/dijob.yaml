@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -31,6 +31,7 @@ spec:
             from easydict import EasyDict
 
             cartpole_dqn_config = dict(
+                exp_name='cartpole_dqn',
                 env=dict(
                     collector_env_num=8,
                     collector_episode_num=2,
@@ -76,8 +77,7 @@ spec:
                             enable_track_used_data=False,
                         ),
                         commander=dict(
-                            # increase collector task space when get rs from server
-                            collector_task_space=0,
+                            collector_task_space=2,
                             learner_task_space=1,
                             eval_interval=5,
                         ),
@@ -97,7 +97,7 @@ spec:
                 learner=dict(type='base', import_names=['ding.worker.learner.base_learner']),
                 collector=dict(
                     type='zergling',
-                    import_names=['ding.worker.collector.zergling_collector'],
+                    import_names=['ding.worker.collector.zergling_parallel_collector'],
                 ),
                 commander=dict(
                     type='solo',
@@ -125,7 +125,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpus": "1",
+                                "gpus": "0",
                                 "replicas": 1,
                             },
                         ),
@@ -133,13 +133,17 @@ spec:
                         learner_target_num=1,
                     ),
                 ),
-                path_data='./data',
-                path_policy='./policy',
+                path_data='./{}/data'.format(main_config.exp_name),
+                path_policy='./{}/policy'.format(main_config.exp_name),
                 communication_mode='auto',
                 learner_gpu_num=1,
             )
             cartpole_dqn_system_config = EasyDict(cartpole_dqn_system_config)
             system_config = cartpole_dqn_system_config
+
+            if __name__ == '__main__':
+                from ding.entry.parallel_entry import parallel_pipeline
+                parallel_pipeline([main_config, create_config, system_config], seed=9)
             EOF
 
             ding -m dist --module config -P k8s -c ./cartpole_dqn_config_k8s.py -s 0;
@@ -155,7 +159,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -175,7 +179,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-df39b81c
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED

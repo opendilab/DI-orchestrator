@@ -18,7 +18,7 @@ spec:
       containers:
       - command:
         - /di-webhook
-        image: diorchestrator/di-webhook:v0.2.0-rc.0
+        image: opendilab/di-webhook:v0.2.0
         imagePullPolicy: Always
         name: webhook
         securityContext:

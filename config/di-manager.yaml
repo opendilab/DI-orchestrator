@@ -16321,7 +16321,7 @@ spec:
         - --leader-elect
         command:
         - /di-operator
-        image: diorchestrator/di-operator:v0.2.0-rc.0
+        image: opendilab/di-operator:v0.2.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16372,7 +16372,7 @@ spec:
         - --lease-lock-name=di-server
         command:
         - /di-server
-        image: diorchestrator/di-server:v0.2.0-rc.0
+        image: opendilab/di-server:v0.2.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16412,7 +16412,7 @@ spec:
       containers:
       - command:
         - /di-webhook
-        image: diorchestrator/di-webhook:v0.2.0-rc.0
+        image: opendilab/di-webhook:v0.2.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

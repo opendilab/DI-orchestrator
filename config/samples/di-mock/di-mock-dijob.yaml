@@ -11,7 +11,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: opendilab/di-orchestrator/di-mock:v0.0.5
+          image: opendilab/di-mock:v0.0.5
           imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
           args: ["python3 -u main.py coordinator -l $HOSTNAME -p $COORDINATOR_PORT"]
@@ -21,7 +21,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: opendilab/di-orchestrator/di-mock:v0.0.5
+          image: opendilab/di-mock:v0.0.5
           imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
           args: ["until ping -c 1 $HOSTNAME.default ; do sleep 1 ; done ; sleep 10; python3 -u main.py collector -l $HOSTNAME.default -p $COLLECTOR_PORT"]
@@ -33,7 +33,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: opendilab/di-orchestrator/di-mock:v0.0.5
+          image: opendilab/di-mock:v0.0.5
           imagePullPolicy: Always
           command: ["/bin/bash", "-c",]
           args: ["until ping -c 1 $HOSTNAME.default ; do sleep 1 ; done ; sleep 10; python3 -u main.py learner -l $HOSTNAME.default -p $LEARNER_PORT"]

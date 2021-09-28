@@ -16,9 +16,9 @@ VERSION := $(MASTER_VERSION)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG_BASE ?= opendilab/di-orchestrator/di-operator
-SERVER_IMG_BASE ?= opendilab/di-orchestrator/di-server
-WEBHOOK_IMG_BASE ?= opendilab/di-orchestrator/di-webhook
+IMG_BASE ?= opendilab/di-operator
+SERVER_IMG_BASE ?= opendilab/di-server
+WEBHOOK_IMG_BASE ?= opendilab/di-webhook
 
 IMG ?= ${IMG_BASE}:${VERSION}
 MASTER_IMG ?= ${IMG_BASE}:${MASTER_VERSION}

@@ -27,7 +27,7 @@ spec:
         - /di-operator
         args:
         - "--server-address=http://di-server.di-system:8080"
-        image: opendilab/di-orchestrator/di-operator:v0.2.0
+        image: opendilab/di-operator:v0.2.0
         imagePullPolicy: Always
         name: manager
         securityContext:

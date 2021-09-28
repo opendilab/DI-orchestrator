@@ -22,7 +22,7 @@ jobs:
       - name: Prepare
         id: prep
         env:
-          DOCKERIO_ORG: opendilab/di-orchestrator
+          DOCKERIO_ORG: opendilab
           TARGET: ${{ matrix.target }}
         run: |
           DOCKER_IMAGE=$DOCKERIO_ORG/$TARGET

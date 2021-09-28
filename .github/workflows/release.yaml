@@ -1,12 +1,12 @@
-name: Publish Releases to Hub
+name: Release
 
 # When its time to do a release do a full cross platform build for all supported
 # architectures and push all of them to Docker Hub.
 # Only trigger on semver shaped tags.
-on:
-  push:
-    tags:
-      - "v*.*.*"
+on: [push]
+
+env:
+  version: v0.2.0
 
 jobs:
   docker:
@@ -22,11 +22,11 @@ jobs:
       - name: Prepare
         id: prep
         env:
-          DOCKERIO_ORG: diorchestrator
+          DOCKERIO_ORG: opendilab/di-orchestrator
           TARGET: ${{ matrix.target }}
         run: |
           DOCKER_IMAGE=$DOCKERIO_ORG/$TARGET
-          VERSION=edge
+          VERSION=${version}-edge
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/}
           fi

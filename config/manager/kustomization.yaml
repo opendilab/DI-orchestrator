@@ -5,12 +5,12 @@ resources:
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
-- name: diorchestrator/di-operator
-  newName: diorchestrator/di-operator
-  newTag: v0.2.0-rc.0
-- name: diorchestrator/di-server
-  newName: diorchestrator/di-server
-  newTag: v0.2.0-rc.0
-- name: diorchestrator/di-webhook
-  newName: diorchestrator/di-webhook
-  newTag: v0.2.0-rc.0
+- name: opendilab/di-orchestrator/di-operator
+  newName: opendilab/di-orchestrator/di-operator
+  newTag: v0.2.0
+- name: opendilab/di-orchestrator/di-server
+  newName: opendilab/di-orchestrator/di-server
+  newTag: v0.2.0
+- name: opendilab/di-orchestrator/di-webhook
+  newName: opendilab/di-orchestrator/di-webhook
+  newTag: v0.2.0

@@ -18,7 +18,7 @@ spec:
           stdin: true
           tty: true
         - name: di-container
-          image: diorchestrator/ding:v0.1.0-75c41277
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED

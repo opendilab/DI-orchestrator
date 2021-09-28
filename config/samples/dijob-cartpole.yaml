@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.1
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -166,7 +166,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.1
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -193,7 +193,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/ding:v0.1.1
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED

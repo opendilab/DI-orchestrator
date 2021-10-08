@@ -4,7 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
 	dicommon "opendilab.org/di-orchestrator/common"
 	diutil "opendilab.org/di-orchestrator/utils"
@@ -56,14 +60,30 @@ func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div1alpha1
 		if err := r.createPodAndService(ctx, job, coorpod, coorsvc); err != nil {
 			return err
 		}
-
-		// update job status
-		msg := fmt.Sprintf("DIJob %s created", job.Name)
-		if err := r.updateJobPhase(ctx, job, div1alpha1.JobCreated, DIJobCreatedReason, msg); err != nil {
-			return err
-		}
 	}
 	return nil
+}
+
+func (r *DIJobReconciler) addDIJob(obj runtime.Object) {
+	job, err := parseJobFromUnstructured(obj)
+	if err != nil {
+		logrus.Errorf("error parsing dijob from unstructured: %v", err)
+		// TODO(liqingping): mark dijob as Failed
+
+	}
+
+	oldStatus := job.Status.DeepCopy()
+	// update job status
+	msg := fmt.Sprintf("DIJob %s created", job.Name)
+	if err := r.updateJobPhase(context.Background(), job, div1alpha1.JobCreated, DIJobCreatedReason, msg); err != nil {
+		logrus.Errorf("error updating job status: %v", err)
+	}
+
+	if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
+		if err := r.updateDIJobStatusInCluster(context.Background(), job); err != nil {
+			logrus.Errorf("failed to update DIJob %s/%s status, error: %v", job.Namespace, job.Name, err)
+		}
+	}
 }
 
 func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *div1alpha1.DIJob,
@@ -90,6 +110,20 @@ func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *div1alp
 	url := diutil.ConcatURL(svc.Name, svc.Namespace, port)
 
 	return pod, svc, url, nil
+}
+
+func parseJobFromUnstructured(obj runtime.Object) (*div1alpha1.DIJob, error) {
+	un, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, fmt.Errorf("failed to covert obj: %s to unstructured", obj.GetObjectKind().GroupVersionKind())
+	}
+
+	var dijob div1alpha1.DIJob
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(un.UnstructuredContent(), &dijob)
+	if err != nil {
+		return nil, err
+	}
+	return &dijob, nil
 }
 
 // func (r *DIJobReconciler) UpdateDIJob(ctx context.Context, job *div1alpha1.DIJob) error {

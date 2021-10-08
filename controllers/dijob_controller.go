@@ -186,6 +186,7 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &div1alpha1.DIJob{}},
 			&DIJobEventHandler{
+				r,
 				handler.EnqueueRequestForObject{},
 			},
 			builder.Predicates{},
@@ -209,12 +210,14 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 type DIJobEventHandler struct {
+	r *DIJobReconciler
 	handler.EnqueueRequestForObject
 }
 
 // Create implements EventHandler
 func (e *DIJobEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	// TODO(liqingping): mark dijob as Created when dijob is added.
+	e.r.addDIJob(evt.Object)
 	e.EnqueueRequestForObject.Create(evt, q)
 }
 

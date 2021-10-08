@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -65,9 +64,10 @@ func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div1alpha1
 }
 
 func (r *DIJobReconciler) addDIJob(obj client.Object) {
+	log := r.Log.WithValues("dijob", diutil.NamespacedName(obj.GetNamespace(), obj.GetName()))
 	job, ok := obj.(*div1alpha1.DIJob)
 	if !ok {
-		logrus.Errorf("failed to convert object DIJob: %s/%s", obj.GetNamespace(), obj.GetName())
+		log.Error(fmt.Errorf("failed to convert object DIJob: %s/%s", obj.GetNamespace(), obj.GetName()), "")
 		// TODO(liqingping): mark dijob as Failed
 		return
 	}
@@ -76,12 +76,15 @@ func (r *DIJobReconciler) addDIJob(obj client.Object) {
 	// update job status
 	msg := fmt.Sprintf("DIJob %s created", job.Name)
 	if err := r.updateJobPhase(context.Background(), job, div1alpha1.JobCreated, DIJobCreatedReason, msg); err != nil {
-		logrus.Errorf("failed to update job status: %v", err)
+		log.Error(err, "failed to update job status")
+		return
 	}
+
+	log.Info(fmt.Sprintf("DIJob %s/%s created", job.Namespace, job.Name))
 
 	if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
 		if err := r.updateDIJobStatusInCluster(context.Background(), job); err != nil {
-			logrus.Errorf("failed to update DIJob %s/%s status, error: %v", job.Namespace, job.Name, err)
+			log.Error(err, fmt.Sprintf("failed to update DIJob %s/%s status", job.Namespace, job.Name))
 		}
 	}
 }

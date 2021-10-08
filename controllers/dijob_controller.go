@@ -183,6 +183,7 @@ func (r *DIJobReconciler) deletePodsAndServices(ctx context.Context, job *div1al
 // SetupWithManager sets up the controller with the Manager.
 func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		For(&div1alpha1.DIJob{}).
 		Watches(
 			&source.Kind{Type: &div1alpha1.DIJob{}},
 			&DIJobEventHandler{
@@ -218,20 +219,20 @@ type DIJobEventHandler struct {
 func (e *DIJobEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
 	// TODO(liqingping): mark dijob as Created when dijob is added.
 	e.r.addDIJob(evt.Object)
-	e.EnqueueRequestForObject.Create(evt, q)
+	// e.EnqueueRequestForObject.Create(evt, q)
 }
 
 // Update implements EventHandler
 func (e *DIJobEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	e.EnqueueRequestForObject.Update(evt, q)
+	// e.EnqueueRequestForObject.Update(evt, q)
 }
 
 // Delete implements EventHandler
 func (e *DIJobEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	e.EnqueueRequestForObject.Delete(evt, q)
+	// e.EnqueueRequestForObject.Delete(evt, q)
 }
 
 // Generic implements EventHandler
 func (e *DIJobEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
-	e.EnqueueRequestForObject.Generic(evt, q)
+	// e.EnqueueRequestForObject.Generic(evt, q)
 }

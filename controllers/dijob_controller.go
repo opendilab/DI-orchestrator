@@ -215,7 +215,6 @@ type DIJobEventHandler struct {
 
 // Create implements EventHandler
 func (e *DIJobEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	// TODO(liqingping): mark dijob as Created when dijob is added.
 	e.r.addDIJob(evt.Object)
 }
 

@@ -28,9 +28,13 @@ var _ = Describe("DIJob Controller", func() {
 			ctx := context.Background()
 			jobTmpl := testutil.NewDIJob()
 			dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
+			checkCoordinatorCreated(ctx, dijob)
+
+			By("Checking the created DIJob is in Created state")
+			checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha1.JobCreated)
+
 			replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
 			podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
-
 			By("Update coordinator to Running")
 			err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodRunning)
 			Expect(err).NotTo(HaveOccurred())
@@ -84,6 +88,8 @@ var _ = Describe("DIJob Controller", func() {
 				ctx := context.Background()
 				jobTmpl := testutil.NewDIJob()
 				dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
+				checkCoordinatorCreated(ctx, dijob)
+
 				replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
 				podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 
@@ -113,6 +119,25 @@ var _ = Describe("DIJob Controller", func() {
 				err = testutil.CleanUpJob(ctx, k8sClient, &dijob)
 				Expect(err).NotTo(HaveOccurred())
 			}
+		})
+
+		It("Should be marked as Created when submitted", func() {
+			By("Create a DIJob")
+			var err error
+			ctx := context.Background()
+			jobTmpl := testutil.NewDIJob()
+			jobTmpl.Spec.Coordinator.Template.Spec.Containers[0].Resources.Limits = make(corev1.ResourceList)
+			jobTmpl.Spec.Coordinator.Template.Spec.Containers[0].Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] =
+				resource.MustParse("1m")
+
+			dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
+
+			By("Checking the created DIJob is in Created state")
+			checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha1.JobCreated)
+
+			By("Cleaning up")
+			err = testutil.CleanUpJob(ctx, k8sClient, &dijob)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 	Context("When creating a DIJob with collectors and learners", func() {
@@ -161,6 +186,8 @@ var _ = Describe("DIJob Controller", func() {
 				ctx := context.Background()
 				jobTmpl := testutil.NewDIJob()
 				dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
+				checkCoordinatorCreated(ctx, dijob)
+
 				replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
 				podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 
@@ -245,6 +272,7 @@ var _ = Describe("DIJob Controller", func() {
 				ctx := context.Background()
 				jobTmpl := testutil.NewDIJob()
 				dijob, _ := createDIJob(ctx, k8sClient, jobTmpl)
+				checkCoordinatorCreated(ctx, dijob)
 
 				// build owner reference
 				ownRefer := diutil.NewOwnerReference(div1alpha1.GroupVersion.String(), div1alpha1.KindDIJob, dijob.Name, dijob.UID, true)
@@ -294,16 +322,18 @@ func createDIJob(ctx context.Context, k8sClient client.Client, dijob *div1alpha1
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
+	return createdDIjob, key
+}
+
+func checkCoordinatorCreated(ctx context.Context, dijob div1alpha1.DIJob) {
 	By("Checking coordinator are created")
 	replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
 	var pod corev1.Pod
 	podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 	Eventually(func() bool {
-		err = k8sClient.Get(ctx, podKey, &pod)
+		err := k8sClient.Get(ctx, podKey, &pod)
 		return err == nil
 	}, timeout, interval).Should(BeTrue())
-
-	return createdDIjob, key
 }
 
 func createAndUpdatePodPhase(

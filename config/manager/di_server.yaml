@@ -23,7 +23,7 @@ spec:
         - "--leader-elect"
         - "--lease-lock-namespace=di-system"
         - "--lease-lock-name=di-server"
-        image: opendilab/di-server:v0.2.0
+        image: opendilab/di-server:v0.2.1
         imagePullPolicy: Always
         name: server
         securityContext:

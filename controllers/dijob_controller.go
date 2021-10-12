@@ -26,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -183,6 +185,13 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&div1alpha1.DIJob{}).
 		Watches(
+			&source.Kind{Type: &div1alpha1.DIJob{}},
+			&DIJobEventHandler{
+				r,
+			},
+			builder.Predicates{},
+		).
+		Watches(
 			&source.Kind{Type: &corev1.Pod{}},
 			&handler.EnqueueRequestForOwner{
 				IsController: true,
@@ -198,4 +207,25 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		).
 		Complete(r)
+}
+
+type DIJobEventHandler struct {
+	r *DIJobReconciler
+}
+
+// Create implements EventHandler
+func (e *DIJobEventHandler) Create(evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	e.r.addDIJob(evt.Object)
+}
+
+// Update implements EventHandler
+func (e *DIJobEventHandler) Update(evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+}
+
+// Delete implements EventHandler
+func (e *DIJobEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+}
+
+// Generic implements EventHandler
+func (e *DIJobEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }

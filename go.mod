@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/deckarep/golang-set v1.7.1
+	github.com/gin-gonic/gin v1.7.7
 	github.com/go-logr/logr v0.3.0
 	github.com/google/uuid v1.1.2
 	github.com/onsi/ginkgo v1.14.1

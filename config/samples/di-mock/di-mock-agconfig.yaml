@@ -9,7 +9,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: diorchestrator/di-mock:v0.0.5
+          image: opendilab/di-mock:v0.0.5
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "-c",]
           args: ["until ping -c 1 $HOSTNAME.default ; do sleep 1 ; done ; sleep 5; python3 -u main.py aggregator -sl $HOSTNAME.default -sp $AGGREGATOR_PORT -sl $HOSTNAME.default -ml $HOSTNAME.default -mp 81"]

@@ -41,10 +41,15 @@ type DIJobSpec struct {
 	// Volumes defines the shared volumes for DI-engine components
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
+	// Coordinator defines the coordinator of distributed DIJob.
+	// For serial DIJob, only coordinator is needed.
+	// +kubebuilder:validation:Required
 	Coordinator CoordinatorSpec `json:"coordinator"`
 
+	// +kubebuilder:validation:Optional
 	Collector CollectorSpec `json:"collector,"`
 
+	// +kubebuilder:validation:Optional
 	Learner LearnerSpec `json:"learner,"`
 }
 

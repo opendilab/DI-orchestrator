@@ -19,7 +19,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.1-3b98cb70
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
@@ -38,6 +38,7 @@ spec:
             from easydict import EasyDict
 
             qbert_dqn_config = dict(
+                exp_name='qbert_dqn',
                 env=dict(
                     collector_env_num=16,
                     collector_episode_num=2,
@@ -46,12 +47,10 @@ spec:
                     stop_value=30000,
                     env_id='QbertNoFrameskip-v4',
                     frame_stack=4,
-                    manager=dict(
-                        shared_memory=False,
-                    ),
+                    manager=dict(shared_memory=False, ),
                 ),
                 policy=dict(
-                    cuda=True,
+                    cuda=False,
                     priority=True,
                     model=dict(
                         obs_shape=[4, 84, 84],
@@ -61,7 +60,6 @@ spec:
                     nstep=3,
                     discount_factor=0.99,
                     learn=dict(
-                        multi_gpu=True,
                         batch_size=32,
                         learning_rate=0.0001,
                         learner=dict(
@@ -89,6 +87,7 @@ spec:
                             enable_track_used_data=True,
                         ),
                         commander=dict(
+                            # increase collector task space when get rs from server
                             collector_task_space=0,
                             learner_task_space=1,
                             eval_interval=30,
@@ -109,7 +108,7 @@ spec:
                 learner=dict(type='base', import_names=['ding.worker.learner.base_learner']),
                 collector=dict(
                     type='zergling',
-                    import_names=['ding.worker.collector.zergling_collector'],
+                    import_names=['ding.worker.collector.zergling_parallel_collector'],
                 ),
                 commander=dict(
                     type='solo',
@@ -137,7 +136,7 @@ spec:
                                 "replicas": 2,
                             },
                             learners={
-                                "gpus": "2",
+                                "gpus": "0",
                                 "replicas": 1,
                             },
                         ),
@@ -145,10 +144,10 @@ spec:
                         learner_target_num=1,
                     ),
                 ),
-                path_data='./data',
-                path_policy='./policy',
+                path_data='./{}/data'.format(main_config.exp_name),
+                path_policy='./{}/policy'.format(main_config.exp_name),
                 communication_mode='auto',
-                learner_gpu_num=2,
+                learner_gpu_num=1,
             )
             qbert_dqn_system_config = EasyDict(qbert_dqn_system_config)
             system_config = qbert_dqn_system_config
@@ -158,7 +157,7 @@ spec:
             # pip install --no-cache-dir -e .;
 
             ding -m dist --module config -P k8s -c qbert_dqn_config_k8s.py -s 0;
-            ding -m dist --module coordinator -c qbert_dqn_config_k8s.py.pkl -s 0 --disable-flask-log 0 -cdp $COORDINATOR_PORT
+            ding -m dist --module coordinator -c /ding/qbert_dqn_config_k8s.py.pkl -s 0 --disable-flask-log 0 -cdp $COORDINATOR_PORT
           ports:
           - name: di-port
             containerPort: 22273
@@ -170,17 +169,17 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.1-3b98cb70
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
           resources:
             requests:
-              cpu: 16
+              cpu: 5
               memory: "10Gi"
             limits:
-              cpu: 16
+              cpu: 5
               memory: "10Gi"
           command: ["/bin/bash", "-c",]
           args:
@@ -188,7 +187,7 @@ spec:
             # if code has been changed in the mount path, we have to reinstall ding cli
             # pip install --no-cache-dir -e .;
 
-            ding -m dist --module collector -c qbert_dqn_config_k8s.py.pkl -s 0 -clp $COLLECTOR_PORT --disable-flask-log 0
+            ding -m dist --module collector -c /ding/qbert_dqn_config_k8s.py.pkl -s 0 -clp $COLLECTOR_PORT --disable-flask-log 0
           ports:
           - name: di-port
             containerPort: 22270
@@ -200,25 +199,25 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: registry.sensetime.com/cloudnative4ai/ding:v0.1.1-3b98cb70
+          image: opendilab/ding:2021-09-26
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED
             value: "1"
           resources:
             requests:
-              cpu: 16
-              memory: "20Gi"
+              cpu: 5
+              memory: "10Gi"
             limits:
-              cpu: 16
-              memory: "20Gi"
+              cpu: 5
+              memory: "10Gi"
           command: ["/bin/bash", "-c",]
           args:
           - |
             # if code has been changed in the mount path, we have to reinstall ding cli
             # pip install --no-cache-dir -e .;
 
-            ding -m dist --module spawn_learner -c qbert_dqn_config_k8s.py.pkl -s 0 -lp $LEARNER_PORT --disable-flask-log 0
+            ding -m dist --module spawn_learner -c /ding/qbert_dqn_config_k8s.py.pkl -s 0 -lp $LEARNER_PORT --disable-flask-log 0
           ports:
           - name: di-port
             containerPort: 22271

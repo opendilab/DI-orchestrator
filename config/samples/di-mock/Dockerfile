@@ -11,4 +11,4 @@ COPY ./utils ./utils
 COPY ./worker ./worker
 COPY ./main.py ./main.py
 
-# docker build -t diorchestrator/di-mock:v0.0.1 .
+# docker build -t opendilab/di-mock:v0.0.1 .

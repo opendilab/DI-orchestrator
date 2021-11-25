@@ -74,6 +74,7 @@ var _ = Describe("DIJob Specification", func() {
 					jobTmpl := testutil.NewDIJob()
 					jobTmpl.Spec.CleanPodPolicy = policy
 					dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
+					checkCoordinatorCreated(ctx, dijob)
 
 					// build owner reference
 					ownRefer := diutil.NewOwnerReference(div1alpha1.GroupVersion.String(), div1alpha1.KindDIJob, dijob.Name, dijob.UID, true)

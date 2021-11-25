@@ -1,6 +1,6 @@
 
 # di-operator version
-VERSION ?= v0.2.0-rc.0
+VERSION ?= v0.2.1
 MASTER_VERSION := $(VERSION)
 
 COMMIT_SHORT_SHA=$(shell git log -n 1 | head -n 1 | sed -e 's/^commit //' | head -c 8)
@@ -62,18 +62,21 @@ help: ## Display this help.
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG} ${SERVER_IMG_BASE}=${MASTER_SERVER_IMG} ${WEBHOOK_IMG_BASE}=${MASTER_WEBHOOK_IMG}
-	./hack/update-version.sh ${MASTER_VERSION}
 	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
 	./hack/update-image-tags.sh config/v1.15.5 ${MASTER_VERSION}
+	./hack/update-version.sh ${MASTER_VERSION}
+## generate installer scripts
+	$(KUSTOMIZE) build config/default > config/di-manager.yaml
+
 
 # dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
 # used `make manifests` when commited git
 dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG} ${SERVER_IMG_BASE}=${SERVER_IMG} ${WEBHOOK_IMG_BASE}=${WEBHOOK_IMG}
-	./hack/update-version.sh ${VERSION}
 	./hack/update-image-tags.sh config/manager ${VERSION}
 	./hack/update-image-tags.sh config/v1.15.5 ${VERSION}
+	./hack/update-version.sh ${VERSION}
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -151,9 +154,6 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 
 dev-deploy: dev-manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
-
-installer-gen: manifests kustomize ## generate di-manager.yaml
-	$(KUSTOMIZE) build config/default > config/di-manager.yaml
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -

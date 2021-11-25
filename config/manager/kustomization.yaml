@@ -7,10 +7,10 @@ kind: Kustomization
 images:
 - name: registry.sensetime.com/cloudnative4ai/di-operator
   newName: registry.sensetime.com/cloudnative4ai/di-operator
-  newTag: v0.2.0-rc.0
+  newTag: v0.2.1
 - name: registry.sensetime.com/cloudnative4ai/di-server
   newName: registry.sensetime.com/cloudnative4ai/di-server
-  newTag: v0.2.0-rc.0
+  newTag: v0.2.1
 - name: registry.sensetime.com/cloudnative4ai/di-webhook
   newName: registry.sensetime.com/cloudnative4ai/di-webhook
-  newTag: v0.2.0-rc.0
+  newTag: v0.2.1

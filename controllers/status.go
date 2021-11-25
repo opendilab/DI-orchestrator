@@ -82,8 +82,10 @@ func (r *DIJobReconciler) updateJobPhase(
 	updateDIJobConditions(job, phase, reason, msg)
 
 	switch phase {
-	case div1alpha1.JobCreated, div1alpha1.JobRunning:
-		// ignore events when job are created or running
+	case div1alpha1.JobCreated:
+		r.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
+	case div1alpha1.JobRunning:
+		// ignore events when job is running
 	case div1alpha1.JobFailed:
 		r.Recorder.Eventf(job, corev1.EventTypeWarning, reason, msg)
 	case div1alpha1.JobSucceeded:

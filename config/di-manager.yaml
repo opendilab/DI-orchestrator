@@ -7617,7 +7617,7 @@ spec:
                 - template
                 type: object
               coordinator:
-                description: CoordinatorSpec defines the desired state of coordinators
+                description: Coordinator defines the coordinator of distributed DIJob. For serial DIJob, only coordinator is needed.
                 properties:
                   template:
                     description: PodTemplateSpec describes the data a pod should have when created from a template
@@ -16018,9 +16018,7 @@ spec:
                   type: object
                 type: array
             required:
-            - collector
             - coordinator
-            - learner
             type: object
           status:
             description: DIJobStatus defines the observed state of DIJob
@@ -16321,7 +16319,7 @@ spec:
         - --leader-elect
         command:
         - /di-operator
-        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.2.0-rc.0
+        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.2.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16372,7 +16370,7 @@ spec:
         - --lease-lock-name=di-server
         command:
         - /di-server
-        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.0-rc.0
+        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16412,7 +16410,7 @@ spec:
       containers:
       - command:
         - /di-webhook
-        image: registry.sensetime.com/cloudnative4ai/di-webhook:v0.2.0-rc.0
+        image: registry.sensetime.com/cloudnative4ai/di-webhook:v0.2.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

@@ -6614,7 +6614,8 @@ spec:
                 - template
                 type: object
               coordinator:
-                description: CoordinatorSpec defines the desired state of coordinators
+                description: Coordinator defines the coordinator of distributed DIJob.
+                  For serial DIJob, only coordinator is needed.
                 properties:
                   template:
                     description: PodTemplateSpec describes the data a pod should have
@@ -21179,9 +21180,7 @@ spec:
                   type: object
                 type: array
             required:
-            - collector
             - coordinator
-            - learner
             type: object
           status:
             description: DIJobStatus defines the observed state of DIJob

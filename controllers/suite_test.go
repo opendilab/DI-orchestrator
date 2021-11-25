@@ -98,10 +98,7 @@ var _ = BeforeSuite(func() {
 	createdAg := div1alpha1.AggregatorConfig{}
 	Eventually(func() bool {
 		err := k8sClient.Get(ctx, key, &createdAg)
-		if err != nil {
-			return false
-		}
-		return true
+		return err == nil
 	}, timeout, interval).Should(BeTrue())
 
 	// create controller manager

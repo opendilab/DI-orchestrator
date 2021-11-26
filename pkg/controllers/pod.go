@@ -9,9 +9,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	dicommon "opendilab.org/di-orchestrator/common"
-	diutil "opendilab.org/di-orchestrator/utils"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
+	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
 func (r *DIJobReconciler) reconcilePodsAndServices(ctx context.Context, job *div1alpha1.DIJob, pods []*corev1.Pod, services []*corev1.Service) error {

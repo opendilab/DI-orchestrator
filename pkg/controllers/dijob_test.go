@@ -9,10 +9,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	dicommon "opendilab.org/di-orchestrator/common"
-	diutil "opendilab.org/di-orchestrator/utils"
-	testutil "opendilab.org/di-orchestrator/utils/testutils"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
+	diutil "opendilab.org/di-orchestrator/pkg/utils"
+	testutil "opendilab.org/di-orchestrator/pkg/utils/testutils"
 )
 
 var _ = Describe("DIJob Specification", func() {

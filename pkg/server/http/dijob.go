@@ -11,10 +11,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	dicommon "opendilab.org/di-orchestrator/common"
-	commontypes "opendilab.org/di-orchestrator/common/types"
-	diutil "opendilab.org/di-orchestrator/utils"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
+	commontypes "opendilab.org/di-orchestrator/pkg/common/types"
+	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
 func (s *DIServer) getDIJob(namespace, modulePodName string) (*div1alpha1.DIJob, error) {

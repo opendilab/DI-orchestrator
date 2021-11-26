@@ -16,11 +16,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	dicommon "opendilab.org/di-orchestrator/common"
-	commontypes "opendilab.org/di-orchestrator/common/types"
-	diutil "opendilab.org/di-orchestrator/utils"
-	testutil "opendilab.org/di-orchestrator/utils/testutils"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
+	commontypes "opendilab.org/di-orchestrator/pkg/common/types"
+	diutil "opendilab.org/di-orchestrator/pkg/utils"
+	testutil "opendilab.org/di-orchestrator/pkg/utils/testutils"
 )
 
 var _ = Describe("Server Test", func() {

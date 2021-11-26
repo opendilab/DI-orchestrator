@@ -21,10 +21,10 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	dicommon "opendilab.org/di-orchestrator/common"
-	gpualloc "opendilab.org/di-orchestrator/common/gpuallocator"
-	serverdynamic "opendilab.org/di-orchestrator/server/dynamic"
-	serverhttp "opendilab.org/di-orchestrator/server/http"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
+	gpualloc "opendilab.org/di-orchestrator/pkg/common/gpuallocator"
+	serverdynamic "opendilab.org/di-orchestrator/pkg/server/dynamic"
+	serverhttp "opendilab.org/di-orchestrator/pkg/server/http"
 )
 
 var (

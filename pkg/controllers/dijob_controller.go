@@ -34,8 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	diutil "opendilab.org/di-orchestrator/utils"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
 // DIJobReconciler reconciles a DIJob object

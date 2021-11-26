@@ -14,7 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dicommon "opendilab.org/di-orchestrator/common"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
 )
 
 func NewPod(name, jobName string, ownRefer metav1.OwnerReference) *corev1.Pod {

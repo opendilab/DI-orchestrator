@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
 )
 
 func TestE2E(t *testing.T) {

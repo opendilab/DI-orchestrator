@@ -9,9 +9,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	dicommon "opendilab.org/di-orchestrator/common"
-	diutil "opendilab.org/di-orchestrator/utils"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
+	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
 func NewDIJob() *div1alpha1.DIJob {

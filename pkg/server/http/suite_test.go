@@ -43,9 +43,9 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	serverdynamic "opendilab.org/di-orchestrator/server/dynamic"
-	testutil "opendilab.org/di-orchestrator/utils/testutils"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	serverdynamic "opendilab.org/di-orchestrator/pkg/server/dynamic"
+	testutil "opendilab.org/di-orchestrator/pkg/utils/testutils"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -83,7 +83,7 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 

@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
 )
 
 var (

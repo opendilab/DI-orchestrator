@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	dicommon "opendilab.org/di-orchestrator/common"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
 )
 
 func BuildPodAndService(

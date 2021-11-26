@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

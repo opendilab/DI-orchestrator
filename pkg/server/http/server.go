@@ -17,12 +17,12 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
-	div1alpha1 "opendilab.org/di-orchestrator/api/v1alpha1"
-	dicommon "opendilab.org/di-orchestrator/common"
-	gpualloc "opendilab.org/di-orchestrator/common/gpuallocator"
-	commontypes "opendilab.org/di-orchestrator/common/types"
-	serverdynamic "opendilab.org/di-orchestrator/server/dynamic"
-	diutil "opendilab.org/di-orchestrator/utils"
+	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
+	gpualloc "opendilab.org/di-orchestrator/pkg/common/gpuallocator"
+	commontypes "opendilab.org/di-orchestrator/pkg/common/types"
+	serverdynamic "opendilab.org/di-orchestrator/pkg/server/dynamic"
+	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
 var (

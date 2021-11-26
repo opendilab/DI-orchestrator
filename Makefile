@@ -93,11 +93,11 @@ lint:
 
 .PHONY: test
 test: ginkgo ## Run tests.
-	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./api/v1alpha1 ./controllers ./server/http ./common/gpuallocator 
-	go tool cover -func=./api/v1alpha1/coverage.out 
-	go tool cover -func=./controllers/coverage.out 
-	go tool cover -func=./server/http/coverage.out 
-	go tool cover -func=./common/gpuallocator/coverage.out
+	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./pkg/... 
+	go tool cover -func=./pkg/api/v1alpha1/coverage.out 
+	go tool cover -func=./pkg/controllers/coverage.out 
+	go tool cover -func=./pkg/server/http/coverage.out 
+	go tool cover -func=./pkg/common/gpuallocator/coverage.out
 
 ##@ Build
 

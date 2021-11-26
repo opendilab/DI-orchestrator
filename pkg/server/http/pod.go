@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	commontypes "opendilab.org/di-orchestrator/common/types"
-	diutil "opendilab.org/di-orchestrator/utils"
+	commontypes "opendilab.org/di-orchestrator/pkg/common/types"
+	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
 func (s *DIServer) getPodsByNames(namespace string, names []string) ([]*corev1.Pod, error) {

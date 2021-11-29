@@ -31,21 +31,21 @@ import (
 	"opendilab.org/di-orchestrator/pkg/controllers"
 )
 
-type OperatorOptions struct {
+type CreateOptions struct {
 	MetricAddress        string
 	ProbeAddress         string
 	EnableLeaderElection bool
 }
 
-func NewOperatorOptions() *OperatorOptions {
-	return &OperatorOptions{
+func NewCreateOptions() *CreateOptions {
+	return &CreateOptions{
 		MetricAddress:        ":8443",
 		ProbeAddress:         ":8080",
 		EnableLeaderElection: false,
 	}
 }
 
-func (o *OperatorOptions) AddFlags(cmd *cobra.Command) {
+func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.MetricAddress, "metric-addr", o.MetricAddress, "The address the metric endpoint binds to.")
 	cmd.Flags().StringVar(&o.ProbeAddress, "probe-addr", o.ProbeAddress, "The address the probe endpoint binds to.")
 	cmd.Flags().BoolVar(&o.EnableLeaderElection, "leader-elect", o.EnableLeaderElection,
@@ -54,7 +54,7 @@ func (o *OperatorOptions) AddFlags(cmd *cobra.Command) {
 }
 
 func NewCmdOperator() *cobra.Command {
-	o := NewOperatorOptions()
+	o := NewCreateOptions()
 	var operatorCmd = &cobra.Command{
 		Use:   "operator",
 		Short: "Command to run di-operator ",
@@ -85,7 +85,7 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-func runCommand(cmd *cobra.Command, options *OperatorOptions) error {
+func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	ctrl.SetLogger(cmdcommon.Logger)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{

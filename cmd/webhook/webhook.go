@@ -28,15 +28,15 @@ import (
 	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
 )
 
-type WebhookOptions struct {
+type CreateOptions struct {
 	MetricAddress        string
 	ProbeAddress         string
 	EnableLeaderElection bool
 	Port                 int
 }
 
-func NewWebhookOptions() *WebhookOptions {
-	return &WebhookOptions{
+func NewCreateOptions() *CreateOptions {
+	return &CreateOptions{
 		MetricAddress:        ":8443",
 		ProbeAddress:         ":8080",
 		EnableLeaderElection: false,
@@ -44,7 +44,7 @@ func NewWebhookOptions() *WebhookOptions {
 	}
 }
 
-func (o *WebhookOptions) AddFlags(cmd *cobra.Command) {
+func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.MetricAddress, "metric-addr", o.MetricAddress, "The address the metric endpoint binds to.")
 	cmd.Flags().StringVar(&o.ProbeAddress, "probe-addr", o.ProbeAddress, "The address the probe endpoint binds to.")
 	cmd.Flags().BoolVar(&o.EnableLeaderElection, "leader-elect", o.EnableLeaderElection,
@@ -54,7 +54,7 @@ func (o *WebhookOptions) AddFlags(cmd *cobra.Command) {
 }
 
 func NewCmdWebhook() *cobra.Command {
-	o := NewWebhookOptions()
+	o := NewCreateOptions()
 	var webhookCmd = &cobra.Command{
 		Use:   "webhook",
 		Short: "Command to run di-webhook ",
@@ -85,7 +85,7 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-func runCommand(cmd *cobra.Command, options *WebhookOptions) error {
+func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	ctrl.SetLogger(cmdcommon.Logger)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{

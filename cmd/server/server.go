@@ -36,7 +36,7 @@ var (
 	DefaultAGConfigName      = "aggregator-config"
 )
 
-type ServerOptions struct {
+type CreateOptions struct {
 	*cmdcommon.GenericFlags
 
 	ServerBindAddress string
@@ -46,8 +46,8 @@ type ServerOptions struct {
 	AGCconfigName     string
 }
 
-func NewServerOptions() *ServerOptions {
-	return &ServerOptions{
+func NewCreateOptions() *CreateOptions {
+	return &CreateOptions{
 		GenericFlags:      cmdcommon.NewGenericFlags(),
 		ServerBindAddress: ":8080",
 		GPUAllocPolicy:    gpualloc.SimpleGPUAllocPolicy,
@@ -56,7 +56,7 @@ func NewServerOptions() *ServerOptions {
 	}
 }
 
-func (o *ServerOptions) AddFlags(cmd *cobra.Command) {
+func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.ServerBindAddress, "server-bind-address", "b", o.ServerBindAddress,
 		"The address for server to bind to.")
 	cmd.Flags().StringVarP(&o.GPUAllocPolicy, "gpu-alloc-policy", "p", o.GPUAllocPolicy,
@@ -70,7 +70,7 @@ func (o *ServerOptions) AddFlags(cmd *cobra.Command) {
 
 // serverCmd represents the server command
 func NewCmdServer() *cobra.Command {
-	o := NewServerOptions()
+	o := NewCreateOptions()
 	var serverCmd = &cobra.Command{
 		Use:   "server",
 		Short: "Command to run di-server ",
@@ -89,7 +89,7 @@ Examples:
 	return serverCmd
 }
 
-func runCommand(cmd *cobra.Command, options *ServerOptions) error {
+func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	cfg, err := ctrl.GetConfig()
 	if err != nil {
 		return err

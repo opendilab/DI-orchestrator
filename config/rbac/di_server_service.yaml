@@ -11,19 +11,3 @@ spec:
     - protocol: TCP
       port: 8080
       targetPort: 8080
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: di-server-nodeport
-  namespace: di-system
-spec:
-  selector:
-    control-plane: di-server
-  type: NodePort
-  ports:
-    - protocol: TCP
-      port: 8080
-      targetPort: 8080
-      nodePort: 32270

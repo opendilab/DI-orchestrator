@@ -16251,7 +16251,7 @@ spec:
   ports:
   - name: https
     port: 8443
-    targetPort: 8080
+    targetPort: 8443
   selector:
     control-plane: di-operator
 ---
@@ -16267,21 +16267,6 @@ spec:
     targetPort: 8080
   selector:
     control-plane: di-server
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: di-server-nodeport
-  namespace: di-system
-spec:
-  ports:
-  - nodePort: 32270
-    port: 8080
-    protocol: TCP
-    targetPort: 8080
-  selector:
-    control-plane: di-server
-  type: NodePort
 ---
 apiVersion: v1
 kind: Service
@@ -16319,7 +16304,7 @@ spec:
         - --leader-elect
         command:
         - /di-operator
-        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.2.1
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16370,7 +16355,7 @@ spec:
         - --lease-lock-name=di-server
         command:
         - /di-server
-        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.1
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16410,7 +16395,7 @@ spec:
       containers:
       - command:
         - /di-webhook
-        image: registry.sensetime.com/cloudnative4ai/di-webhook:v0.2.1
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

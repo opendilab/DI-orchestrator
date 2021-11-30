@@ -18,7 +18,7 @@ COPY pkg/ pkg/
 COPY main.go main.go
 
 # Build orchestrator
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-orchetrator ./main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-orchestrator ./main.go
 
 # Use distroless as minimal base image to package the di-orchestrator binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
@@ -26,6 +26,6 @@ FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0
 LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /
-COPY --from=builder /workspace/di-orchetrator .
+COPY --from=builder /workspace/di-orchestrator .
 
-ENTRYPOINT ["/di-orchetrator"]
+ENTRYPOINT ["/di-orchestrator"]

@@ -17,8 +17,13 @@ spec:
     spec:
       containers:
       - command:
-        - /di-webhook
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        - /di-orchestrator 
+        - webhook
+        args:
+        - "--probe-addr=:8080"
+        - "--metric-addr=:8443"
+        - --port=9443
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0-51ca9ef7
         imagePullPolicy: Always
         name: webhook
         securityContext:
@@ -26,13 +31,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:

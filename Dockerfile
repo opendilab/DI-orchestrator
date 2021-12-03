@@ -1,5 +1,5 @@
 # Build the di-operator binary
-FROM registry.sensetime.com/cloudnative4ai/golang:1.15 as builder
+FROM golang:1.15 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests

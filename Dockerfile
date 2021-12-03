@@ -1,5 +1,5 @@
 # Build the di-operator binary
-FROM golang:1.15 as builder
+FROM registry.sensetime.com/cloudnative4ai/golang:1.15 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -28,7 +28,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o di-serve
 # Use distroless as minimal base image to package the di-operator binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM redhat/ubi8:latest as di-operator
-LABEL maintainer="opendilab.contact.gmail.com"
+LABEL maintainer="opendilab.contact@gmail.com"
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 WORKDIR /
 COPY --from=builder /workspace/di-operator .

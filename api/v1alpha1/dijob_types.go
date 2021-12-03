@@ -44,13 +44,13 @@ type DIJobSpec struct {
 	// Coordinator defines the coordinator of distributed DIJob.
 	// For serial DIJob, only coordinator is needed.
 	// +kubebuilder:validation:Required
-	Coordinator CoordinatorSpec `json:"coordinator"`
+	Coordinator *CoordinatorSpec `json:"coordinator"`
 
 	// +kubebuilder:validation:Optional
-	Collector CollectorSpec `json:"collector,"`
+	Collector *CollectorSpec `json:"collector,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	Learner LearnerSpec `json:"learner,"`
+	Learner *LearnerSpec `json:"learner,omitempty"`
 }
 
 // Priority defines the priority of DIJob
@@ -84,12 +84,12 @@ type CoordinatorSpec struct {
 
 // CollectorSpec defines the desired state of CollectorSpec
 type CollectorSpec struct {
-	Template corev1.PodTemplateSpec `json:"template,"`
+	Template corev1.PodTemplateSpec `json:"template"`
 }
 
 // Learner defines the desired state of Learner
 type LearnerSpec struct {
-	Template corev1.PodTemplateSpec `json:"template,"`
+	Template corev1.PodTemplateSpec `json:"template"`
 }
 
 // DIJobStatus defines the observed state of DIJob
@@ -170,7 +170,6 @@ type DIJobCondition struct {
 // +kubebuilder:resource:shortName=dijob
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-
 // DIJob is the Schema for the dijobs API
 type DIJob struct {
 	metav1.TypeMeta   `json:",inline"`

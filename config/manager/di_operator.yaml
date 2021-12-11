@@ -30,7 +30,7 @@ spec:
         - "--probe-addr=:8080"
         - "--metric-addr=:8443"
         - "--leader-elect"
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0-51ca9ef7
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0-24dca4e4
         imagePullPolicy: Always
         name: manager
         securityContext:

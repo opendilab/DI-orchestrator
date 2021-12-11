@@ -1,4 +1,4 @@
-apiVersion: diengine.opendilab.org/v1alpha1
+apiVersion: diengine.opendilab.org/v1alpha2
 kind: DIJob
 metadata:
   name: cartpole-dqn
@@ -126,7 +126,7 @@ spec:
                 coordinator=dict(
                     operator_server=dict(
                         system_addr='di-server.di-system:8080',
-                        api_version='/v1alpha1',
+                        api_version='/v1alpha2',
                         init_replicas_request=dict(
                             collectors={
                                 "replicas": 2,

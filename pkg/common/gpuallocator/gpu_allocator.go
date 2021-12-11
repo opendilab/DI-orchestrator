@@ -1,4 +1,4 @@
-package common
+package gpu_allocator
 
 import (
 	"fmt"

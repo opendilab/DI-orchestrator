@@ -16,8 +16,6 @@ limitations under the License.
 package operator
 
 import (
-	"os"
-
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -26,8 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
-	dicommon "opendilab.org/di-orchestrator/pkg/common"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	"opendilab.org/di-orchestrator/pkg/controllers"
 )
 
@@ -81,7 +78,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(div1alpha1.AddToScheme(scheme))
+	utilruntime.Must(div1alpha2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -98,12 +95,6 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		return err
-	}
-
-	// set DefaultDIServerURL
-	serverAddr := os.Getenv(dicommon.ServerURLEnv)
-	if serverAddr != "" {
-		dicommon.DefaultServerURL = serverAddr
 	}
 
 	reconciler := &controllers.DIJobReconciler{

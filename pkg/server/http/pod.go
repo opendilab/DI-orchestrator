@@ -1,13 +1,10 @@
 package http
 
 import (
-	"context"
 	"fmt"
 
 	mapset "github.com/deckarep/golang-set"
 	corev1 "k8s.io/api/core/v1"
-	errors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,46 +69,14 @@ func (s *DIServer) getPodByKey(key string) (*corev1.Pod, error) {
 	return &pod, nil
 }
 
-func (s *DIServer) createPod(namespace string, pod *corev1.Pod) (*corev1.Pod, error) {
-	newpod, err := s.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
-	if err != nil && !errors.IsAlreadyExists(err) {
-		return nil, err
-	}
-	return newpod, nil
-}
-
-func (s *DIServer) deletePods(pods []*corev1.Pod) error {
-	for _, pod := range pods {
-		// delete old pod and service
-		if err := s.deletePod(pod.Namespace, pod.Name); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *DIServer) deletePod(namespace, name string) error {
-	if err := s.KubeClient.CoreV1().Pods(namespace).Delete(context.Background(), name,
-		metav1.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !errors.IsNotFound(err) {
-		return err
-	}
-	return nil
-}
-
-func (s *DIServer) listReplicaPodsWithSelector(namespace string, labelSelector labels.Selector) (
-	collectors []*corev1.Pod, learners []*corev1.Pod,
-	coordinator *corev1.Pod, aggregators []*corev1.Pod, DDPLearners []*corev1.Pod, err error) {
+func (s *DIServer) listReplicaPodsWithSelector(jobID string, labelSelector labels.Selector) (
+	pods []*corev1.Pod, err error) {
 	// list pods that belong to the DIJob
-	pods, err := s.listPodsWithSelector(namespace, labelSelector)
+	id, err := diutil.SplitNamespaceName(jobID)
 	if err != nil {
 		return
 	}
-
-	// filter out terminating pods since these pods are deleted
-	pods = diutil.FilterOutTerminatingPods(pods)
-
-	// classify pods
-	collectors, learners, coordinator, aggregators, DDPLearners, err = diutil.ClassifyPods(pods)
+	pods, err = s.listPodsWithSelector(id.Namespace, labelSelector)
 	if err != nil {
 		return
 	}

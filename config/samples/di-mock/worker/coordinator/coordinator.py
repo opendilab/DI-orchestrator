@@ -22,7 +22,7 @@ from utils import LockContext, LockContextType, get_task_uid
 
 cfg = {
     'interaction': {
-        'api_version': '/v1alpha1',
+        'api_version': '/v1alpha2',
         'collector_limits': 1,
         'learner_limits': 1,
         'collector': {

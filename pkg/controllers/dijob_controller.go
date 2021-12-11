@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
@@ -43,13 +43,12 @@ type DIJobReconciler struct {
 	client.Client
 	Log      logr.Logger
 	Scheme   *runtime.Scheme
-	AGConfig string
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs;aggregatorconfigs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs/status;aggregatorconfigs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs/finalizers;aggregatorconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=pods;services;events,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=namespaces;nodes,verbs=get;list
 
@@ -67,7 +66,7 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// log.Info("reconcile dijob", "dijob", req.NamespacedName)
 
 	// get DIJob object
-	job := &div1alpha1.DIJob{}
+	job := &div1alpha2.DIJob{}
 	err := r.Get(ctx, req.NamespacedName, job)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -75,17 +74,6 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 		return ctrl.Result{}, nil
 	}
-
-	jobStatus := job.Status.DeepCopy()
-
-	// update status
-	defer func() {
-		if !apiequality.Semantic.DeepEqual(*jobStatus, job.Status) {
-			if err := r.updateDIJobStatusInCluster(ctx, job); err != nil {
-				log.Error(err, "failed to update DIJobStatus", "job", req.NamespacedName)
-			}
-		}
-	}()
 
 	// list pods of DIJob
 	pods, err := diutil.ListPods(ctx, r.Client, job)
@@ -107,18 +95,8 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			log.Error(err, "failed to delete pods and services of DIJob", "job", req.NamespacedName)
 			return ctrl.Result{}, nil
 		}
-
-		if isSucceeded(job) {
-			for rtype := range job.Status.ReplicaStatus {
-				job.Status.ReplicaStatus[rtype].Succeeded += job.Status.ReplicaStatus[rtype].Active
-				job.Status.ReplicaStatus[rtype].Active = 0
-			}
-		}
 		return ctrl.Result{}, nil
 	}
-
-	// initialize DIJob status
-	initializeDIJobReplicaStatus(job)
 
 	if err := r.reconcileReplicas(ctx, job, pods, services); err != nil {
 		log.Error(err, "failed to reconcile pods", "job", req.NamespacedName)
@@ -128,7 +106,7 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{}, nil
 }
 
-func (r *DIJobReconciler) deletePodsAndServices(ctx context.Context, job *div1alpha1.DIJob, pods []*corev1.Pod, services []*corev1.Service) error {
+func (r *DIJobReconciler) deletePodsAndServices(ctx context.Context, job *div1alpha2.DIJob, pods []*corev1.Pod, services []*corev1.Service) error {
 	log := r.Log.WithValues("dijob", fmt.Sprintf("%s/%s", job.Namespace, job.Name))
 	if len(pods) == 0 {
 		return nil
@@ -141,15 +119,15 @@ func (r *DIJobReconciler) deletePodsAndServices(ctx context.Context, job *div1al
 		}
 	}
 
-	if job.Spec.CleanPodPolicy != div1alpha1.CleanPodPolicyAll &&
-		job.Spec.CleanPodPolicy != div1alpha1.CleanPodPolicyRunning {
+	if job.Spec.CleanPodPolicy != div1alpha2.CleanPodPolicyAll &&
+		job.Spec.CleanPodPolicy != div1alpha2.CleanPodPolicyRunning {
 		return nil
 	}
 
 	for _, pod := range pods {
 		// Just delete running pod when the cleanPodPolicy is Running
 		needsDelete := true
-		if job.Spec.CleanPodPolicy == div1alpha1.CleanPodPolicyRunning {
+		if job.Spec.CleanPodPolicy == div1alpha2.CleanPodPolicyRunning {
 			if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
 				continue
 			}
@@ -183,9 +161,9 @@ func (r *DIJobReconciler) deletePodsAndServices(ctx context.Context, job *div1al
 // SetupWithManager sets up the controller with the Manager.
 func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&div1alpha1.DIJob{}).
+		For(&div1alpha2.DIJob{}).
 		Watches(
-			&source.Kind{Type: &div1alpha1.DIJob{}},
+			&source.Kind{Type: &div1alpha2.DIJob{}},
 			&DIJobEventHandler{
 				r,
 			},
@@ -195,7 +173,7 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &corev1.Pod{}},
 			&handler.EnqueueRequestForOwner{
 				IsController: true,
-				OwnerType:    &div1alpha1.DIJob{},
+				OwnerType:    &div1alpha2.DIJob{},
 			},
 			builder.Predicates{},
 		).
@@ -203,7 +181,7 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &corev1.Service{}},
 			&handler.EnqueueRequestForOwner{
 				IsController: true,
-				OwnerType:    &div1alpha1.DIJob{},
+				OwnerType:    &div1alpha2.DIJob{},
 			},
 		).
 		Complete(r)
@@ -228,4 +206,27 @@ func (e *DIJobEventHandler) Delete(evt event.DeleteEvent, q workqueue.RateLimiti
 
 // Generic implements EventHandler
 func (e *DIJobEventHandler) Generic(evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+}
+
+// addDIJob is the event handler responsible for handling job add events
+func (r *DIJobReconciler) addDIJob(obj client.Object) {
+	log := r.Log.WithValues("dijob", diutil.NamespacedName(obj.GetNamespace(), obj.GetName()))
+	job, ok := obj.(*div1alpha2.DIJob)
+	if !ok {
+		log.Error(fmt.Errorf("failed to convert object DIJob: %s/%s", obj.GetNamespace(), obj.GetName()), "")
+		r.markIncorrectJobFailed(obj)
+		return
+	}
+	oldStatus := job.Status.DeepCopy()
+
+	// update job status
+	msg := fmt.Sprintf("DIJob %s created", job.Name)
+	r.updateJobStatus(context.Background(), job, div1alpha2.JobPending, DIJobPendingReason, msg)
+
+	log.Info(fmt.Sprintf("DIJob %s/%s created", job.Namespace, job.Name))
+	if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
+		if err := r.updateDIJobStatusInCluster(context.Background(), job); err != nil {
+			log.Error(err, fmt.Sprintf("failed to update DIJob %s/%s status", job.Namespace, job.Name))
+		}
+	}
 }

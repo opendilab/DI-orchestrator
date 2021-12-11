@@ -1,4 +1,4 @@
-package v1alpha1
+package v1alpha2
 
 import (
 	"context"
@@ -134,41 +134,13 @@ func NewDIJob() *DIJob {
 			Namespace: DIJobNamespace,
 		},
 		Spec: DIJobSpec{
-			Coordinator: CoordinatorSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name:    "coordinator",
-								Image:   DIJobImage,
-								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
-							},
-						},
-					},
-				},
-			},
-			Collector: CollectorSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name:    "collector",
-								Image:   DIJobImage,
-								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
-							},
-						},
-					},
-				},
-			},
-			Learner: LearnerSpec{
-				Template: corev1.PodTemplateSpec{
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
-							{
-								Name:    "learner",
-								Image:   DIJobImage,
-								Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
-							},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    "coordinator",
+							Image:   DIJobImage,
+							Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
 						},
 					},
 				},

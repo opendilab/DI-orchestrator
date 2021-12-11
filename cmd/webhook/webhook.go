@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 )
 
 type CreateOptions struct {
@@ -81,7 +81,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(div1alpha1.AddToScheme(scheme))
+	utilruntime.Must(div1alpha2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -101,7 +101,7 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 		return err
 	}
 
-	if err = (&div1alpha1.DIJob{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = (&div1alpha2.DIJob{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "DIJob")
 		return err
 	}

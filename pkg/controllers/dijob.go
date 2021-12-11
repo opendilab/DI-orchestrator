@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -14,86 +15,140 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
-func isSucceeded(job *div1alpha1.DIJob) bool {
-	return job.Status.Phase == div1alpha1.JobSucceeded
+func isSucceeded(job *div1alpha2.DIJob) bool {
+	return job.Status.Phase == div1alpha2.JobSucceeded
 }
 
-func isFailed(job *div1alpha1.DIJob) bool {
-	return job.Status.Phase == div1alpha1.JobFailed
+func isFailed(job *div1alpha2.DIJob) bool {
+	return job.Status.Phase == div1alpha2.JobFailed
 }
 
-func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div1alpha1.DIJob, pods []*corev1.Pod, services []*corev1.Service) error {
+func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div1alpha2.DIJob,
+	pods []*corev1.Pod, services []*corev1.Service) error {
+
 	log := r.Log.WithValues("dijob", diutil.NamespacedName(job.Namespace, job.Name))
-
-	if err := r.reconcilePodsAndServices(ctx, job, pods, services); err != nil {
-		log.Error(err, "failed to reconcile pods and services")
-		return err
+	oldStatus := job.Status.DeepCopy()
+	allocation := job.Status.Allocation
+	replicas := int(job.Status.Replicas)
+	if r.checkJobCompletion(ctx, job, pods) {
+		log.Info("job completed:", job.Name, job.Status.Phase)
+		return nil
 	}
 
-	// classify pods
-	collectors, learners, coordinator, ags, _, err := diutil.ClassifyPods(pods)
-	if err != nil {
-		log.Error(err, "unable to classify pods")
-		return err
+	switch job.Status.Phase {
+	case div1alpha2.JobPending:
+		if job.Spec.Preemptible {
+			if allocation != nil && len(pods) == 0 {
+				r.updateJobStatus(ctx, job, div1alpha2.JobStarting, DIJobStartingReason, fmt.Sprintf("DIJob %s is starting now.", job.Name))
+			}
+		} else {
+			if job.Status.Replicas != 0 && len(pods) == 0 {
+				r.updateJobStatus(ctx, job, div1alpha2.JobStarting, DIJobStartingReason, fmt.Sprintf("DIJob %s is starting now.", job.Name))
+			}
+		}
+	case div1alpha2.JobStarting:
+		if job.Spec.Preemptible {
+			if diutil.CountPodsScheduled(pods) != replicas && r.detectRestart(job, pods, allocation, replicas) || allocation == nil {
+				r.updateJobStatus(ctx, job, div1alpha2.JobRestarting, DIJobRestartingReason,
+					fmt.Sprintf("DIJob %s is restarting since conditions changed.", job.Name))
+			}
+
+			if allocation != nil && len(pods) == 0 {
+				job.Status.Generation = job.Status.Generation + 1
+				createdPods := []*corev1.Pod{}
+				for i := 0; i < len(allocation); i++ {
+					pod, err := r.buildAndCreatePod(ctx, job, i, allocation)
+					if err != nil {
+						log.Error(err, "failed to create pod", "pod", pod.Name)
+						r.updateJobStatus(ctx, job, div1alpha2.JobFailed, DIJobFailedReason,
+							fmt.Sprintf("DIJob %s failed because pod %s failed to created.", job.Name, pod.Name))
+						return r.deletePods(ctx, job, createdPods)
+					}
+					createdPods = append(createdPods, pod)
+				}
+			}
+		} else {
+			if replicas != 0 && len(pods) == 0 {
+				createdPods := []*corev1.Pod{}
+				for i := 0; i < replicas; i++ {
+					pod, err := r.buildAndCreatePod(ctx, job, i, allocation)
+					if err != nil {
+						log.Error(err, "failed to create pod", "pod", pod.Name)
+						r.updateJobStatus(ctx, job, div1alpha2.JobFailed, DIJobFailedReason,
+							fmt.Sprintf("DIJob %s failed because pod %s failed to created.", job.Name, pod.Name))
+						return r.deletePods(ctx, job, createdPods)
+					}
+					createdPods = append(createdPods, pod)
+				}
+			}
+		}
+
+		if len(pods) != replicas {
+			r.updateJobStatus(ctx, job, div1alpha2.JobRestarting, DIJobRestartingReason,
+				fmt.Sprintf("DIJob %s is restarting since the created pods %s are not matched replicas %s.", job.Name, len(pods), replicas))
+		}
+
+		if diutil.CountReadyPods(pods) == replicas {
+			r.updateJobStatus(ctx, job, div1alpha2.JobRunning, DIJobRunningReason,
+				fmt.Sprintf("DIJob %s is running since all pods are ready.", job.Name))
+		}
+	case div1alpha2.JobRunning:
+		if r.detectRestart(job, pods, allocation, replicas) || len(pods) == 0 {
+			r.updateJobStatus(ctx, job, div1alpha2.JobRestarting, DIJobRestartingReason,
+				fmt.Sprintf("DIJob %s is restarting since the created pods %s are not matched replicas %s.", job.Name, len(pods), replicas))
+		}
+	case div1alpha2.JobRestarting:
+		if len(pods) != 0 {
+			r.deletePods(ctx, job, pods)
+		} else {
+			r.updateJobStatus(ctx, job, div1alpha2.JobPending, DIJobPendingReason,
+				fmt.Sprintf("DIJob %s is pending since job restarted.", job.Name))
+		}
 	}
 
-	// update DIJob status if coordinator and aggregator are created
-	if coordinator != nil {
-		if err := r.updateDIJobStatus(ctx, job, collectors, learners, coordinator, ags); err != nil {
-			return err
-		}
-	} else {
-		// build coordinator pod
-		volumes := job.Spec.Volumes
-		template := job.Spec.Coordinator.Template.DeepCopy()
-		coorpod, coorsvc, coorurl, err := buildPodAndServiceForReplica(template, job, dicommon.CoordinatorName, volumes)
-		if err != nil {
-			msg := fmt.Sprintf("build coordinator pod for job %s failed", job.Name)
-			log.Error(err, msg)
-			return err
-		}
-		// add env
-		envs := make(map[string]string)
-		envs[dicommon.CoordinatorURLEnv] = coorurl
-		diutil.AddEnvsToPod(coorpod, envs)
+	if allocation != nil {
+		job.Status.Replicas = int32(len(allocation))
+		job.Status.ReadyReplicas = int32(diutil.CountReadyPods(pods))
+	} else if job.Spec.Preemptible {
+		job.Status.Allocation = nil
+		job.Status.Replicas = 0
+		job.Status.ReadyReplicas = 0
+	}
 
-		if err := r.createPodAndService(ctx, job, coorpod, coorsvc); err != nil {
+	if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
+		if err := r.updateDIJobStatusInCluster(ctx, job); err != nil {
+			log.Error(err, "failed to update DIJobStatus", "job", job.Name)
 			return err
 		}
 	}
 	return nil
 }
 
-// addDIJob is the event handler responsible for handling job add events
-func (r *DIJobReconciler) addDIJob(obj client.Object) {
-	log := r.Log.WithValues("dijob", diutil.NamespacedName(obj.GetNamespace(), obj.GetName()))
-	job, ok := obj.(*div1alpha1.DIJob)
-	if !ok {
-		log.Error(fmt.Errorf("failed to convert object DIJob: %s/%s", obj.GetNamespace(), obj.GetName()), "")
-		r.markIncorrectJobFailed(obj)
-		return
-	}
-
-	oldStatus := job.Status.DeepCopy()
-	// update job status
-	msg := fmt.Sprintf("DIJob %s created", job.Name)
-	if err := r.updateJobPhase(context.Background(), job, div1alpha1.JobCreated, DIJobCreatedReason, msg); err != nil {
-		log.Error(err, "failed to update job status")
-		return
-	}
-
-	log.Info(fmt.Sprintf("DIJob %s/%s created", job.Namespace, job.Name))
-
-	if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
-		if err := r.updateDIJobStatusInCluster(context.Background(), job); err != nil {
-			log.Error(err, fmt.Sprintf("failed to update DIJob %s/%s status", job.Namespace, job.Name))
+func (r *DIJobReconciler) detectRestart(job *div1alpha2.DIJob, pods []*corev1.Pod, allocation []string, replicas int) bool {
+	log := r.Log.WithValues("detect restart")
+	for _, pod := range pods {
+		areplicas, err := strconv.Atoi(pod.Annotations[dicommon.AnnotationReplicas])
+		if err != nil {
+			log.Error(err, fmt.Sprintf("%s is not a valid number, mark job as restarted.", pod.Annotations[dicommon.AnnotationReplicas]))
+			return true
+		}
+		rank, err := strconv.Atoi(pod.Annotations[dicommon.AnnotationRank])
+		if err != nil {
+			log.Error(err, fmt.Sprintf("%s is not a valid number, mark job as restarted.", pod.Annotations[dicommon.AnnotationRank]))
+			return true
+		}
+		if job.Spec.Preemptible && (areplicas != len(allocation) || pod.Annotations[dicommon.AnnotationNode] != allocation[rank]) {
+			return true
+		} else if !job.Spec.Preemptible && areplicas != replicas {
+			return true
 		}
 	}
+	return false
 }
 
 func (r *DIJobReconciler) markIncorrectJobFailed(obj client.Object) {
@@ -109,18 +164,18 @@ func (r *DIJobReconciler) markIncorrectJobFailed(obj client.Object) {
 
 	// dynamic client for dijobs
 	dijobRes := schema.GroupVersionResource{
-		Group:    div1alpha1.GroupVersion.Group,
-		Version:  div1alpha1.GroupVersion.Version,
+		Group:    div1alpha2.GroupVersion.Group,
+		Version:  div1alpha2.GroupVersion.Version,
 		Resource: "dijobs",
 	}
 
 	// build status
-	failedConvertDIJob := fmt.Sprintf("failed to convert type %T to v1alpha1.DIJob", obj)
-	status := div1alpha1.DIJobStatus{
-		Phase: div1alpha1.JobFailed,
-		Conditions: []div1alpha1.DIJobCondition{
+	failedConvertDIJob := fmt.Sprintf("failed to convert type %T to v1alpha2.DIJob", obj)
+	status := div1alpha2.DIJobStatus{
+		Phase: div1alpha2.JobFailed,
+		Conditions: []div1alpha2.DIJobCondition{
 			{
-				Type:    div1alpha1.JobFailed,
+				Type:    div1alpha2.JobFailed,
 				Status:  corev1.ConditionTrue,
 				Message: failedConvertDIJob,
 			},
@@ -153,46 +208,3 @@ func (r *DIJobReconciler) markIncorrectJobFailed(obj client.Object) {
 		log.Error(updateErr, "failed to update job status")
 	}
 }
-
-func buildPodAndServiceForReplica(template *corev1.PodTemplateSpec, job *div1alpha1.DIJob,
-	replicaType string, volumes []corev1.Volume) (*corev1.Pod, *corev1.Service, string, error) {
-	if string(job.Spec.PriorityClassName) != "" {
-		template.Spec.PriorityClassName = string(job.Spec.PriorityClassName)
-	}
-
-	// set restart policy for coordinator
-	if replicaType == dicommon.CoordinatorName && template.Spec.RestartPolicy == "" {
-		template.Spec.RestartPolicy = corev1.RestartPolicyNever
-	}
-
-	// build owner reference
-	ownRefer := diutil.NewOwnerReference(job.APIVersion, job.Kind, job.Name, job.UID, true)
-
-	// build pod
-	pod, svc, port, err := diutil.BuildPodAndService(template, ownRefer, job.Name, job.Namespace, replicaType, volumes)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	// access url
-	url := diutil.ConcatURL(svc.Name, svc.Namespace, port)
-
-	return pod, svc, url, nil
-}
-
-// func (r *DIJobReconciler) UpdateDIJob(ctx context.Context, job *div1alpha1.DIJob) error {
-// 	var err error
-// 	for i := 0; i < statusUpdateRetries; i++ {
-// 		newJob := &div1alpha1.DIJob{}
-// 		err = r.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: job.Name}, newJob)
-// 		if err != nil {
-// 			break
-// 		}
-
-// 		err = r.Update(ctx, job, &client.UpdateOptions{})
-// 		if err == nil {
-// 			break
-// 		}
-// 	}
-// 	return err
-// }

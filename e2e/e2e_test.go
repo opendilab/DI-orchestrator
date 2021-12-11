@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 	testutil "opendilab.org/di-orchestrator/pkg/utils/testutils"
@@ -81,13 +81,13 @@ var _ = Describe("E2E test for DI-engine", func() {
 
 				By("Waiting for job to be succeeded")
 				jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
-				Eventually(func() div1alpha1.Phase {
+				Eventually(func() div1alpha2.Phase {
 					err := k8sClient.Get(ctx, jobKey, job)
 					if err != nil {
-						return div1alpha1.JobUnknown
+						return div1alpha2.JobUnknown
 					}
 					return job.Status.Phase
-				}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
+				}, timeout, interval).Should(Equal(div1alpha2.JobSucceeded))
 
 				testutil.CleanUpJob(ctx, k8sClient, job)
 			}
@@ -132,13 +132,13 @@ var _ = Describe("E2E test for DI-engine", func() {
 
 			By("Waiting for job to be succeeded")
 			jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
-			Eventually(func() div1alpha1.Phase {
+			Eventually(func() div1alpha2.Phase {
 				err := k8sClient.Get(ctx, jobKey, job)
 				if err != nil {
-					return div1alpha1.JobUnknown
+					return div1alpha2.JobUnknown
 				}
 				return job.Status.Phase
-			}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
+			}, timeout, interval).Should(Equal(div1alpha2.JobSucceeded))
 
 			testutil.CleanUpJob(ctx, k8sClient, job)
 		})
@@ -190,13 +190,13 @@ var _ = Describe("E2E test for DI-engine", func() {
 
 				By("Waiting for job to be succeeded")
 				jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
-				Eventually(func() div1alpha1.Phase {
+				Eventually(func() div1alpha2.Phase {
 					err := k8sClient.Get(ctx, jobKey, job)
 					if err != nil {
-						return div1alpha1.JobUnknown
+						return div1alpha2.JobUnknown
 					}
 					return job.Status.Phase
-				}, timeout, interval).Should(Equal(div1alpha1.JobSucceeded))
+				}, timeout, interval).Should(Equal(div1alpha2.JobSucceeded))
 
 				testutil.CleanUpJob(ctx, k8sClient, job)
 			}
@@ -281,38 +281,17 @@ var _ = Describe("E2E test for DI-engine", func() {
 	})
 })
 
-func buildDIJob(jobPath, sharedVolumePath string) *div1alpha1.DIJob {
+func buildDIJob(jobPath, sharedVolumePath string) *div1alpha2.DIJob {
 	yamlFile, err := ioutil.ReadFile(jobPath)
 	Expect(err).NotTo(HaveOccurred())
 
-	var job div1alpha1.DIJob
+	var job div1alpha2.DIJob
 	err = yaml.Unmarshal(yamlFile, &job)
 	Expect(err).NotTo(HaveOccurred())
-
-	// name := diutil.GenerateName(job.Name)
-	// job.SetName(name)
-	job.SetNamespace(namespace)
-	for i := range job.Spec.Volumes {
-		if job.Spec.Volumes[i].Name != defaultSharedVolumeName {
-			continue
-		}
-		job.Spec.Volumes[i].HostPath.Path = sharedVolumePath
-	}
 
 	if job.Labels == nil {
 		job.Labels = make(map[string]string)
 	}
 	job.Labels["stability-test"] = "dijobs"
 	return &job
-}
-
-func buildAGConfig(configPath string) *div1alpha1.AggregatorConfig {
-	yamlFile, err := ioutil.ReadFile(configPath)
-	Expect(err).NotTo(HaveOccurred())
-
-	var agconfig div1alpha1.AggregatorConfig
-	err = yaml.Unmarshal(yamlFile, &agconfig)
-	Expect(err).NotTo(HaveOccurred())
-
-	return &agconfig
 }

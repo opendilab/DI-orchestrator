@@ -382,7 +382,7 @@ class ServerConnection:
         self,
         host: str,
         port: Optional[int] = None,
-        api_version: str = "v1alpha1",
+        api_version: str = "v1alpha2",
         https: bool = False,
         namespace: str = None,
         name: str = None,

@@ -20,20 +20,17 @@ import (
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	gpualloc "opendilab.org/di-orchestrator/pkg/common/gpuallocator"
 	serverdynamic "opendilab.org/di-orchestrator/pkg/server/dynamic"
 	serverhttp "opendilab.org/di-orchestrator/pkg/server/http"
-)
-
-var (
-	DefaultAGConfigNamespace = "di-system"
-	DefaultAGConfigName      = "aggregator-config"
 )
 
 type CreateOptions struct {
@@ -41,9 +38,6 @@ type CreateOptions struct {
 
 	ServerBindAddress string
 	GPUAllocPolicy    string
-
-	AGConfigNamespace string
-	AGCconfigName     string
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -51,8 +45,6 @@ func NewCreateOptions() *CreateOptions {
 		GenericFlags:      cmdcommon.NewGenericFlags(),
 		ServerBindAddress: ":8080",
 		GPUAllocPolicy:    gpualloc.SimpleGPUAllocPolicy,
-		AGConfigNamespace: DefaultAGConfigNamespace,
-		AGCconfigName:     DefaultAGConfigName,
 	}
 }
 
@@ -61,11 +53,6 @@ func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
 		"The address for server to bind to.")
 	cmd.Flags().StringVarP(&o.GPUAllocPolicy, "gpu-alloc-policy", "p", o.GPUAllocPolicy,
 		"The policy for server to allocate gpus to pods.")
-
-	cmd.Flags().StringVar(&o.AGConfigNamespace, "agconfig-namespace", o.AGConfigNamespace,
-		"The AggregatorConfig namespace to manage actors and learners.")
-	cmd.Flags().StringVar(&o.AGCconfigName, "agconfig-name", o.AGCconfigName,
-		"The AggregatorConfig name to manage actors and learners.")
 }
 
 // serverCmd represents the server command
@@ -97,18 +84,20 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 
 	kubeClient := kubernetes.NewForConfigOrDie(cfg)
 	dynamicClient := dynamic.NewForConfigOrDie(cfg)
-
 	dif := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, serverdynamic.ResyncPeriod, corev1.NamespaceAll, nil)
-
 	dyi := serverdynamic.NewDynamicInformer(dif)
-
 	// start dynamic informer
 	stopCh := make(chan struct{})
 	go dif.Start(stopCh)
 
-	agconfig := fmt.Sprintf("%s/%s", options.AGConfigNamespace, options.AGCconfigName)
-	diServer := serverhttp.NewDIServer(kubeClient, dynamicClient, cmdcommon.Logger, agconfig, dyi, options.GPUAllocPolicy)
+	diGVR := schema.GroupVersionResource{
+		Group:    div1alpha2.GroupVersion.Group,
+		Version:  div1alpha2.GroupVersion.Version,
+		Resource: "dijobs",
+	}
+	diclient := dynamicClient.Resource(diGVR)
 
+	diServer := serverhttp.NewDIServer(kubeClient, diclient, cmdcommon.Logger, dyi, options.GPUAllocPolicy)
 	if err := diServer.Start(options.ServerBindAddress); err != nil {
 		return fmt.Errorf("failed to start di-server: %v", err)
 	}

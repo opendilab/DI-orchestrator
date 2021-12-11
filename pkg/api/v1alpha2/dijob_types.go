@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1alpha2
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -36,21 +36,25 @@ type DIJobSpec struct {
 	PriorityClassName PriorityClassName `json:"priorityClassName,omitempty"`
 
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed
+	// +kubebuilder:default=Running
+	// +kubebuilder:validation:Enum=Running;All;None
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
 
-	// Volumes defines the shared volumes for DI-engine components
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
+	// Preemptible defines whether the dijob can be preempted.
+	// +kubebuilder:default=false
+	Preemptible bool `json:"preemptible,omitempty"`
 
-	// Coordinator defines the coordinator of distributed DIJob.
-	// For serial DIJob, only coordinator is needed.
+	// MinReplicas defines the minimum number of replicas of DIJob.
+	// +kubebuilder:validation:Minimum=0
+	MinReplicas int32 `json:"minReplicas,omitempty"`
+
+	// MaxReplicas defines the maximum number of replicas of DIJob.
+	// +kubebuilder:validation:Minimum=1
+	MaxReplicas int32 `json:"maxReplicas,omitempty"`
+
+	// Template defines the pod template for DIJob.
 	// +kubebuilder:validation:Required
-	Coordinator CoordinatorSpec `json:"coordinator"`
-
-	// +kubebuilder:validation:Optional
-	Collector CollectorSpec `json:"collector,"`
-
-	// +kubebuilder:validation:Optional
-	Learner LearnerSpec `json:"learner,"`
+	Template corev1.PodTemplateSpec `json:"template"`
 }
 
 // Priority defines the priority of DIJob
@@ -77,41 +81,40 @@ const (
 	CleanPodPolicyNone CleanPodPolicy = "None"
 )
 
-// CoordinatorSpec defines the desired state of coordinators
-type CoordinatorSpec struct {
-	Template corev1.PodTemplateSpec `json:"template"`
-}
-
-// CollectorSpec defines the desired state of CollectorSpec
-type CollectorSpec struct {
-	Template corev1.PodTemplateSpec `json:"template,"`
-}
-
-// Learner defines the desired state of Learner
-type LearnerSpec struct {
-	Template corev1.PodTemplateSpec `json:"template,"`
-}
-
 // DIJobStatus defines the observed state of DIJob
 type DIJobStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	Generation int32 `json:"generation,omitempty"`
+
 	Phase Phase `json:"phase,omitempty"`
 
-	Conditions []DIJobCondition `json:"conditions,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
 
-	ReplicaStatus map[ReplicaType]*ReplicaStatus `json:"replicaStatus,omitempty"`
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+
+	Allocation []string `json:"allocation,omitempty"`
+
+	Profilings Profilings `json:"profilings,omitempty"`
+
+	Conditions []DIJobCondition `json:"conditions,omitempty"`
 }
 
 // Phase defines the phase of DIJob
 type Phase string
 
 const (
-	// JobCreated means the job has been submitted to the cluster,
+	// JobPending means the job has been submitted to the cluster,
 	// but not all the pods and services have been created,
 	// or not pods are running
-	JobCreated Phase = "Created"
+	JobPending Phase = "Pending"
+
+	// JobStarted means the job has been scheduled and waits for running.
+	JobStarting Phase = "Starting"
+
+	// JobRestarting means the job has been rescheduled and waits for restarting.
+	JobRestarting Phase = "Restarting"
 
 	// JobRunning means all the pods are in running state
 	JobRunning Phase = "Running"
@@ -126,28 +129,7 @@ const (
 	JobUnknown Phase = "Unknown"
 )
 
-// ReplicaType represents the type of the replica. Each operator needs to define its
-// own set of ReplicaTypes.
-type ReplicaType string
-
-const (
-	ReplicaTypeCollector   ReplicaType = "Collector"
-	ReplicaTypeLearner     ReplicaType = "Learner"
-	ReplicaTypeAggregator  ReplicaType = "Aggregator"
-	ReplicaTypeCoordinator ReplicaType = "Coordinator"
-)
-
-// ReplicaStatus represents the current observed state of the replica.
-type ReplicaStatus struct {
-	// The number of actively running pods.
-	Active int32 `json:"active,omitempty"`
-
-	// The number of pods which reached phase Succeeded.
-	Succeeded int32 `json:"succeeded,omitempty"`
-
-	// The number of pods which reached phase Failed.
-	Failed int32 `json:"failed,omitempty"`
-}
+type Profilings struct{}
 
 // DIJobCondition records the conditions of DIJob
 type DIJobCondition struct {

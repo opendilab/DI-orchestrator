@@ -16319,7 +16319,7 @@ spec:
         - --leader-elect
         command:
         - /di-operator
-        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.2.1
+        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.2.2
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16370,7 +16370,7 @@ spec:
         - --lease-lock-name=di-server
         command:
         - /di-server
-        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.1
+        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.2
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16410,7 +16410,7 @@ spec:
       containers:
       - command:
         - /di-webhook
-        image: registry.sensetime.com/cloudnative4ai/di-webhook:v0.2.1
+        image: registry.sensetime.com/cloudnative4ai/di-webhook:v0.2.2
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

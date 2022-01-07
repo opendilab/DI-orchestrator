@@ -41,7 +41,6 @@ func GetDIServerURL() string {
 	url := os.Getenv(ENVServerURL)
 	if url == "" {
 		return "di-server.di-system:8080"
-	} else {
-		return url
 	}
+	return url
 }

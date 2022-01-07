@@ -26,9 +26,8 @@ import (
 )
 
 var (
-	apiVersion        = "v1alpha2"
-	replicasAPI       = "/replicas"
-	replicasFailedAPI = "/replicas/failed"
+	apiVersion  = "v1alpha2"
+	replicasAPI = "/replicas"
 )
 
 func withAPIVersion(api string) string {

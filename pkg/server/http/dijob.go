@@ -68,10 +68,6 @@ func (s *DIServer) needMultiDDPLearnerPod(resource commontypes.ResourceQuantity)
 	return false, nil
 }
 
-func needAggregator(resource commontypes.ResourceQuantity) bool {
-	return resource.GPU.Value() > 1
-}
-
 func (s *DIServer) updateDIJobStatusInCluster(job *div1alpha2.DIJob) error {
 	var err error
 	for i := 0; i < statusUpdateRetries; i++ {

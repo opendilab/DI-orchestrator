@@ -182,27 +182,27 @@ func (c *Context) UpdateDIJobStatusInCluster(job *div1alpha2.DIJob) error {
 	return err
 }
 
-func (r *Context) UpdateJobStatus(
+func (c *Context) UpdateJobStatus(
 	job *div1alpha2.DIJob, phase div1alpha2.Phase, reason string, msg string) {
 	updateDIJobConditions(job, phase, reason, msg)
 	switch phase {
 	case div1alpha2.JobPending, div1alpha2.JobStarting:
-		r.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
+		c.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
 	case div1alpha2.JobRunning:
 		if job.Status.Phase != div1alpha2.JobRunning {
-			r.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
+			c.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
 		}
 	case div1alpha2.JobRestarting:
-		job.Status.Generation += 1
-		r.Recorder.Eventf(job, corev1.EventTypeWarning, reason, msg)
+		job.Status.Generation++
+		c.Recorder.Eventf(job, corev1.EventTypeWarning, reason, msg)
 	case div1alpha2.JobFailed:
 		job.Status.ReadyReplicas = 0
-		r.Recorder.Eventf(job, corev1.EventTypeWarning, reason, msg)
+		c.Recorder.Eventf(job, corev1.EventTypeWarning, reason, msg)
 	case div1alpha2.JobSucceeded:
 		job.Status.ReadyReplicas = 0
-		r.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
+		c.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
 	default:
-		r.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
+		c.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
 	}
 	job.Status.Phase = phase
 }

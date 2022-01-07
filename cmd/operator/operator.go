@@ -101,8 +101,8 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 		return err
 	}
 
-	ctx := handler.NewContext(config,
-		context.Background(),
+	ctx := handler.NewContext(context.Background(),
+		config,
 		mgr.GetClient(),
 		mgr.GetEventRecorderFor("di-operator"),
 		ctrl.Log.WithName("di-operator"))

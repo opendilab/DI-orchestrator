@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
@@ -43,9 +42,9 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 const (
-	timeout  = 5 * time.Second
-	interval = 250 * time.Millisecond
-	duration = 200 * time.Millisecond
+// timeout  = 5 * time.Second
+// interval = 250 * time.Millisecond
+// duration = 200 * time.Millisecond
 )
 
 // var cfg *rest.Config
@@ -91,8 +90,8 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	ctx := handler.NewContext(cfg,
-		context.Background(),
+	ctx := handler.NewContext(context.Background(),
+		cfg,
 		k8sManager.GetClient(),
 		k8sManager.GetEventRecorderFor("di-operator"),
 		ctrl.Log.WithName("di-operator"))

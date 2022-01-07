@@ -1,4 +1,4 @@
-package gpu_allocator
+package gpuallocator
 
 import (
 	"testing"

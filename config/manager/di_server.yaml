@@ -22,7 +22,7 @@ spec:
         args:
         - --server-bind-address=:8080
         - --gpu-alloc-policy=simple
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0-51ca9ef7
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
         name: server
         securityContext:

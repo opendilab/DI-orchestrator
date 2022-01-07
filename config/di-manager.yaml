@@ -16300,7 +16300,7 @@ spec:
       containers:
       - args:
         - --probe-addr=:8080
-        - --metric-addr =:8443
+        - --metric-addr=:8443
         - --leader-elect
         command:
         - /di-orchestrator
@@ -16310,14 +16310,14 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:
@@ -16353,7 +16353,7 @@ spec:
         - --server-bind-address=:8080
         - --gpu-alloc-policy=simple
         command:
-        - /di-operator
+        - /di-orchestrator
         - server
         image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
@@ -16394,6 +16394,8 @@ spec:
     spec:
       containers:
       - args:
+        - --probe-addr=:8080
+        - --metric-addr=:8443
         - --port=9443
         command:
         - /di-orchestrator
@@ -16403,7 +16405,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
         name: webhook
@@ -16414,7 +16416,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:

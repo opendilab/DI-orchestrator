@@ -42,9 +42,11 @@ unit-test:
   tags: 
     - cloudnative4ai-group-runner-phoenix
   script:
+    - unset https_proxy
     - curl -L https://download.phoenix.sensetime.com/mirrors/kubebuilder/v2.3.2/kubebuilder_2.3.2_linux_amd64.tar.gz | tar -xz -C /tmp/
     - mv /tmp/kubebuilder_2.3.2_linux_amd64 /usr/local/kubebuilder
     - export PATH=$PATH:/usr/local/kubebuilder/bin
+    - export https_proxy=http://10.54.0.110:8080
     - make test
 
 build-manual:
@@ -63,7 +65,7 @@ build-manual:
     - develop
     - /^release.*$/
   script:
-    - make docker-build
+    - make dev-images
     - make docker-push
   after_script:
     - docker image prune -f
@@ -83,7 +85,7 @@ build-release:
     - develop
     - /^release.*$/
   script:
-    - make docker-build
+    - make dev-images
     - make docker-push
   after_script:
     - docker image prune -f

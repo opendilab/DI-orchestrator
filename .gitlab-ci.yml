@@ -15,14 +15,10 @@ variables:
 before_script:
   # this is necessary.
   - export PATH="/go/bin:/root/go/bin:${PATH}"
-  - git config --global user.name "gitlab-runner"
-  - git config --global user.email "no-exist@sensetime.com"
-  # set proxy
-  - export GOPROXY=https://goproxy.cn
-  - export GOPRIVATE=go-sensephoenix.sensetime.com
   # set image name
   - export PROJECT_IMAGE="${REGISTRY}/${PROJECT}:${VERSION}-${CI_COMMIT_SHORT_SHA}"
   - export PROJECT_IMAGE_RELEASE="${REGISTRY}/${PROJECT}:${VERSION}"
+  - export https_proxy=http://10.54.0.110:8080
 
 stages:
   - lint
@@ -33,7 +29,7 @@ stages:
 
 lint:
   stage: lint
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags: 
     - cloudnative4ai-group-runner-phoenix
   script:
@@ -42,7 +38,7 @@ lint:
 
 unit-test:
   stage: test
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags: 
     - cloudnative4ai-group-runner-phoenix
   script:
@@ -53,7 +49,7 @@ unit-test:
 
 build-manual:
   stage: build
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags: 
     - cloudnative4ai-group-runner-phoenix
   allow_failure: false
@@ -74,7 +70,7 @@ build-manual:
 
 build-release:
   stage: build
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags: 
     - cloudnative4ai-group-runner-phoenix
   allow_failure: false
@@ -94,7 +90,7 @@ build-release:
 
 tag:
   stage: release
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags:
     - cloudnative4ai-group-runner-phoenix
   services:

@@ -320,12 +320,13 @@ spec:
     spec:
       containers:
       - args:
-        - --health-probe-bind-address=:8081
-        - --metrics-bind-address=:8080
+        - --probe-addr=:8080
+        - --metric-addr=:8443
         - --leader-elect
         command:
-        - /di-operator
-        image: registry.sensetime.com/cloudnative4ai/di-operator:v1.0.0
+        - /di-orchestrator
+        - operator
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -371,12 +372,11 @@ spec:
       containers:
       - args:
         - --server-bind-address=:8080
-        - --leader-elect
-        - --lease-lock-namespace=di-system
-        - --lease-lock-name=di-server
+        - --gpu-alloc-policy=simple
         command:
-        - /di-server
-        image: registry.sensetime.com/cloudnative4ai/di-server:v1.0.0
+        - /di-orchestrator
+        - server
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -414,9 +414,14 @@ spec:
         control-plane: di-webhook
     spec:
       containers:
-      - command:
-        - /di-webhook
-        image: registry.sensetime.com/cloudnative4ai/di-webhook:v1.0.0
+      - args:
+        - --probe-addr=:8080
+        - --metric-addr=:8443
+        - --port=9443
+        command:
+        - /di-orchestrator
+        - webhook
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

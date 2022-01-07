@@ -3863,6 +3863,10 @@ spec:
                 items:
                   type: string
                 type: array
+              completionTimestamp:
+                description: CompletionTimestamp defines the timestamp when the job was completed
+                format: date-time
+                type: string
               conditions:
                 description: Conditions defines the conditions of the job
                 items:

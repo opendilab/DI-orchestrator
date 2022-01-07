@@ -24,10 +24,13 @@ spec:
     spec:
       containers:
       - command:
-        - /di-operator
+        - /di-orchestrator
+        - operator
         args:
-        - "--server-address=http://di-server.di-system:8080"
-        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.2.2
+        - "--probe-addr=:8080"
+        - "--metric-addr=:8443"
+        - "--leader-elect"
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
         name: manager
         securityContext:
@@ -35,13 +38,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:

@@ -1,6 +1,6 @@
 variables:
   REGISTRY: registry.sensetime.com/cloudnative4ai
-  VERSION: v0.2.2
+  VERSION: v0.3.0
   PROJECT: di-orchestrator
   # dind config
   DOCKER_HOST: tcp://localhost:2376
@@ -15,14 +15,10 @@ variables:
 before_script:
   # this is necessary.
   - export PATH="/go/bin:/root/go/bin:${PATH}"
-  - git config --global user.name "gitlab-runner"
-  - git config --global user.email "no-exist@sensetime.com"
-  # set proxy
-  - export GOPROXY=https://goproxy.cn
-  - export GOPRIVATE=go-sensephoenix.sensetime.com
   # set image name
   - export PROJECT_IMAGE="${REGISTRY}/${PROJECT}:${VERSION}-${CI_COMMIT_SHORT_SHA}"
   - export PROJECT_IMAGE_RELEASE="${REGISTRY}/${PROJECT}:${VERSION}"
+  - export https_proxy=http://10.54.0.110:8080
 
 stages:
   - lint
@@ -33,7 +29,7 @@ stages:
 
 lint:
   stage: lint
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags: 
     - cloudnative4ai-group-runner-phoenix
   script:
@@ -42,18 +38,20 @@ lint:
 
 unit-test:
   stage: test
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags: 
     - cloudnative4ai-group-runner-phoenix
   script:
+    - unset https_proxy
     - curl -L https://download.phoenix.sensetime.com/mirrors/kubebuilder/v2.3.2/kubebuilder_2.3.2_linux_amd64.tar.gz | tar -xz -C /tmp/
     - mv /tmp/kubebuilder_2.3.2_linux_amd64 /usr/local/kubebuilder
     - export PATH=$PATH:/usr/local/kubebuilder/bin
+    - export https_proxy=http://10.54.0.110:8080
     - make test
 
 build-manual:
   stage: build
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags: 
     - cloudnative4ai-group-runner-phoenix
   allow_failure: false
@@ -67,14 +65,14 @@ build-manual:
     - develop
     - /^release.*$/
   script:
-    - make docker-build
+    - make dev-images
     - make docker-push
   after_script:
     - docker image prune -f
 
 build-release:
   stage: build
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags: 
     - cloudnative4ai-group-runner-phoenix
   allow_failure: false
@@ -87,14 +85,14 @@ build-release:
     - develop
     - /^release.*$/
   script:
-    - make docker-build
+    - make dev-images
     - make docker-push
   after_script:
     - docker image prune -f
 
 tag:
   stage: release
-  image: registry.sensetime.com/cloudnative4ai/ci-deploy-kit:latest
+  image: ${PHOENIX_CI_IMAGE_NEW}
   tags:
     - cloudnative4ai-group-runner-phoenix
   services:

@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -34,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	"opendilab.org/di-orchestrator/pkg/handler"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -89,12 +91,15 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = (&DIJobReconciler{
-		Scheme:   k8sManager.GetScheme(),
-		Client:   k8sManager.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("DIJob"),
-		Recorder: k8sManager.GetEventRecorderFor("di-orchestrator"),
-	}).SetupWithManager(k8sManager)
+	ctx := handler.NewContext(cfg,
+		context.Background(),
+		k8sManager.GetClient(),
+		k8sManager.GetEventRecorderFor("di-operator"),
+		ctrl.Log.WithName("di-operator"))
+	reconciler := NewDIJobReconciler(k8sManager.GetScheme(), ctx)
+	if err = reconciler.SetupWithManager(k8sManager); err != nil {
+		Expect(err).NotTo(HaveOccurred())
+	}
 
 	Expect(err).NotTo(HaveOccurred())
 

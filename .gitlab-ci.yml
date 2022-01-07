@@ -1,6 +1,6 @@
 variables:
   REGISTRY: registry.sensetime.com/cloudnative4ai
-  VERSION: v0.3.0-24dca4e4
+  VERSION: v1.0.0
   PROJECT: di-orchestrator
   # dind config
   DOCKER_HOST: tcp://localhost:2376

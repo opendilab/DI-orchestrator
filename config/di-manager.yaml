@@ -38,6 +38,15 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
+    - jsonPath: .status.generation
+      name: Restarts
+      type: integer
+    - jsonPath: .status.readyReplicas
+      name: ReadyReplicas
+      type: integer
+    - jsonPath: .status.replicas
+      name: Replicas
+      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -59,14 +68,14 @@ spec:
             properties:
               cleanPodPolicy:
                 default: Running
-                description: CleanPodPolicy defines the policy to clean pods after DIJob completed
+                description: CleanPodPolicy defines the policy to clean pods after DIJob completed.
                 enum:
                 - Running
                 - All
                 - None
                 type: string
               group:
-                description: Group is a collection of DIJobs
+                description: Group is a collection of DIJobs.
                 type: string
               maxReplicas:
                 description: MaxReplicas defines the maximum number of replicas of DIJob.
@@ -78,12 +87,22 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
+              parallelWorkers:
+                default: 1
+                description: ParallelWorkers defines the number of parallel workers in each worker.
+                format: int32
+                minimum: 1
+                type: integer
               preemptible:
                 default: false
                 description: Preemptible defines whether the dijob can be preempted.
                 type: boolean
-              priorityClassName:
-                description: Priority labels the priority of DIJob
+              priority:
+                default: normal
+                description: Priority labels the priority of DIJob.
+                enum:
+                - normal
+                - high
                 type: string
               template:
                 description: Template defines the pod template for DIJob.
@@ -3825,6 +3844,14 @@ spec:
                     - containers
                     type: object
                 type: object
+              topology:
+                default: star
+                description: Topology defines the topology among the workers of the job.
+                enum:
+                - star
+                - alone
+                - mesh
+                type: string
             required:
             - template
             type: object
@@ -3832,10 +3859,12 @@ spec:
             description: DIJobStatus defines the observed state of DIJob
             properties:
               allocation:
+                description: Allocation defines the replicas allocation of the job
                 items:
                   type: string
                 type: array
               conditions:
+                description: Conditions defines the conditions of the job
                 items:
                   description: DIJobCondition records the conditions of DIJob
                   properties:
@@ -3865,17 +3894,24 @@ spec:
                   type: object
                 type: array
               generation:
+                default: 0
+                description: Generation defines restart times of the job
                 format: int32
                 type: integer
               phase:
-                description: Phase defines the phase of DIJob
+                description: Phase defines the observed phase of the job
                 type: string
               profilings:
+                description: Profilings defines the profiling data reported from DI-engine jobs
                 type: object
               readyReplicas:
+                default: 0
+                description: ReadyReplicas defines the observed number of ready replicas of the job
                 format: int32
                 type: integer
               replicas:
+                default: 0
+                description: Replicas defines the observed number of replicas of the job
                 format: int32
                 type: integer
             type: object
@@ -4107,7 +4143,7 @@ spec:
         command:
         - /di-orchestrator
         - operator
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -4157,7 +4193,7 @@ spec:
         command:
         - /di-orchestrator
         - server
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -4202,7 +4238,7 @@ spec:
         command:
         - /di-orchestrator
         - webhook
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

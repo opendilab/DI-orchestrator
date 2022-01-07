@@ -29,13 +29,25 @@ type DIJobSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Group is a collection of DIJobs
+	// Group is a collection of DIJobs.
 	Group string `json:"group,omitempty"`
 
-	//Priority labels the priority of DIJob
-	PriorityClassName PriorityClassName `json:"priorityClassName,omitempty"`
+	// Priority labels the priority of DIJob.
+	// +kubebuilder:default=normal
+	// +kubebuilder:validation:Enum=normal;high
+	Priority Priority `json:"priority,omitempty"`
 
-	// CleanPodPolicy defines the policy to clean pods after DIJob completed
+	// Topology defines the topology among the workers of the job.
+	// +kubebuilder:default=star
+	// +kubebuilder:validation:Enum=star;alone;mesh
+	Topology Topology `json:"topology,omitempty"`
+
+	// ParallelWorkers defines the number of parallel workers in each worker.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	ParallelWorkers int32 `json:"parallelWorkers,omitempty"`
+
+	// CleanPodPolicy defines the policy to clean pods after DIJob completed.
 	// +kubebuilder:default=Running
 	// +kubebuilder:validation:Enum=Running;All;None
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
@@ -58,14 +70,27 @@ type DIJobSpec struct {
 }
 
 // Priority defines the priority of DIJob
-type PriorityClassName string
+type Priority string
 
 const (
-	// NormalPriority is normal priority
-	NormalPriority PriorityClassName = "default"
+	// PriorityNormal is normal priority
+	PriorityNormal Priority = "normal"
 
-	// HighPriority is high priority
-	HighPriority PriorityClassName = "high"
+	// PriorityHigh is high priority
+	PriorityHigh Priority = "high"
+)
+
+type Topology string
+
+const (
+	// TopologyStar means all other workers are connected to a central node.
+	TopologyStar Topology = "star"
+
+	// TopologyAlone means no connections among workers.
+	TopologyAlone Topology = "alone"
+
+	// TopologyMesh means all workers are connected each other.
+	TopologyMesh Topology = "mesh"
 )
 
 type CleanPodPolicy string
@@ -86,18 +111,31 @@ type DIJobStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// CompletionTimestamp defines the timestamp when the job was completed
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
+	// Generation defines restart times of the job
+	// +kubebuilder:default=0
 	Generation int32 `json:"generation,omitempty"`
 
+	// Phase defines the observed phase of the job
 	Phase Phase `json:"phase,omitempty"`
 
+	// Replicas defines the observed number of replicas of the job
+	// +kubebuilder:default=0
 	Replicas int32 `json:"replicas,omitempty"`
 
+	// ReadyReplicas defines the observed number of ready replicas of the job
+	// +kubebuilder:default=0
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 
+	// Allocation defines the replicas allocation of the job
 	Allocation []string `json:"allocation,omitempty"`
 
+	// Profilings defines the profiling data reported from DI-engine jobs
 	Profilings Profilings `json:"profilings,omitempty"`
 
+	// Conditions defines the conditions of the job
 	Conditions []DIJobCondition `json:"conditions,omitempty"`
 }
 
@@ -151,8 +189,10 @@ type DIJobCondition struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=dijob
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="Restarts",type=integer,JSONPath=`.status.generation`
+// +kubebuilder:printcolumn:name="ReadyReplicas",type=integer,JSONPath=`.status.readyReplicas`
+// +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=`.status.replicas`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
-
 // DIJob is the Schema for the dijobs API
 type DIJob struct {
 	metav1.TypeMeta   `json:",inline"`

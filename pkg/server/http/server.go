@@ -157,7 +157,7 @@ func (s *DIServer) getReplicas(r *http.Request) ([]string, error) {
 func (s *DIServer) getNamespacedReplicas(jobID string, generation string) ([]string, error) {
 	log := s.Log.WithName("getNamespacedReplicas")
 
-	diJob, err := s.getCachedDIJobByKey(jobID)
+	job, err := s.getCachedDIJobByKey(jobID)
 	if err != nil {
 		log.Error(err, "failed to get owner reference")
 		return nil, err
@@ -165,7 +165,7 @@ func (s *DIServer) getNamespacedReplicas(jobID string, generation string) ([]str
 
 	// list pods that belong to the DIJob
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: diutil.GenLabels(diJob.Name),
+		MatchLabels: diutil.GenLabels(*job),
 	})
 	if err != nil {
 		return nil, err

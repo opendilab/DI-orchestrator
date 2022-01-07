@@ -1,7 +1,6 @@
 package util
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -14,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
@@ -84,17 +82,16 @@ func AddPortToPod(pod *corev1.Pod, port corev1.ContainerPort) {
 	}
 }
 
-func GenLabels(jobName string) map[string]string {
-	groupName := div1alpha2.GroupVersion.Group
+func GenLabels(job div1alpha2.DIJob) map[string]string {
 	return map[string]string{
-		dicommon.LabelGroup:    groupName,
-		dicommon.LabelJob:      strings.Replace(jobName, "/", "-", -1),
+		dicommon.LabelGroup:    job.Spec.Group,
+		dicommon.LabelJob:      strings.Replace(job.Name, "/", "-", -1),
 		dicommon.LabelOperator: dicommon.OperatorName,
 	}
 }
 
-func GenPodName(jobName string, group, rank int) string {
-	return fmt.Sprintf("%s-%d-%d", jobName, group, rank)
+func ReplicaName(jobName string, generation, rank int) string {
+	return fmt.Sprintf("%s-%d-%d", jobName, generation, rank)
 }
 
 func AddLabelsToPod(pod *corev1.Pod, labels map[string]string) {
@@ -212,54 +209,6 @@ func GetServiceAccessURL(service *corev1.Service) string {
 	return url
 }
 
-func ListPods(ctx context.Context, cli client.Client, job *div1alpha2.DIJob) ([]*corev1.Pod, error) {
-	podList := &corev1.PodList{}
-
-	// generate label selector
-	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: GenLabels(job.Name),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// list pods of job
-	err = cli.List(ctx, podList, &client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
-	if err != nil {
-		return nil, err
-	}
-
-	pods := []*corev1.Pod{}
-	for _, pod := range podList.Items {
-		pods = append(pods, pod.DeepCopy())
-	}
-	return pods, nil
-}
-
-func ListServices(ctx context.Context, cli client.Client, job *div1alpha2.DIJob) ([]*corev1.Service, error) {
-	svcList := &corev1.ServiceList{}
-
-	// generate label selector
-	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: GenLabels(job.Name),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// list svcs of job
-	err = cli.List(ctx, svcList, &client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
-	if err != nil {
-		return nil, err
-	}
-
-	svcs := []*corev1.Service{}
-	for _, svc := range svcList.Items {
-		svcs = append(svcs, svc.DeepCopy())
-	}
-	return svcs, nil
-}
-
 func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	results := []*corev1.Pod{}
 	for _, pod := range pods {
@@ -272,7 +221,14 @@ func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	return results
 }
 
-// IsTerminating returns true if pod's DeletionTimestamp has been set
+func IsSucceeded(job *div1alpha2.DIJob) bool {
+	return job.Status.Phase == div1alpha2.JobSucceeded
+}
+
+func IsFailed(job *div1alpha2.DIJob) bool {
+	return job.Status.Phase == div1alpha2.JobFailed
+}
+
 func IsTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
 }

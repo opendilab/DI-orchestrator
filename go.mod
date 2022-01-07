@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/deckarep/golang-set v1.7.1
 	github.com/go-logr/logr v0.3.0
+	github.com/google/martian v2.1.0+incompatible
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.2
 	github.com/sirupsen/logrus v1.6.0

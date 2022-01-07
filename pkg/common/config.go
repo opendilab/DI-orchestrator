@@ -22,15 +22,19 @@ const (
 	DefaultPortName      = "di-port"
 	DefaultPort          = 22270
 
-	ENVJobID          = "DI_JOB_ID"
-	ENVJobGeneration  = "DI_JOB_GENERATION"
-	ENVServerURL      = "DI_SERVER_URL"
-	ENVWorldSize      = "WORLD_SIZE"
-	ENVLocalWorldSize = "LOCAL_WORLD_SIZE"
-	ENVStartRank      = "START_RANK"
-	ENVMasterAddr     = "MASTER_ADDR"
-	ENVMasterPort     = "MASTER_PORT"
-	DefaultMasterPort = 10314
+	ENVJobID              = "DI_JOB_ID"
+	ENVJobGeneration      = "DI_JOB_GENERATION"
+	ENVServerURL          = "DI_SERVER_URL"
+	ENVParallelWorkersArg = "DI_PARALLEL_WORKERS_ARG"
+	ENVPortsArg           = "DI_PORTS_ARG"
+	ENVNodeIDsArg         = "DI_NODE_IDS_ARG"
+	ENVAttachedNodesArg   = "DI_ATTACHED_NODES_ARG"
+
+	DIArgParallelWorkers = "parallel-workers"
+	DIArgPorts           = "ports"
+	DIArgNodeIDs         = "node-ids"
+	DIArgAttachedNodes   = "attach-to"
+	DINodeURLPrefix      = "tcp://"
 )
 
 func GetDIServerURL() string {

@@ -16,6 +16,8 @@ limitations under the License.
 package operator
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -26,6 +28,7 @@ import (
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	"opendilab.org/di-orchestrator/pkg/controllers"
+	"opendilab.org/di-orchestrator/pkg/handler"
 )
 
 type CreateOptions struct {
@@ -85,7 +88,8 @@ func init() {
 func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	ctrl.SetLogger(cmdcommon.Logger)
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	config := ctrl.GetConfigOrDie()
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     options.MetricAddress,
 		HealthProbeBindAddress: options.ProbeAddress,
@@ -97,12 +101,12 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 		return err
 	}
 
-	reconciler := &controllers.DIJobReconciler{
-		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("DIJob"),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("di-orchestrator"),
-	}
+	ctx := handler.NewContext(config,
+		context.Background(),
+		mgr.GetClient(),
+		mgr.GetEventRecorderFor("di-operator"),
+		ctrl.Log.WithName("di-operator"))
+	reconciler := controllers.NewDIJobReconciler(mgr.GetScheme(), ctx)
 	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DIJob")
 		return err

@@ -1,4 +1,4 @@
-package handler
+package context
 
 import (
 	"context"
@@ -115,7 +115,7 @@ func (c *Context) DetectRestart(job *div1alpha2.DIJob, pods []*corev1.Pod, alloc
 	return false
 }
 
-func (c *Context) markIncorrectJobFailed(obj client.Object) {
+func (c *Context) MarkIncorrectJobFailed(obj client.Object) {
 	log := c.Log.WithName("markIncorrectJobFailed")
 	dclient, err := dynamic.NewForConfig(c.config)
 	if err != nil {

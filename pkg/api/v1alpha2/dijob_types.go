@@ -37,15 +37,8 @@ type DIJobSpec struct {
 	// +kubebuilder:validation:Enum=normal;high
 	Priority Priority `json:"priority,omitempty"`
 
-	// Topology defines the topology among the workers of the job.
-	// +kubebuilder:default=star
-	// +kubebuilder:validation:Enum=star;alone;mesh
-	Topology Topology `json:"topology,omitempty"`
-
-	// ParallelWorkers defines the number of parallel workers in each worker.
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	ParallelWorkers int32 `json:"parallelWorkers,omitempty"`
+	// EngineFields defines features of the DI-engine framework.
+	EngineFields EngineFields `json:"engineFields,omitempty"`
 
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed.
 	// +kubebuilder:default=Running
@@ -67,6 +60,18 @@ type DIJobSpec struct {
 	// Template defines the pod template for DIJob.
 	// +kubebuilder:validation:Required
 	Template corev1.PodTemplateSpec `json:"template"`
+}
+
+type EngineFields struct {
+	// Topology defines the topology among the workers of the job.
+	// +kubebuilder:default=star
+	// +kubebuilder:validation:Enum=star;alone;mesh
+	Topology Topology `json:"topology,omitempty"`
+
+	// ParallelWorkers defines the number of parallel workers in each worker.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	ParallelWorkers int32 `json:"parallelWorkers,omitempty"`
 }
 
 // Priority defines the priority of DIJob

@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
-	"opendilab.org/di-orchestrator/pkg/handler"
+	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -90,7 +90,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	ctx := handler.NewContext(context.Background(),
+	ctx := dicontext.NewContext(context.Background(),
 		cfg,
 		k8sManager.GetClient(),
 		k8sManager.GetEventRecorderFor("di-operator"),

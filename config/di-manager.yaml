@@ -74,6 +74,24 @@ spec:
                 - All
                 - None
                 type: string
+              engineFields:
+                description: EngineFields defines features of the DI-engine framework.
+                properties:
+                  parallelWorkers:
+                    default: 1
+                    description: ParallelWorkers defines the number of parallel workers in each worker.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  topology:
+                    default: star
+                    description: Topology defines the topology among the workers of the job.
+                    enum:
+                    - star
+                    - alone
+                    - mesh
+                    type: string
+                type: object
               group:
                 description: Group is a collection of DIJobs.
                 type: string
@@ -86,12 +104,6 @@ spec:
                 description: MinReplicas defines the minimum number of replicas of DIJob.
                 format: int32
                 minimum: 0
-                type: integer
-              parallelWorkers:
-                default: 1
-                description: ParallelWorkers defines the number of parallel workers in each worker.
-                format: int32
-                minimum: 1
                 type: integer
               preemptible:
                 default: false
@@ -3844,14 +3856,6 @@ spec:
                     - containers
                     type: object
                 type: object
-              topology:
-                default: star
-                description: Topology defines the topology among the workers of the job.
-                enum:
-                - star
-                - alone
-                - mesh
-                type: string
             required:
             - template
             type: object

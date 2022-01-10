@@ -17,6 +17,7 @@ package operator
 
 import (
 	"context"
+	"time"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,26 +27,35 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
+	alloc "opendilab.org/di-orchestrator/pkg/allocator"
+	alloctypes "opendilab.org/di-orchestrator/pkg/allocator/types"
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	"opendilab.org/di-orchestrator/pkg/controllers"
-	"opendilab.org/di-orchestrator/pkg/handler"
 )
 
 type CreateOptions struct {
+	SyncPeriod           *time.Duration
 	MetricAddress        string
 	ProbeAddress         string
 	EnableLeaderElection bool
 }
 
 func NewCreateOptions() *CreateOptions {
+	DefaultSyncPeriod := 1 * time.Minute
+	DefaultMetricAddress := ":8443"
+	DefaultProbeAddress := ":8080"
+	DefaultEnableLeaderElection := false
 	return &CreateOptions{
-		MetricAddress:        ":8443",
-		ProbeAddress:         ":8080",
-		EnableLeaderElection: false,
+		SyncPeriod:           &DefaultSyncPeriod,
+		MetricAddress:        DefaultMetricAddress,
+		ProbeAddress:         DefaultProbeAddress,
+		EnableLeaderElection: DefaultEnableLeaderElection,
 	}
 }
 
 func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().DurationVar(o.SyncPeriod, "sync-period", *o.SyncPeriod, "Resync period for controllers.")
 	cmd.Flags().StringVar(&o.MetricAddress, "metric-addr", o.MetricAddress, "The address the metric endpoint binds to.")
 	cmd.Flags().StringVar(&o.ProbeAddress, "probe-addr", o.ProbeAddress, "The address the probe endpoint binds to.")
 	cmd.Flags().BoolVar(&o.EnableLeaderElection, "leader-elect", o.EnableLeaderElection,
@@ -91,6 +101,7 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	config := ctrl.GetConfigOrDie()
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
+		SyncPeriod:             options.SyncPeriod,
 		MetricsBindAddress:     options.MetricAddress,
 		HealthProbeBindAddress: options.ProbeAddress,
 		LeaderElection:         options.EnableLeaderElection,
@@ -101,7 +112,7 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 		return err
 	}
 
-	ctx := handler.NewContext(context.Background(),
+	ctx := dicontext.NewContext(context.Background(),
 		config,
 		mgr.GetClient(),
 		mgr.GetEventRecorderFor("di-operator"),
@@ -109,6 +120,17 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	reconciler := controllers.NewDIJobReconciler(mgr.GetScheme(), ctx)
 	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DIJob")
+		return err
+	}
+
+	ctx = dicontext.NewContext(context.Background(),
+		config,
+		mgr.GetClient(),
+		mgr.GetEventRecorderFor("di-allocator"),
+		ctrl.Log.WithName("di-allocator"))
+	allocator := alloc.NewAllocator(mgr.GetScheme(), ctx, *alloctypes.NewFitPolicy(), *options.SyncPeriod)
+	if err = allocator.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create allocator", "allocator", "DIJob")
 		return err
 	}
 

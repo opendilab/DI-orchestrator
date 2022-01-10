@@ -1,4 +1,4 @@
-package handler
+package context
 
 import (
 	"fmt"
@@ -23,7 +23,7 @@ var (
 
 func OnTopologyHandler(job *v1alpha2.DIJob, rank int, pod *corev1.Pod) {
 	envs := make(map[string]string)
-	pworkers := int(job.Spec.ParallelWorkers)
+	pworkers := int(job.Spec.EngineFields.ParallelWorkers)
 	ports := make([]int, pworkers)
 	nodeIDs := make([]int, pworkers)
 	for i := 0; i < pworkers; i++ {
@@ -35,7 +35,7 @@ func OnTopologyHandler(job *v1alpha2.DIJob, rank int, pod *corev1.Pod) {
 		return fmt.Sprintf("%s%s:%d", prefix, addr, port)
 	}
 	attachedNodesArgValue := ""
-	switch job.Spec.Topology {
+	switch job.Spec.EngineFields.Topology {
 	case v1alpha2.TopologyAlone:
 		// do nothing
 	case v1alpha2.TopologyStar:

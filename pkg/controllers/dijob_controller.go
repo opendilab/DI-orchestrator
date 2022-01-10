@@ -18,27 +18,31 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
-	dihandler "opendilab.org/di-orchestrator/pkg/handler"
+	dihandler "opendilab.org/di-orchestrator/pkg/common/handler"
+	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
 // DIJobReconciler reconciles a DIJob object
 type DIJobReconciler struct {
 	Scheme *runtime.Scheme
-	ctx    *dihandler.Context
+	ctx    dicontext.Context
 }
 
-func NewDIJobReconciler(scheme *runtime.Scheme, ctx *dihandler.Context) *DIJobReconciler {
+func NewDIJobReconciler(scheme *runtime.Scheme, ctx dicontext.Context) *DIJobReconciler {
 	return &DIJobReconciler{
 		Scheme: scheme,
 		ctx:    ctx,
@@ -108,8 +112,13 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&div1alpha2.DIJob{}).
 		Watches(
 			&source.Kind{Type: &div1alpha2.DIJob{}},
-			&dihandler.DIJobEventHandler{
-				Context: r.ctx,
+			&dihandler.EventHandler{
+				OnCreateHandlers: []func(obj client.Object){
+					r.onJobAdd,
+				},
+				OnDeleteHandlers: []func(obj client.Object){
+					r.onJobDelete,
+				},
 			},
 			builder.Predicates{},
 		).
@@ -129,4 +138,36 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		).
 		Complete(r)
+}
+
+// addDIJob is the event handler responsible for handling job add events
+func (r *DIJobReconciler) onJobAdd(obj client.Object) {
+	jobkey := diutil.NamespacedName(obj.GetNamespace(), obj.GetName())
+	log := r.ctx.Log.WithValues("dijob", jobkey)
+	job, ok := obj.(*div1alpha2.DIJob)
+	if !ok {
+		log.Error(fmt.Errorf("failed to convert object DIJob: %s", jobkey), "")
+		r.ctx.MarkIncorrectJobFailed(obj)
+		return
+	}
+	oldStatus := job.Status.DeepCopy()
+
+	// update job status
+	msg := fmt.Sprintf("DIJob %s created", job.Name)
+	if job.Status.Phase == "" {
+		r.ctx.UpdateJobStatus(job, div1alpha2.JobPending, dicontext.DIJobPendingReason, msg)
+	}
+
+	log.Info(fmt.Sprintf("DIJob %s created", jobkey))
+	if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
+		if err := r.ctx.UpdateDIJobStatusInCluster(job); err != nil {
+			log.Error(err, fmt.Sprintf("failed to update DIJob %s status", jobkey))
+		}
+	}
+}
+
+func (r *DIJobReconciler) onJobDelete(obj client.Object) {
+	jobkey := diutil.NamespacedName(obj.GetNamespace(), obj.GetName())
+	log := r.ctx.Log.WithValues("dijob", jobkey)
+	log.Info(fmt.Sprintf("DIJob %s deleted", jobkey))
 }

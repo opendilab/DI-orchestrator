@@ -1,4 +1,4 @@
-package handler
+package context
 
 import (
 	"context"
@@ -17,8 +17,8 @@ type Context struct {
 	Recorder record.EventRecorder
 }
 
-func NewContext(ctx context.Context, config *rest.Config, client client.Client, recorder record.EventRecorder, logger logr.Logger) *Context {
-	return &Context{
+func NewContext(ctx context.Context, config *rest.Config, client client.Client, recorder record.EventRecorder, logger logr.Logger) Context {
+	return Context{
 		config:   config,
 		ctx:      ctx,
 		Client:   client,

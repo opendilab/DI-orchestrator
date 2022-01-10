@@ -23,7 +23,6 @@ import (
 
 	"opendilab.org/di-orchestrator/cmd/operator"
 	"opendilab.org/di-orchestrator/cmd/server"
-	"opendilab.org/di-orchestrator/cmd/webhook"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -50,7 +49,6 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(server.NewCmdServer())
 	rootCmd.AddCommand(operator.NewCmdOperator())
-	rootCmd.AddCommand(webhook.NewCmdWebhook())
 
 	// add all the flags in go flagset into pflagset
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)

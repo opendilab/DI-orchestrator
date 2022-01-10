@@ -9,7 +9,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    cert-manager.io/inject-ca-from: di-system/di-serving-cert
+    cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
     controller-gen.kubebuilder.io/version: v0.4.1
   name: dijobs.diengine.opendilab.org
 spec:
@@ -18,7 +18,7 @@ spec:
     webhook:
       clientConfig:
         service:
-          name: di-webhook-service
+          name: $(SERVICE_NAME)
           namespace: di-system
           path: /mutate-diengine-opendilab-org-v1alpha2-dijob
       conversionReviewVersions:
@@ -4110,18 +4110,6 @@ spec:
   selector:
     control-plane: di-server
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: di-webhook-service
-  namespace: di-system
-spec:
-  ports:
-  - port: 443
-    targetPort: 9443
-  selector:
-    control-plane: di-webhook
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -4216,147 +4204,3 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
       terminationGracePeriodSeconds: 10
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    control-plane: di-webhook
-  name: di-webhook
-  namespace: di-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      control-plane: di-webhook
-  template:
-    metadata:
-      labels:
-        control-plane: di-webhook
-    spec:
-      containers:
-      - args:
-        - --probe-addr=:8080
-        - --metric-addr=:8443
-        - --port=9443
-        command:
-        - /di-orchestrator
-        - webhook
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
-        imagePullPolicy: Always
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        name: webhook
-        ports:
-        - containerPort: 9443
-          name: webhook-server
-          protocol: TCP
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        resources:
-          limits:
-            cpu: 30m
-            memory: 100Mi
-          requests:
-            cpu: 30m
-            memory: 100Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-        volumeMounts:
-        - mountPath: /tmp/k8s-webhook-server/serving-certs
-          name: cert
-          readOnly: true
-      terminationGracePeriodSeconds: 10
-      volumes:
-      - name: cert
-        secret:
-          defaultMode: 420
-          secretName: di-webhook-server-cert
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: di-serving-cert
-  namespace: di-system
-spec:
-  dnsNames:
-  - di-webhook-service.di-system.svc
-  - di-webhook-service.di-system.svc.cluster.local
-  issuerRef:
-    kind: Issuer
-    name: di-selfsigned-issuer
-  secretName: di-webhook-server-cert
----
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: di-selfsigned-issuer
-  namespace: di-system
-spec:
-  selfSigned: {}
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: MutatingWebhookConfiguration
-metadata:
-  annotations:
-    cert-manager.io/inject-ca-from: di-system/di-serving-cert
-  name: di-mutating-webhook-configuration
-webhooks:
-- admissionReviewVersions:
-  - v1
-  - v1beta1
-  clientConfig:
-    service:
-      name: di-webhook-service
-      namespace: di-system
-      path: /mutate-diengine-opendilab-org-v1alpha2-dijob
-  failurePolicy: Fail
-  name: mdijob.kb.io
-  rules:
-  - apiGroups:
-    - diengine.opendilab.org
-    apiVersions:
-    - v1alpha2
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - dijobs
-  sideEffects: None
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingWebhookConfiguration
-metadata:
-  annotations:
-    cert-manager.io/inject-ca-from: di-system/di-serving-cert
-  name: di-validating-webhook-configuration
-webhooks:
-- admissionReviewVersions:
-  - v1
-  - v1beta1
-  clientConfig:
-    service:
-      name: di-webhook-service
-      namespace: di-system
-      path: /validate-diengine-opendilab-org-v1alpha2-dijob
-  failurePolicy: Fail
-  name: vdijob.kb.io
-  rules:
-  - apiGroups:
-    - diengine.opendilab.org
-    apiVersions:
-    - v1alpha2
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - dijobs
-  sideEffects: None

@@ -16251,7 +16251,7 @@ spec:
   ports:
   - name: https
     port: 8443
-    targetPort: 8080
+    targetPort: 8443
   selector:
     control-plane: di-operator
 ---
@@ -16267,21 +16267,6 @@ spec:
     targetPort: 8080
   selector:
     control-plane: di-server
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: di-server-nodeport
-  namespace: di-system
-spec:
-  ports:
-  - nodePort: 32270
-    port: 8080
-    protocol: TCP
-    targetPort: 8080
-  selector:
-    control-plane: di-server
-  type: NodePort
 ---
 apiVersion: v1
 kind: Service
@@ -16314,24 +16299,25 @@ spec:
     spec:
       containers:
       - args:
-        - --health-probe-bind-address=:8081
-        - --metrics-bind-address=:8080
+        - --probe-addr=:8080
+        - --metric-addr=:8443
         - --leader-elect
         command:
-        - /di-operator
-        image: registry.sensetime.com/cloudnative4ai/di-operator:v0.2.2
+        - /di-orchestrator
+        - operator
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:
@@ -16365,12 +16351,11 @@ spec:
       containers:
       - args:
         - --server-bind-address=:8080
-        - --leader-elect
-        - --lease-lock-namespace=di-system
-        - --lease-lock-name=di-server
+        - --gpu-alloc-policy=simple
         command:
-        - /di-server
-        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.2
+        - /di-orchestrator
+        - server
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -16408,14 +16393,19 @@ spec:
         control-plane: di-webhook
     spec:
       containers:
-      - command:
-        - /di-webhook
-        image: registry.sensetime.com/cloudnative4ai/di-webhook:v0.2.2
+      - args:
+        - --probe-addr=:8080
+        - --metric-addr=:8443
+        - --port=9443
+        command:
+        - /di-orchestrator
+        - webhook
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 15
           periodSeconds: 20
         name: webhook
@@ -16426,7 +16416,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 8081
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:

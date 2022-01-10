@@ -17,13 +17,12 @@ spec:
     spec:
       containers:
       - command:
-        - /di-server
+        - /di-orchestrator
+        - server
         args:
-        - "--server-bind-address=:8080"
-        - "--leader-elect"
-        - "--lease-lock-namespace=di-system"
-        - "--lease-lock-name=di-server"
-        image: registry.sensetime.com/cloudnative4ai/di-server:v0.2.2
+        - --server-bind-address=:8080
+        - --gpu-alloc-policy=simple
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
         imagePullPolicy: Always
         name: server
         securityContext:

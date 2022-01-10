@@ -11,6 +11,6 @@ spec:
       containers:
       - name: manager
         args:
-        - "--health-probe-bind-address=:8081"
-        - "--metrics-bind-address=:8080"
+        - "--probe-addr=:8080"
+        - "--metric-addr=:8443"
         - "--leader-elect"

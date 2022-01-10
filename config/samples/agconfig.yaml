@@ -9,7 +9,7 @@ spec:
       spec:
         containers:
         - name: di-container
-          image: opendilab/ding:2021-09-26
+          image: opendilab/ding:nightly-atari
           imagePullPolicy: Always
           env:
           - name: PYTHONUNBUFFERED

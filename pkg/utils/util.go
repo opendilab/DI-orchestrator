@@ -1,7 +1,6 @@
 package util
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -14,9 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 	commontypes "opendilab.org/di-orchestrator/pkg/common/types"
 )
@@ -31,10 +29,6 @@ func init() {
 
 func GenerateName(name string) string {
 	return fmt.Sprintf("%s-%s", name, utilrand.String(randomLength))
-}
-
-func ReplicaPodName(name, replicaType string) string {
-	return fmt.Sprintf("%s-%s", name, replicaType)
 }
 
 func NamespacedName(namespace, name string) string {
@@ -88,13 +82,16 @@ func AddPortToPod(pod *corev1.Pod, port corev1.ContainerPort) {
 	}
 }
 
-func GenLabels(jobName string) map[string]string {
-	groupName := div1alpha1.GroupVersion.Group
+func GenLabels(job div1alpha2.DIJob) map[string]string {
 	return map[string]string{
-		dicommon.GroupNameLabel:      groupName,
-		dicommon.JobNameLabel:        strings.Replace(jobName, "/", "-", -1),
-		dicommon.ControllerNameLabel: dicommon.ControllerName,
+		dicommon.LabelGroup:    job.Spec.Group,
+		dicommon.LabelJob:      strings.Replace(job.Name, "/", "-", -1),
+		dicommon.LabelOperator: dicommon.OperatorName,
 	}
+}
+
+func ReplicaName(jobName string, generation, rank int) string {
+	return fmt.Sprintf("%s-%d-%d", jobName, generation, rank)
 }
 
 func AddLabelsToPod(pod *corev1.Pod, labels map[string]string) {
@@ -106,17 +103,22 @@ func AddLabelsToPod(pod *corev1.Pod, labels map[string]string) {
 	}
 }
 
+func AddAnnotationsToPod(pod *corev1.Pod, annotations map[string]string) {
+	if pod.ObjectMeta.Annotations == nil {
+		pod.ObjectMeta.Annotations = make(map[string]string)
+	}
+	for k, v := range annotations {
+		pod.ObjectMeta.Annotations[k] = v
+	}
+}
+
 func AddEnvsToPod(pod *corev1.Pod, envs map[string]string) {
-	// add env
 	for i := range pod.Spec.Containers {
 		if len(pod.Spec.Containers[i].Env) == 0 {
 			pod.Spec.Containers[i].Env = make([]corev1.EnvVar, 0)
 		}
 		for k, v := range envs {
-			env := corev1.EnvVar{
-				Name:  k,
-				Value: v,
-			}
+			env := corev1.EnvVar{Name: k, Value: v}
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, env)
 		}
 	}
@@ -134,6 +136,30 @@ func GetEnvFromPod(pod *corev1.Pod, envName string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func CountPodsScheduled(pods []*corev1.Pod) int {
+	count := 0
+	for _, pod := range pods {
+		for _, c := range pod.Status.Conditions {
+			if c.Type == corev1.PodScheduled && c.Status == corev1.ConditionTrue {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+func CountReadyPods(pods []*corev1.Pod) int {
+	count := 0
+	for _, pod := range pods {
+		for _, c := range pod.Status.ContainerStatuses {
+			if c.Ready {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func BuildService(name, namespace string, ownRefer metav1.OwnerReference, labels map[string]string, port int32) *corev1.Service {
@@ -183,54 +209,6 @@ func GetServiceAccessURL(service *corev1.Service) string {
 	return url
 }
 
-func ListPods(ctx context.Context, cli client.Client, job *div1alpha1.DIJob) ([]*corev1.Pod, error) {
-	podList := &corev1.PodList{}
-
-	// generate label selector
-	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: GenLabels(job.Name),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// list pods of job
-	err = cli.List(ctx, podList, &client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
-	if err != nil {
-		return nil, err
-	}
-
-	pods := []*corev1.Pod{}
-	for _, pod := range podList.Items {
-		pods = append(pods, pod.DeepCopy())
-	}
-	return pods, nil
-}
-
-func ListServices(ctx context.Context, cli client.Client, job *div1alpha1.DIJob) ([]*corev1.Service, error) {
-	svcList := &corev1.ServiceList{}
-
-	// generate label selector
-	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: GenLabels(job.Name),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// list svcs of job
-	err = cli.List(ctx, svcList, &client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
-	if err != nil {
-		return nil, err
-	}
-
-	svcs := []*corev1.Service{}
-	for _, svc := range svcList.Items {
-		svcs = append(svcs, svc.DeepCopy())
-	}
-	return svcs, nil
-}
-
 func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	results := []*corev1.Pod{}
 	for _, pod := range pods {
@@ -243,34 +221,16 @@ func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	return results
 }
 
-// IsTerminating returns true if pod's DeletionTimestamp has been set
+func IsSucceeded(job *div1alpha2.DIJob) bool {
+	return job.Status.Phase == div1alpha2.JobSucceeded
+}
+
+func IsFailed(job *div1alpha2.DIJob) bool {
+	return job.Status.Phase == div1alpha2.JobFailed
+}
+
 func IsTerminating(pod *corev1.Pod) bool {
 	return pod.DeletionTimestamp != nil
-}
-
-func AddGPUPortsToPod(pod *corev1.Pod, total int, startPort int32) {
-	for i := 1; i < total; i++ {
-		pname := fmt.Sprintf("%s-%d", dicommon.DDPLearnerPortPrefix, i)
-		pport := startPort + int32(i)
-		port := corev1.ContainerPort{
-			Name:          pname,
-			ContainerPort: pport,
-		}
-		AddPortToPod(pod, port)
-	}
-}
-
-func AddGPUPortsToService(service *corev1.Service, total int, startPort int32) {
-	// gpu 0's port has already been created
-	for i := 1; i < total; i++ {
-		pname := fmt.Sprintf("%s-%d", dicommon.DDPLearnerPortPrefix, i)
-		pport := startPort + int32(i)
-		port := corev1.ServicePort{
-			Name: pname,
-			Port: pport,
-		}
-		service.Spec.Ports = append(service.Spec.Ports, port)
-	}
 }
 
 func SetPodResources(pod *corev1.Pod, resources commontypes.ResourceQuantity) {

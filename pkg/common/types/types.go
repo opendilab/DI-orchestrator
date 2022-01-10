@@ -5,24 +5,18 @@ import (
 )
 
 type DIJobRequestParams struct {
-	Namespace   []string `json:"namespace"`
-	Coordinator []string `json:"coordinator"`
-	Name        []string `json:"name"`
-	Aggregator  []string `json:"aggregator"`
+	JobID      []string `json:"jobID"`
+	Generation []string `json:"generation"`
 }
 
 const (
-	RequestParamTypeNamespace   string = "namespace"
-	RequestParamTypeCoordinator string = "coordinator"
-	RequestParamTypeName        string = "name"
-	RequestParamTypeAggregator  string = "aggregator"
+	RequestParamTypeJobID      string = "job_id"
+	RequestParamTypeGeneration string = "generation"
 )
 
 type DIJobRequest struct {
-	Namespace   string           `json:"namespace"`
-	Coordinator string           `json:"coordinator"`
-	Collectors  ResourceQuantity `json:"collectors"`
-	Learners    ResourceQuantity `json:"learners"`
+	JobID    string `json:"jobID"`
+	Replicas int    `json:"replicas"`
 }
 
 type ResourceQuantity struct {
@@ -51,27 +45,13 @@ func NewResourceQuantity(replicas int, cpu, gpu, memory string) *ResourceQuantit
 }
 
 type Response struct {
-	Success bool        `json:"success"`
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data"`
+	Success bool     `json:"success"`
+	Code    int      `json:"code"`
+	Message string   `json:"message"`
+	Data    []string `json:"data"`
 }
 
 const (
 	CodeSuccess = iota
 	CodeFailed
 )
-
-type DIJobResponse struct {
-	Namespace   string   `json:"namespace"`
-	Coordinator string   `json:"coordinator"`
-	Collectors  []string `json:"collectors"`
-	Learners    []string `json:"learners"`
-}
-
-type ReplicaResponse struct {
-	Namespace   string `json:"namespace"`
-	Coordinator string `json:"coordinator"`
-	ReplicaType string `json:"replicaType"`
-	Name        string `json:"name"`
-}

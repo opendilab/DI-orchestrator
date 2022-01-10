@@ -16,13 +16,13 @@ This project is based on [kubebuilder v3](https://github.com/kubernetes-sigs/kub
 ```bash
 kubebuilder init --domain opendilab.org --license apache2 --owner "The OpenDILab authors"
 
-kubebuilder create api --group diengine --version v1alpha1 --kind DIJob
+kubebuilder create api --group diengine --version v1alpha2 --kind DIJob
 
-kubebuilder create api --group diengine --version v1alpha1 --kind AggregatorConfig
+kubebuilder create api --group diengine --version v1alpha2 --kind AggregatorConfig
 ```
 
 ## CRD Design
-Make codes in [dijob_types.go](./api/v1alpha1/dijob_types.go) and [aggregatorconfig_types.go](./api/v1alpha1/aggregatorconfig.go) with your requirements, and generate deepcopy functions.
+Make codes in [dijob_types.go](./api/v1alpha2/dijob_types.go) and [aggregatorconfig_types.go](./api/v1alpha2/aggregatorconfig.go) with your requirements, and generate deepcopy functions.
 ```bash
 make generate
 ```

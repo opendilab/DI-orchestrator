@@ -32,7 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
@@ -43,9 +43,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	serverdynamic "opendilab.org/di-orchestrator/pkg/server/dynamic"
-	testutil "opendilab.org/di-orchestrator/pkg/utils/testutils"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -91,7 +90,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = div1alpha1.AddToScheme(scheme.Scheme)
+	err = div1alpha2.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -116,29 +115,14 @@ var _ = BeforeSuite(func() {
 		fmt.Printf("node: %s added to cluster\n", node.Name)
 	}
 
-	By("Apply AggregatorConfig")
-	ctx := context.Background()
-	agconfig := testutil.NewAggregatorConfig()
-
-	err = k8sClient.Create(ctx, testutil.NewNamespace(agconfig.Namespace), &client.CreateOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	err = k8sClient.Create(ctx, agconfig, &client.CreateOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	By("Agconfig successfully created")
-	key := types.NamespacedName{Namespace: agconfig.Namespace, Name: agconfig.Name}
-	createdAg := div1alpha1.AggregatorConfig{}
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, key, &createdAg)
-		if err != nil {
-			return false
-		}
-		return true
-	}, timeout, interval).Should(BeTrue())
-
 	kubeClient = kubernetes.NewForConfigOrDie(cfg)
 	dynamicClient := dynamic.NewForConfigOrDie(cfg)
+	diGVR := schema.GroupVersionResource{
+		Group:    div1alpha2.GroupVersion.Group,
+		Version:  div1alpha2.GroupVersion.Version,
+		Resource: "dijobs",
+	}
+	diclient := dynamicClient.Resource(diGVR)
 
 	dif := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, serverdynamic.ResyncPeriod, corev1.NamespaceAll, nil)
 
@@ -156,9 +140,8 @@ var _ = BeforeSuite(func() {
 
 	logger := zap.New(zap.UseFlagOptions(&opts))
 
-	agconfigstr := "di-system/aggregator-config"
 	gpuAllocPolicy := "simple"
-	diServer := NewDIServer(kubeClient, dynamicClient, logger, agconfigstr, dyi, gpuAllocPolicy)
+	diServer := NewDIServer(kubeClient, diclient, logger, dyi, gpuAllocPolicy)
 
 	localServingPort = port + config.GinkgoConfig.ParallelNode
 	addrPort := fmt.Sprintf("%s:%d", localServingHost, localServingPort)

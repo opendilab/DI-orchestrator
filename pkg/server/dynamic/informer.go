@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 )
 
 var (
@@ -19,24 +19,16 @@ var (
 )
 
 type Informers struct {
-	NJInformer   informers.GenericInformer
-	AGInformer   informers.GenericInformer
+	DIInformer   informers.GenericInformer
 	PodInformer  informers.GenericInformer
 	NodeInformer informers.GenericInformer
 }
 
 func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Informers {
-	// add ALConfig informer
-	aggregatorGVR := schema.GroupVersionResource{
-		Group:    div1alpha1.GroupVersion.Group,
-		Version:  div1alpha1.GroupVersion.Version,
-		Resource: "aggregatorconfigs",
-	}
-
 	// add DIJob informer
-	njGVR := schema.GroupVersionResource{
-		Group:    div1alpha1.GroupVersion.Group,
-		Version:  div1alpha1.GroupVersion.Version,
+	diGVR := schema.GroupVersionResource{
+		Group:    div1alpha2.GroupVersion.Group,
+		Version:  div1alpha2.GroupVersion.Version,
 		Resource: "dijobs",
 	}
 
@@ -55,32 +47,16 @@ func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Inform
 	}
 
 	dyi := Informers{
-		NJInformer:   dif.ForResource(njGVR),
-		AGInformer:   dif.ForResource(aggregatorGVR),
+		DIInformer:   dif.ForResource(diGVR),
 		PodInformer:  dif.ForResource(podGVR),
 		NodeInformer: dif.ForResource(nodeGVR),
 	}
 
-	dyi.NJInformer.Informer().AddEventHandler(
+	dyi.DIInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				// on add object
 				log.Printf("new DIJob: %s/%s", obj.(*unstructured.Unstructured).GetNamespace(), obj.(*unstructured.Unstructured).GetName())
-			},
-			UpdateFunc: func(old, new interface{}) {
-				// on update object
-			},
-			DeleteFunc: func(obj interface{}) {
-				// on delete object
-			},
-		},
-	)
-
-	dyi.AGInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				// on add object
-				log.Printf("new AGConfig: %s/%s", obj.(*unstructured.Unstructured).GetNamespace(), obj.(*unstructured.Unstructured).GetName())
 			},
 			UpdateFunc: func(old, new interface{}) {
 				// on update object

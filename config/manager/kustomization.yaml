@@ -1,10 +1,10 @@
 resources:
 - di_operator.yaml
 - di_server.yaml
-- di_webhook.yaml
+# - di_webhook.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: registry.sensetime.com/cloudnative4ai/di-orchestrator
   newName: registry.sensetime.com/cloudnative4ai/di-orchestrator
-  newTag: v0.3.0
+  newTag: v1.0.0

@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
+	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 )
 
 func GetPodFromObject(obj interface{}) (*corev1.Pod, error) {
@@ -20,7 +20,7 @@ func GetPodFromObject(obj interface{}) (*corev1.Pod, error) {
 	}
 	owners := pod.GetOwnerReferences()
 	for _, owner := range owners {
-		if owner.Kind == div1alpha1.KindDIJob {
+		if owner.Kind == div1alpha2.KindDIJob {
 			return &pod, nil
 		}
 	}
@@ -36,7 +36,7 @@ func GetServiceFromObject(obj interface{}) (*corev1.Service, error) {
 	}
 	owners := service.GetOwnerReferences()
 	for _, owner := range owners {
-		if owner.Kind == div1alpha1.KindDIJob {
+		if owner.Kind == div1alpha2.KindDIJob {
 			return &service, nil
 		}
 	}

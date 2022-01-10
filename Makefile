@@ -1,6 +1,6 @@
 
 # di-operator version
-VERSION ?= v0.3.0
+VERSION ?= v1.0.0
 MASTER_VERSION := $(VERSION)
 
 COMMIT_SHORT_SHA=$(shell git log -n 1 | head -n 1 | sed -e 's/^commit //' | head -c 8)
@@ -86,7 +86,6 @@ lint:
 .PHONY: test
 test: ginkgo ## Run tests.
 	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./pkg/... 
-	go tool cover -func=./pkg/api/v1alpha1/coverage.out 
 	go tool cover -func=./pkg/controllers/coverage.out 
 	go tool cover -func=./pkg/server/http/coverage.out 
 	go tool cover -func=./pkg/common/gpuallocator/coverage.out

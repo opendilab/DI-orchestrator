@@ -56,7 +56,7 @@ spec:
               description: CollectorSpec defines the desired state of CollectorSpec
               type: object
   versions:
-  - name: v1alpha1
+  - name: v1alpha2
     served: true
     storage: true
 
@@ -88,7 +88,7 @@ spec:
               description: AggregatorSpec defines the desired state of aggregator
               type: object
   versions:
-  - name: v1alpha1
+  - name: v1alpha2
     served: true
     storage: true
 ---
@@ -326,7 +326,7 @@ spec:
         command:
         - /di-orchestrator
         - operator
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -376,7 +376,7 @@ spec:
         command:
         - /di-orchestrator
         - server
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -421,7 +421,7 @@ spec:
         command:
         - /di-orchestrator
         - webhook
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -496,14 +496,14 @@ webhooks:
     service:
       name: di-webhook-service
       namespace: di-system
-      path: /mutate-diengine-opendilab-org-v1alpha1-dijob
+      path: /mutate-diengine-opendilab-org-v1alpha2-dijob
   failurePolicy: Fail
   name: mdijob.kb.io
   rules:
   - apiGroups:
     - diengine.opendilab.org
     apiVersions:
-    - v1alpha1
+    - v1alpha2
     operations:
     - CREATE
     - UPDATE
@@ -525,14 +525,14 @@ webhooks:
     service:
       name: di-webhook-service
       namespace: di-system
-      path: /validate-diengine-opendilab-org-v1alpha1-dijob
+      path: /validate-diengine-opendilab-org-v1alpha2-dijob
   failurePolicy: Fail
   name: vdijob.kb.io
   rules:
   - apiGroups:
     - diengine.opendilab.org
     apiVersions:
-    - v1alpha1
+    - v1alpha2
     operations:
     - CREATE
     - UPDATE

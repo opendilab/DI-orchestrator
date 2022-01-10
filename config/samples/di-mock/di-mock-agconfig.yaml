@@ -1,4 +1,4 @@
-apiVersion: diengine.opendilab.org/v1alpha1
+apiVersion: diengine.opendilab.org/v1alpha2
 kind: AggregatorConfig
 metadata:
   name: aggregator-config

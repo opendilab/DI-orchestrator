@@ -134,7 +134,7 @@ func NewDIJob() *DIJob {
 			Namespace: DIJobNamespace,
 		},
 		Spec: DIJobSpec{
-			Coordinator: CoordinatorSpec{
+			Coordinator: &CoordinatorSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -147,7 +147,7 @@ func NewDIJob() *DIJob {
 					},
 				},
 			},
-			Collector: CollectorSpec{
+			Collector: &CollectorSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -160,7 +160,7 @@ func NewDIJob() *DIJob {
 					},
 				},
 			},
-			Learner: LearnerSpec{
+			Learner: &LearnerSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{

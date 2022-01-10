@@ -58,12 +58,13 @@ Then running the following command will solve the problem:
 kustomize build config/crd | kubectl create -f -
 ```
 
-`di-operator` and `di-server` will be installed in `di-system` namespace. 
+`di-operator`, `di-webhook` and `di-server` will be installed in `di-system` namespace. 
 ```bash
 $ kubectl get pod -n di-system
 NAME                               READY   STATUS    RESTARTS   AGE
-di-operator-57cc65d5c9-5vnvn   1/1     Running   0          59s
-di-server-7b86ff8df4-jfgmp     1/1     Running   0          59s
+di-operator-57cc65d5c9-5vnvn       1/1     Running   0          59s
+di-server-7b86ff8df4-jfgmp         1/1     Running   0          59s
+di-webhook-45jgi23fhc-9yght        1/1     Running   0          59s
 ```
 
 Install global components of DIJob defined in AggregatorConfig:

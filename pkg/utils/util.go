@@ -7,7 +7,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -16,7 +15,6 @@ import (
 
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
-	commontypes "opendilab.org/di-orchestrator/pkg/common/types"
 )
 
 const (
@@ -38,9 +36,25 @@ func NamespacedName(namespace, name string) string {
 func SplitNamespaceName(namespaceName string) (types.NamespacedName, error) {
 	strs := strings.Split(namespaceName, "/")
 	if len(strs) != 2 {
-		return types.NamespacedName{}, fmt.Errorf("Invalid namespace, name %s", namespaceName)
+		return types.NamespacedName{}, fmt.Errorf("invalid namespace/name %s", namespaceName)
 	}
 	return types.NamespacedName{Namespace: strs[0], Name: strs[1]}, nil
+}
+
+func ReplicaName(jobName string, generation, rank int) string {
+	return fmt.Sprintf("%s-%d-%d", jobName, generation, rank)
+}
+
+func IsSucceeded(job *div1alpha2.DIJob) bool {
+	return job.Status.Phase == div1alpha2.JobSucceeded
+}
+
+func IsFailed(job *div1alpha2.DIJob) bool {
+	return job.Status.Phase == div1alpha2.JobFailed
+}
+
+func IsTerminating(pod *corev1.Pod) bool {
+	return pod.DeletionTimestamp != nil
 }
 
 func GetObjectFromUnstructured(obj interface{}, dest interface{}) error {
@@ -88,10 +102,6 @@ func GenLabels(job div1alpha2.DIJob) map[string]string {
 		dicommon.LabelJob:      strings.Replace(job.Name, "/", "-", -1),
 		dicommon.LabelOperator: dicommon.OperatorName,
 	}
-}
-
-func ReplicaName(jobName string, generation, rank int) string {
-	return fmt.Sprintf("%s-%d-%d", jobName, generation, rank)
 }
 
 func AddLabelsToPod(pod *corev1.Pod, labels map[string]string) {
@@ -162,28 +172,23 @@ func CountReadyPods(pods []*corev1.Pod) int {
 	return count
 }
 
-func BuildService(name, namespace string, ownRefer metav1.OwnerReference, labels map[string]string, port int32) *corev1.Service {
-	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
-			Namespace:       namespace,
-			Labels:          labels,
-			OwnerReferences: []metav1.OwnerReference{ownRefer},
-		},
-		Spec: corev1.ServiceSpec{
-			Type:      corev1.ServiceTypeClusterIP,
-			ClusterIP: "None",
-			Selector:  labels,
-			Ports: []corev1.ServicePort{
-				{
-					Port: port,
-					Name: dicommon.DefaultPortName,
-				},
-			},
-		},
+func SetPodResources(pod *corev1.Pod, resources corev1.ResourceRequirements) {
+	for i := range pod.Spec.Containers {
+		if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
+			continue
+		}
+		pod.Spec.Containers[i].Resources = resources
 	}
+}
 
-	return svc
+func GetPodResources(spec *corev1.PodSpec) corev1.ResourceRequirements {
+	for _, container := range spec.Containers {
+		if container.Name != dicommon.DefaultContainerName {
+			continue
+		}
+		return container.Resources
+	}
+	return corev1.ResourceRequirements{}
 }
 
 func ConcatURL(name, ns string, port int32) string {
@@ -221,71 +226,28 @@ func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
 	return results
 }
 
-func IsSucceeded(job *div1alpha2.DIJob) bool {
-	return job.Status.Phase == div1alpha2.JobSucceeded
-}
-
-func IsFailed(job *div1alpha2.DIJob) bool {
-	return job.Status.Phase == div1alpha2.JobFailed
-}
-
-func IsTerminating(pod *corev1.Pod) bool {
-	return pod.DeletionTimestamp != nil
-}
-
-func SetPodResources(pod *corev1.Pod, resources commontypes.ResourceQuantity) {
-	for i := range pod.Spec.Containers {
-		if pod.Spec.Containers[i].Name != dicommon.DefaultContainerName {
-			continue
-		}
-		if pod.Spec.Containers[i].Resources.Limits == nil {
-			pod.Spec.Containers[i].Resources.Limits = make(corev1.ResourceList)
-		}
-		if pod.Spec.Containers[i].Resources.Requests == nil {
-			pod.Spec.Containers[i].Resources.Requests = make(corev1.ResourceList)
-		}
-
-		// cpu and memory must not be zero
-		if !resources.CPU.IsZero() {
-			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceCPU] = resources.CPU
-			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceCPU] = resources.CPU
-		}
-		if !resources.Memory.IsZero() {
-			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceMemory] = resources.Memory
-			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceMemory] = resources.Memory
-		}
-		if !resources.GPU.IsZero() {
-			pod.Spec.Containers[i].Resources.Limits[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
-			pod.Spec.Containers[i].Resources.Requests[corev1.ResourceName("nvidia.com/gpu")] = resources.GPU
-		}
+func BuildService(name, namespace string, ownRefer metav1.OwnerReference, labels map[string]string, port int32) *corev1.Service {
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Namespace:       namespace,
+			Labels:          labels,
+			OwnerReferences: []metav1.OwnerReference{ownRefer},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:      corev1.ServiceTypeClusterIP,
+			ClusterIP: "None",
+			Selector:  labels,
+			Ports: []corev1.ServicePort{
+				{
+					Port: port,
+					Name: dicommon.DefaultPortName,
+				},
+			},
+		},
 	}
-}
 
-func GetPodResources(pod *corev1.Pod) commontypes.ResourceQuantity {
-	resource := commontypes.ResourceQuantity{
-		CPU:    resource.MustParse("0"),
-		GPU:    resource.MustParse("0"),
-		Memory: resource.MustParse("0"),
-	}
-	for _, container := range pod.Spec.Containers {
-		if container.Name != dicommon.DefaultContainerName {
-			continue
-		}
-		if container.Resources.Limits == nil && container.Resources.Requests == nil {
-			break
-		}
-		if container.Resources.Requests != nil {
-			resource.CPU = container.Resources.Requests[corev1.ResourceCPU].DeepCopy()
-			resource.GPU = container.Resources.Requests[corev1.ResourceName("nvidia.com/gpu")].DeepCopy()
-			resource.Memory = container.Resources.Requests[corev1.ResourceMemory].DeepCopy()
-		}
-		if container.Resources.Limits != nil {
-			resource.CPU = container.Resources.Limits[corev1.ResourceCPU].DeepCopy()
-			resource.GPU = container.Resources.Limits[corev1.ResourceName("nvidia.com/gpu")].DeepCopy()
-			resource.Memory = container.Resources.Limits[corev1.ResourceMemory].DeepCopy()
-		}
-	}
-	return resource
+	return svc
 }
 
 func NewOwnerReference(apiVersion, kind, name string, uid types.UID, controller bool) metav1.OwnerReference {

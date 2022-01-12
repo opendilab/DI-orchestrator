@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: di-server
-  namespace: di-system
   labels:
     control-plane: di-server
 spec:
@@ -25,6 +24,9 @@ spec:
         image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         name: server
+        envFrom:
+        - configMapRef:
+            name: di-config
         securityContext:
           allowPrivilegeEscalation: false
         livenessProbe:

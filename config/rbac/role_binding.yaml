@@ -9,4 +9,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: di-system
+  # namespace: di-system

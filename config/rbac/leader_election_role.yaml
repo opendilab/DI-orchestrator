@@ -3,7 +3,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: di-leader-election-role
-  namespace: di-system
 rules:
 - apiGroups:
   - ""

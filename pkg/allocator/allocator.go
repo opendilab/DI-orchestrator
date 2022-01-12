@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -13,8 +15,10 @@ import (
 
 	ditypes "opendilab.org/di-orchestrator/pkg/allocator/types"
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	"opendilab.org/di-orchestrator/pkg/common"
 	dihandler "opendilab.org/di-orchestrator/pkg/common/handler"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
+	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
 type Allocator struct {
@@ -50,12 +54,8 @@ func (a *Allocator) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resul
 	}
 
 	// TODO(liqingping): implement jobinfo getter and nodeinfo getter.
-	jobinfo := *ditypes.NewJobInfo(types.NamespacedName{
-		Namespace: job.Namespace, Name: job.Name,
-	})
-	nodeinfos := map[string]ditypes.NodeInfo{
-		"node-0": *ditypes.NewNodeInfo("node-0"),
-	}
+	jobinfo := a.getJobInfo(job)
+	nodeinfos := a.getNodeInfos()
 	jobinfos := map[string]ditypes.JobInfo{
 		jobinfo.Key.String(): jobinfo,
 	}
@@ -74,7 +74,7 @@ func (a *Allocator) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &div1alpha2.DIJob{}},
 			&dihandler.EventHandler{
 				OnCreateHandlers: []func(obj client.Object){
-					a.onJobAdd,
+					a.onJobAddHandler,
 				},
 				OnUpdateHandlers: []func(old, new client.Object){},
 			},
@@ -83,7 +83,7 @@ func (a *Allocator) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(a)
 }
 
-// return true if time elapsed is almost greater than schedule duration
+// return true if time elapsed is almost greater than schedule duration.
 func (a *Allocator) needReconcile() bool {
 	return (a.scheduleDuration - time.Since(a.last)) < time.Second
 }
@@ -92,29 +92,83 @@ func (a *Allocator) updateLastTime() {
 	a.last = time.Now()
 }
 
-func (a *Allocator) onJobAdd(obj client.Object) {
-	log := a.ctx.Log.WithName("onJobAdd")
+// onJobAddHandler handle the event when a job is created.
+func (a *Allocator) onJobAddHandler(obj client.Object) {
+	log := a.ctx.Log.WithName("onJobAddHandler")
 	job := obj.(*div1alpha2.DIJob)
 
-	// TODO(liqingping): implement jobinfo getter and nodeinfo getter.
-	jobinfo := *ditypes.NewJobInfo(types.NamespacedName{
-		Namespace: job.Namespace, Name: job.Name,
-	})
-	nodeinfos := map[string]ditypes.NodeInfo{
-		"node-0": *ditypes.NewNodeInfo("node-0"),
+	if err := a.allocate(job); err != nil {
+		log.Error(err, "failed to allocate", "job", job.Name)
 	}
-	if err := a.allocate(jobinfo, nodeinfos); err != nil {
-		log.Error(err, "failed to allocate", "job", jobinfo.Key.String())
-	}
+
 }
 
-func (a *Allocator) allocate(jobinfo ditypes.JobInfo, nodeinfos map[string]ditypes.NodeInfo) error {
-	log := a.ctx.Log.WithName("Allocate")
-	allocation, err := a.policy.Allocate(jobinfo, nodeinfos)
-	if err != nil {
-		return err
+func (a *Allocator) getJobInfo(job *div1alpha2.DIJob) ditypes.JobInfo {
+	res := a.getJobResources(job)
+	jobinfo := ditypes.NewJobInfo(
+		types.NamespacedName{
+			Namespace: job.Namespace, Name: job.Name,
+		},
+		res, int(job.Spec.MinReplicas), int(job.Spec.MaxReplicas),
+		job.Spec.Preemptible,
+	)
+	return *jobinfo
+}
+
+func (a *Allocator) getJobResources(job *div1alpha2.DIJob) corev1.ResourceRequirements {
+	res := common.GetDIJobDefaultResources()
+	jobres := diutil.GetPodResources(&job.Spec.Template.Spec)
+	if jobres.Requests != nil {
+		if jobres.Requests.Cpu() != nil {
+			res.Requests[corev1.ResourceCPU] = *jobres.Requests.Cpu()
+		}
+		if jobres.Requests.Memory() != nil {
+			res.Requests[corev1.ResourceMemory] = *jobres.Requests.Memory()
+		}
+		res.Requests[corev1.ResourceName(common.ResourceGPU)] = jobres.Requests[corev1.ResourceName(common.ResourceGPU)]
+	} else if jobres.Limits != nil {
+		if jobres.Limits.Cpu() != nil {
+			res.Limits[corev1.ResourceCPU] = *jobres.Limits.Cpu()
+		}
+		if jobres.Limits.Memory() != nil {
+			res.Limits[corev1.ResourceMemory] = *jobres.Limits.Memory()
+		}
+		res.Limits[corev1.ResourceName(common.ResourceGPU)] = jobres.Limits[corev1.ResourceName(common.ResourceGPU)]
 	}
-	log.Info("new allocation", "allocation", allocation)
+	if _, ok := res.Requests[corev1.ResourceName(common.ResourceGPU)]; !ok {
+		res.Requests[corev1.ResourceName(common.ResourceGPU)] = res.Limits[corev1.ResourceName(common.ResourceGPU)]
+	}
+	return res
+}
+
+func (a *Allocator) getNodeInfos() map[string]ditypes.NodeInfo {
+	return nil
+}
+
+func (a *Allocator) allocate(job *div1alpha2.DIJob) error {
+	log := a.ctx.Log.WithName("allocate")
+	status := job.Status.DeepCopy()
+	jobinfo := a.getJobInfo(job)
+	nodeinfos := a.getNodeInfos()
+	// allocate job if preemptible, otherwise just update status.replicas
+	if job.Spec.Preemptible {
+		allocation, err := a.policy.Allocate(jobinfo, nodeinfos)
+		if err != nil {
+			return err
+		}
+		log.Info("allocate job "+diutil.NamespacedName(job.Namespace, job.Name), "allocation", allocation)
+		if len(allocation) != 0 {
+			job.Status.Allocation = allocation
+		}
+	} else {
+		job.Status.Replicas = job.Spec.MinReplicas
+	}
+
+	if !apiequality.Semantic.DeepEqual(job.Status, *status) {
+		if err := a.ctx.UpdateDIJobStatusInCluster(job); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

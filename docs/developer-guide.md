@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- a well prepared kubernetes cluster. Follow the[instructions](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create a kubernetes cluster, or create a local kubernetes node referring to[kind](https://kind.sigs.k8s.io/docs/user/quick-start/) or[minikube](https://minikube.sigs.k8s.io/docs/start/)
+- a well prepared kubernetes cluster. Follow the [instructions](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/) to create a kubernetes cluster, or create a local kubernetes node referring to [kind](https://kind.sigs.k8s.io/docs/user/quick-start/) or [minikube](https://minikube.sigs.k8s.io/docs/start/)
 - kustomize. Installed by the following command
 
 ```bash
@@ -69,7 +69,6 @@ di-server-7b86ff8df4-jfgmp         1/1     Running   0          59s
 
 ## Programming Specification
 
-- Logger: logger should use`github.com/go-logr/logr.Logger`, created from`sigs.k8s.io/controller-runtime/pkg/log.DelegatingLogger`. We have the following specifications
-  - Logger used in each function should be defined as:`logger := ctx.Log.WithName(function-name).WithValues("job", job-namespace-name))`. It's helpful for debuging since we can easily locate where the log message is from and what the DIJob is. Then, DIJob related information is not needed in log message.
+- Logger: logger should use `github.com/go-logr/logr.Logger`, created from `sigs.k8s.io/controller-runtime/pkg/log.DelegatingLogger`. We have the following specifications
+  - Logger used in each function should be defined as: `logger := ctx.Log.WithName(function-name).WithValues("job", job-namespace-name))`. It's helpful for debugging since we can easily locate where the log message is from and what the DIJob is. Then, DIJob related information is not needed in log message.
   - All the log message should start with lower case letter.
-  -

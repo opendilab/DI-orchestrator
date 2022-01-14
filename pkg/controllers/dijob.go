@@ -14,22 +14,25 @@ import (
 
 func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div1alpha2.DIJob,
 	pods []*corev1.Pod, services []*corev1.Service) error {
-	log := r.ctx.Log.WithValues("dijob", diutil.NamespacedName(job.Namespace, job.Name))
+	log := r.ctx.Log.WithName("reconcileReplicas").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	oldStatus := job.Status.DeepCopy()
 	allocation := job.Status.Allocation
 	replicas := job.Status.Replicas
 	if r.ctx.CheckJobCompletion(job, pods) {
-		log.Info("job completed:", job.Name, job.Status.Phase)
 		if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
 			if err := r.ctx.UpdateDIJobStatusInCluster(job); err != nil {
-				log.Error(err, "failed to update DIJobStatus", "job", job.Name)
+				log.Error(err, "failed to update job status")
 				return err
 			}
 		}
 		return nil
 	}
 
-	if err := r.reconcileWithJobStatus(ctx, job, pods); err != nil {
+	if err := r.reconcileWithJobStatus(job, pods); err != nil {
+		return err
+	}
+
+	if err := r.reconcileServices(job, services); err != nil {
 		return err
 	}
 
@@ -50,78 +53,61 @@ func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div1alpha2
 
 	if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
 		if err := r.ctx.UpdateDIJobStatusInCluster(job); err != nil {
-			log.Error(err, "failed to update DIJobStatus", "job", job.Name)
+			log.Error(err, "failed to update job status")
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *DIJobReconciler) reconcileWithJobStatus(ctx context.Context, job *div1alpha2.DIJob,
+func (r *DIJobReconciler) reconcileWithJobStatus(job *div1alpha2.DIJob,
 	pods []*corev1.Pod) error {
 	allocation := job.Status.Allocation
 	replicas := int(job.Status.Replicas)
 	switch job.Status.Phase {
 	case div1alpha2.JobPending:
-		if job.Spec.Preemptible {
-			if allocation != nil && len(pods) == 0 {
-				r.ctx.UpdateJobStatus(job, div1alpha2.JobStarting, dicontext.DIJobStartingReason, fmt.Sprintf("DIJob %s is starting now.", job.Name))
+		if job.Spec.Preemptible && allocation != nil && len(pods) == 0 {
+			if err := r.buildAndCreatePods(job, len(allocation), allocation); err != nil {
+				return err
 			}
-		} else {
-			if replicas != 0 && len(pods) == 0 {
-				r.ctx.UpdateJobStatus(job, div1alpha2.JobStarting, dicontext.DIJobStartingReason, fmt.Sprintf("DIJob %s is starting now.", job.Name))
+			r.ctx.UpdateJobStatus(job, div1alpha2.JobStarting, dicontext.DIJobStartingReason,
+				"job is starting since all pods are created.")
+		} else if !job.Spec.Preemptible && replicas != 0 && len(pods) == 0 {
+			if err := r.buildAndCreatePods(job, replicas, allocation); err != nil {
+				return err
 			}
+			r.ctx.UpdateJobStatus(job, div1alpha2.JobStarting, dicontext.DIJobStartingReason,
+				"job is starting since all pods are created.")
 		}
 	case div1alpha2.JobStarting:
-		if job.Spec.Preemptible {
-			if (diutil.CountPodsScheduled(pods) != replicas && r.ctx.DetectRestart(job, pods, allocation, replicas)) || allocation == nil {
-				r.ctx.UpdateJobStatus(job, div1alpha2.JobRestarting, dicontext.DIJobRestartingReason,
-					fmt.Sprintf("DIJob %s is restarting since conditions changed.", job.Name))
-			} else if allocation != nil && len(pods) == 0 {
-				if err := r.buildAndCreatePods(job, replicas, allocation); err != nil {
-					return err
-				}
-			} else if len(pods) != replicas {
-				r.ctx.UpdateJobStatus(job, div1alpha2.JobRestarting, dicontext.DIJobRestartingReason,
-					fmt.Sprintf("DIJob %s is restarting since the created pods %d are not matched replicas %d.", job.Name, len(pods), replicas))
-			} else if diutil.CountReadyPods(pods) == replicas {
-				r.ctx.UpdateJobStatus(job, div1alpha2.JobRunning, dicontext.DIJobRunningReason,
-					fmt.Sprintf("DIJob %s is running since all pods are ready.", job.Name))
-			}
-		} else {
-			if diutil.CountPodsScheduled(pods) != replicas && r.ctx.DetectRestart(job, pods, allocation, replicas) {
-				r.ctx.UpdateJobStatus(job, div1alpha2.JobRestarting, dicontext.DIJobRestartingReason,
-					fmt.Sprintf("DIJob %s is restarting since conditions changed.", job.Name))
-			} else if replicas != 0 && len(pods) == 0 {
-				if err := r.buildAndCreatePods(job, replicas, allocation); err != nil {
-					return err
-				}
-			} else if len(pods) != replicas {
-				r.ctx.UpdateJobStatus(job, div1alpha2.JobRestarting, dicontext.DIJobRestartingReason,
-					fmt.Sprintf("DIJob %s is restarting since the created pods %d are not matched replicas %d.", job.Name, len(pods), replicas))
-			} else if diutil.CountReadyPods(pods) == replicas {
-				r.ctx.UpdateJobStatus(job, div1alpha2.JobRunning, dicontext.DIJobRunningReason,
-					fmt.Sprintf("DIJob %s is running since all pods are ready.", job.Name))
-			}
+		if diutil.CountPodsScheduled(pods) != replicas && r.ctx.DetectRestart(job, pods, allocation, replicas) {
+			r.ctx.UpdateJobStatus(job, div1alpha2.JobRestarting, dicontext.DIJobRestartingReason,
+				"job is restarting since conditions changed.")
+		} else if len(pods) != replicas {
+			r.ctx.UpdateJobStatus(job, div1alpha2.JobRestarting, dicontext.DIJobRestartingReason,
+				fmt.Sprintf("job is restarting since the created pods %d are not matched replicas %d.", len(pods), replicas))
+		} else if diutil.CountReadyPods(pods) == replicas {
+			r.ctx.UpdateJobStatus(job, div1alpha2.JobRunning, dicontext.DIJobRunningReason,
+				"job is running since all pods are ready.")
 		}
 	case div1alpha2.JobRunning:
 		if r.ctx.DetectRestart(job, pods, allocation, replicas) || len(pods) != replicas {
 			r.ctx.UpdateJobStatus(job, div1alpha2.JobRestarting, dicontext.DIJobRestartingReason,
-				fmt.Sprintf("DIJob %s is restarting since the created pods %d are not matched replicas %d.", job.Name, len(pods), replicas))
+				fmt.Sprintf("job is restarting since the created pods %d are not matched replicas %d.", len(pods), replicas))
 		}
 	case div1alpha2.JobRestarting:
 		if len(pods) != 0 {
 			r.ctx.DeletePods(job, pods)
 		} else {
 			r.ctx.UpdateJobStatus(job, div1alpha2.JobPending, dicontext.DIJobPendingReason,
-				fmt.Sprintf("DIJob %s is pending since job restarted.", job.Name))
+				"job is pending since job restarted.")
 		}
 	}
 	return nil
 }
 
 func (r *DIJobReconciler) buildAndCreatePods(job *div1alpha2.DIJob, replicas int, allocation []string) error {
-	log := r.ctx.Log.WithName("buildAndCreatePods")
+	log := r.ctx.Log.WithName("buildAndCreatePods").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	builtPods := []*corev1.Pod{}
 	for i := 0; i < replicas; i++ {
 		pod := r.ctx.BuildPod(job, i, allocation)
@@ -130,10 +116,27 @@ func (r *DIJobReconciler) buildAndCreatePods(job *div1alpha2.DIJob, replicas int
 	for _, pod := range builtPods {
 		err := r.ctx.CreatePod(job, pod)
 		if err != nil {
-			log.Error(err, "failed to create pod", "pod", pod.Name)
+			log.Error(err, "failed to create pod.")
 			r.ctx.UpdateJobStatus(job, div1alpha2.JobFailed, dicontext.DIJobFailedReason,
-				fmt.Sprintf("DIJob %s failed because pod %s failed to created.", job.Name, pod.Name))
+				fmt.Sprintf("job failed since pod %s failed to create.", pod.Name))
 			return r.ctx.DeletePods(job, builtPods)
+		}
+	}
+	return nil
+}
+
+// we will utilize pod subdomain to reduce the number of services created.
+func (r *DIJobReconciler) reconcileServices(job *div1alpha2.DIJob, svcs []*corev1.Service) error {
+	if len(svcs) == 0 {
+		svc := r.ctx.BuildService(job)
+		if err := r.ctx.CreateService(job, svc); err != nil {
+			return err
+		}
+	} else if len(svcs) > 1 {
+		for _, svc := range svcs {
+			if err := r.ctx.DeleteService(job, svc); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

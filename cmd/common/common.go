@@ -18,30 +18,20 @@ package common
 import (
 	goflag "flag"
 
-	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 type GenericFlags struct {
+	ZapOpts zap.Options
 }
 
 func NewGenericFlags() *GenericFlags {
-	return &GenericFlags{}
+	return &GenericFlags{
+		ZapOpts: zap.Options{},
+	}
 }
 
-func (f *GenericFlags) AddFlags(cmd *cobra.Command) {}
-
-var (
-	Logger logr.Logger
-)
-
-func init() {
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(goflag.CommandLine)
-	goflag.Parse()
-
-	Logger = zap.New(zap.UseFlagOptions(&opts))
+func (f *GenericFlags) AddFlags(cmd *cobra.Command) {
+	f.ZapOpts.BindFlags(goflag.CommandLine)
 }

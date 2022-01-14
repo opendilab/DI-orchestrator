@@ -9,21 +9,10 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
     controller-gen.kubebuilder.io/version: v0.4.1
+  creationTimestamp: null
   name: dijobs.diengine.opendilab.org
 spec:
-  conversion:
-    strategy: Webhook
-    webhook:
-      clientConfig:
-        service:
-          name: $(SERVICE_NAME)
-          namespace: di-system
-          path: /mutate-diengine-opendilab-org-v1alpha2-dijob
-      conversionReviewVersions:
-      - v1
-      - v1beta1
   group: diengine.opendilab.org
   names:
     kind: DIJob
@@ -4139,6 +4128,9 @@ spec:
         command:
         - /di-orchestrator
         - operator
+        envFrom:
+        - configMapRef:
+            name: di-config
         image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:
@@ -4189,6 +4181,9 @@ spec:
         command:
         - /di-orchestrator
         - server
+        envFrom:
+        - configMapRef:
+            name: di-config
         image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         livenessProbe:

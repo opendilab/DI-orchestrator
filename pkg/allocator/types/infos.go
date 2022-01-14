@@ -24,10 +24,11 @@ func NewJobInfo(key apitypes.NamespacedName, r corev1.ResourceRequirements, minr
 }
 
 type NodeInfo struct {
-	Key       string
-	Resources corev1.ResourceRequirements
+	Key string
+	// Resources is the list of the free resources on the node.
+	Resources corev1.ResourceList
 }
 
-func NewNodeInfo(key string, r corev1.ResourceRequirements) *NodeInfo {
+func NewNodeInfo(key string, r corev1.ResourceList) *NodeInfo {
 	return &NodeInfo{Key: key, Resources: r}
 }

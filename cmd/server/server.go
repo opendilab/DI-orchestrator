@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
@@ -34,15 +35,15 @@ import (
 )
 
 type CreateOptions struct {
-	*cmdcommon.GenericFlags
+	cmdcommon.GenericFlags
 
 	ServerBindAddress string
 	GPUAllocPolicy    string
 }
 
-func NewCreateOptions() *CreateOptions {
+func NewCreateOptions(genFlags cmdcommon.GenericFlags) *CreateOptions {
 	return &CreateOptions{
-		GenericFlags:      cmdcommon.NewGenericFlags(),
+		GenericFlags:      genFlags,
 		ServerBindAddress: ":8080",
 		GPUAllocPolicy:    gpualloc.SimpleGPUAllocPolicy,
 	}
@@ -56,8 +57,8 @@ func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
 }
 
 // serverCmd represents the server command
-func NewCmdServer() *cobra.Command {
-	o := NewCreateOptions()
+func NewCmdServer(genFlags cmdcommon.GenericFlags) *cobra.Command {
+	o := NewCreateOptions(genFlags)
 	var serverCmd = &cobra.Command{
 		Use:   "server",
 		Short: "Command to run di-server ",
@@ -77,6 +78,7 @@ Examples:
 }
 
 func runCommand(cmd *cobra.Command, options *CreateOptions) error {
+	logger := zap.New(zap.UseFlagOptions(&options.GenericFlags.ZapOpts))
 	cfg, err := ctrl.GetConfig()
 	if err != nil {
 		return err
@@ -97,7 +99,7 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	}
 	diclient := dynamicClient.Resource(diGVR)
 
-	diServer := serverhttp.NewDIServer(kubeClient, diclient, cmdcommon.Logger, dyi, options.GPUAllocPolicy)
+	diServer := serverhttp.NewDIServer(kubeClient, diclient, logger, dyi, options.GPUAllocPolicy)
 	if err := diServer.Start(options.ServerBindAddress); err != nil {
 		return fmt.Errorf("failed to start di-server: %v", err)
 	}

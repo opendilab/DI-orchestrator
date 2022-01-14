@@ -7,7 +7,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -15,7 +14,6 @@ import (
 
 	ditypes "opendilab.org/di-orchestrator/pkg/allocator/types"
 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
-	"opendilab.org/di-orchestrator/pkg/common"
 	dihandler "opendilab.org/di-orchestrator/pkg/common/handler"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
@@ -40,9 +38,9 @@ func NewAllocator(scheme *runtime.Scheme, ctx dicontext.Context, policy ditypes.
 }
 
 func (a *Allocator) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := a.ctx.Log.WithName("Reconcile")
+	log := a.ctx.Log.WithName("Reconcile").WithValues("job", req.NamespacedName)
 	if !a.needReconcile() {
-		log.Info("skipped reconcile since scheduling duration not meet")
+		log.V(2).Info("skipped reconcile since scheduling duration not meet")
 		return ctrl.Result{}, nil
 	}
 	a.updateLastTime()
@@ -53,9 +51,19 @@ func (a *Allocator) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resul
 		return ctrl.Result{}, err
 	}
 
-	// TODO(liqingping): implement jobinfo getter and nodeinfo getter.
-	jobinfo := a.getJobInfo(job)
-	nodeinfos := a.getNodeInfos()
+	jobinfo := getJobInfo(job)
+	nodes, err := a.ctx.ListNodes()
+	if err != nil {
+		log.Error(err, "list nodes failed")
+		return ctrl.Result{}, err
+	}
+
+	nodeinfos, err := a.getNodeInfos(nodes)
+	if err != nil {
+		log.Error(err, "list nodeinfos failed")
+		return ctrl.Result{}, err
+	}
+	log.V(2).Info("get", "nodeinfos", nodeinfos)
 	jobinfos := map[string]ditypes.JobInfo{
 		jobinfo.Key.String(): jobinfo,
 	}
@@ -76,11 +84,28 @@ func (a *Allocator) SetupWithManager(mgr ctrl.Manager) error {
 				OnCreateHandlers: []func(obj client.Object){
 					a.onJobAddHandler,
 				},
-				OnUpdateHandlers: []func(old, new client.Object){},
 			},
 			builder.Predicates{},
 		).
+		Watches(
+			&source.Kind{Type: &corev1.Node{}},
+			&dihandler.EventHandler{},
+		).
+		Watches(
+			&source.Kind{Type: &corev1.Pod{}},
+			&dihandler.EventHandler{},
+		).
 		Complete(a)
+}
+
+// onJobAddHandler handle the event when a job is created.
+func (a *Allocator) onJobAddHandler(obj client.Object) {
+	log := a.ctx.Log.WithName("onJobAddHandler").WithValues("job", diutil.NamespacedName(obj.GetNamespace(), obj.GetName()))
+	job := obj.(*div1alpha2.DIJob)
+
+	if err := a.allocate(job); err != nil {
+		log.Error(err, "failed to allocate")
+	}
 }
 
 // return true if time elapsed is almost greater than schedule duration.
@@ -92,71 +117,25 @@ func (a *Allocator) updateLastTime() {
 	a.last = time.Now()
 }
 
-// onJobAddHandler handle the event when a job is created.
-func (a *Allocator) onJobAddHandler(obj client.Object) {
-	log := a.ctx.Log.WithName("onJobAddHandler")
-	job := obj.(*div1alpha2.DIJob)
-
-	if err := a.allocate(job); err != nil {
-		log.Error(err, "failed to allocate", "job", job.Name)
-	}
-
-}
-
-func (a *Allocator) getJobInfo(job *div1alpha2.DIJob) ditypes.JobInfo {
-	res := a.getJobResources(job)
-	jobinfo := ditypes.NewJobInfo(
-		types.NamespacedName{
-			Namespace: job.Namespace, Name: job.Name,
-		},
-		res, int(job.Spec.MinReplicas), int(job.Spec.MaxReplicas),
-		job.Spec.Preemptible,
-	)
-	return *jobinfo
-}
-
-func (a *Allocator) getJobResources(job *div1alpha2.DIJob) corev1.ResourceRequirements {
-	res := common.GetDIJobDefaultResources()
-	jobres := diutil.GetPodResources(&job.Spec.Template.Spec)
-	if jobres.Requests != nil {
-		if jobres.Requests.Cpu() != nil {
-			res.Requests[corev1.ResourceCPU] = *jobres.Requests.Cpu()
-		}
-		if jobres.Requests.Memory() != nil {
-			res.Requests[corev1.ResourceMemory] = *jobres.Requests.Memory()
-		}
-		res.Requests[corev1.ResourceName(common.ResourceGPU)] = jobres.Requests[corev1.ResourceName(common.ResourceGPU)]
-	} else if jobres.Limits != nil {
-		if jobres.Limits.Cpu() != nil {
-			res.Limits[corev1.ResourceCPU] = *jobres.Limits.Cpu()
-		}
-		if jobres.Limits.Memory() != nil {
-			res.Limits[corev1.ResourceMemory] = *jobres.Limits.Memory()
-		}
-		res.Limits[corev1.ResourceName(common.ResourceGPU)] = jobres.Limits[corev1.ResourceName(common.ResourceGPU)]
-	}
-	if _, ok := res.Requests[corev1.ResourceName(common.ResourceGPU)]; !ok {
-		res.Requests[corev1.ResourceName(common.ResourceGPU)] = res.Limits[corev1.ResourceName(common.ResourceGPU)]
-	}
-	return res
-}
-
-func (a *Allocator) getNodeInfos() map[string]ditypes.NodeInfo {
-	return nil
-}
-
 func (a *Allocator) allocate(job *div1alpha2.DIJob) error {
-	log := a.ctx.Log.WithName("allocate")
+	log := a.ctx.Log.WithName("allocate").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	status := job.Status.DeepCopy()
-	jobinfo := a.getJobInfo(job)
-	nodeinfos := a.getNodeInfos()
 	// allocate job if preemptible, otherwise just update status.replicas
 	if job.Spec.Preemptible {
+		jobinfo := getJobInfo(job)
+		nodes, err := a.ctx.ListNodes()
+		if err != nil {
+			return err
+		}
+		nodeinfos, err := a.getNodeInfos(nodes)
+		if err != nil {
+			return err
+		}
 		allocation, err := a.policy.Allocate(jobinfo, nodeinfos)
 		if err != nil {
 			return err
 		}
-		log.Info("allocate job "+diutil.NamespacedName(job.Namespace, job.Name), "allocation", allocation)
+		log.Info("successfully allocate", "allocation", allocation)
 		if len(allocation) != 0 {
 			job.Status.Allocation = allocation
 		}
@@ -172,12 +151,12 @@ func (a *Allocator) allocate(job *div1alpha2.DIJob) error {
 	return nil
 }
 
-func (a *Allocator) allocateAll(jobinfos map[string]ditypes.JobInfo, nodeinfos map[string]ditypes.NodeInfo, prevAllocations map[string]ditypes.NodeList) error {
+func (a *Allocator) allocateAll(jobinfos map[string]ditypes.JobInfo, nodeinfos map[string]*ditypes.NodeInfo, prevAllocations map[string]ditypes.NodeList) error {
 	log := a.ctx.Log.WithName("allocateAll")
 	allocations, err := a.policy.Optimize(jobinfos, nodeinfos, prevAllocations)
 	if err != nil {
 		return err
 	}
-	log.Info("new allocations", "allocations", allocations)
+	log.Info("successfully allocate all", "allocations", allocations)
 	return nil
 }

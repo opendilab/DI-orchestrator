@@ -42,10 +42,12 @@ func (c *Context) CheckJobCompletion(job *div1alpha2.DIJob, pods []*corev1.Pod) 
 	succeeded, failed := c.checkPodsCompletion(pods, job.Spec.Preemptible)
 	completed = false
 	if succeeded != 0 && succeeded == len(pods) {
-		c.UpdateJobStatus(job, div1alpha2.JobSucceeded, DIJobSucceededReason, "DIJob succeeded since all the replicas are succeeded.")
+		msg := "job succeeded since all the replicas are succeeded."
+		c.UpdateJobStatus(job, div1alpha2.JobSucceeded, DIJobSucceededReason, msg)
 		completed = true
 	} else if failed != 0 {
-		c.UpdateJobStatus(job, div1alpha2.JobFailed, DIJobFailedReason, fmt.Sprintf("DIJob failed since %d replicas failed.", failed))
+		msg := fmt.Sprintf("job failed since %d replicas failed.", failed)
+		c.UpdateJobStatus(job, div1alpha2.JobFailed, DIJobFailedReason, msg)
 		completed = true
 	}
 	return
@@ -94,16 +96,16 @@ func (c *Context) checkPodsCompletion(pods []*corev1.Pod, preemptable bool) (suc
 }
 
 func (c *Context) DetectRestart(job *div1alpha2.DIJob, pods []*corev1.Pod, allocation []string, replicas int) bool {
-	log := c.Log.WithName("DetectRestart")
+	log := c.Log.WithName("DetectRestart").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	for _, pod := range pods {
 		areplicas, err := strconv.Atoi(pod.Annotations[dicommon.AnnotationReplicas])
 		if err != nil {
-			log.Error(err, fmt.Sprintf("%s is not a valid number, mark job as restarted.", pod.Annotations[dicommon.AnnotationReplicas]))
+			log.Error(err, fmt.Sprintf("annotation %s is not a valid number, should mark job as restarting.", pod.Annotations[dicommon.AnnotationReplicas]))
 			return true
 		}
 		rank, err := strconv.Atoi(pod.Annotations[dicommon.AnnotationRank])
 		if err != nil {
-			log.Error(err, fmt.Sprintf("%s is not a valid number, mark job as restarted.", pod.Annotations[dicommon.AnnotationRank]))
+			log.Error(err, fmt.Sprintf("annotation %s is not a valid number, should mark job as restarting.", pod.Annotations[dicommon.AnnotationRank]))
 			return true
 		}
 		if job.Spec.Preemptible && (areplicas != len(allocation) || pod.Annotations[dicommon.AnnotationNode] != allocation[rank]) {
@@ -116,7 +118,7 @@ func (c *Context) DetectRestart(job *div1alpha2.DIJob, pods []*corev1.Pod, alloc
 }
 
 func (c *Context) MarkIncorrectJobFailed(obj client.Object) {
-	log := c.Log.WithName("markIncorrectJobFailed")
+	log := c.Log.WithName("markIncorrectJobFailed").WithValues("job", diutil.NamespacedName(obj.GetNamespace(), obj.GetName()))
 	dclient, err := dynamic.NewForConfig(c.config)
 	if err != nil {
 		log.Error(err, "failed to create dynamic client")
@@ -184,26 +186,9 @@ func (c *Context) UpdateDIJobStatusInCluster(job *div1alpha2.DIJob) error {
 
 func (c *Context) UpdateJobStatus(
 	job *div1alpha2.DIJob, phase div1alpha2.Phase, reason string, msg string) {
+	log := c.Log.WithName("UpdateJobStatus").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
+	log.Info(msg)
 	updateDIJobConditions(job, phase, reason, msg)
-	switch phase {
-	case div1alpha2.JobPending, div1alpha2.JobStarting:
-		c.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
-	case div1alpha2.JobRunning:
-		if job.Status.Phase != div1alpha2.JobRunning {
-			c.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
-		}
-	case div1alpha2.JobRestarting:
-		job.Status.Generation++
-		c.Recorder.Eventf(job, corev1.EventTypeWarning, reason, msg)
-	case div1alpha2.JobFailed:
-		job.Status.ReadyReplicas = 0
-		c.Recorder.Eventf(job, corev1.EventTypeWarning, reason, msg)
-	case div1alpha2.JobSucceeded:
-		job.Status.ReadyReplicas = 0
-		c.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
-	default:
-		c.Recorder.Eventf(job, corev1.EventTypeNormal, reason, msg)
-	}
 	job.Status.Phase = phase
 }
 

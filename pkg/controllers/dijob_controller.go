@@ -65,41 +65,41 @@ func NewDIJobReconciler(scheme *runtime.Scheme, ctx dicontext.Context) *DIJobRec
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
 func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.ctx.Log.WithValues("dijob", req.NamespacedName)
+	log := r.ctx.Log.WithName("Reconcile").WithValues("job", req.NamespacedName)
 
 	// get DIJob object
 	job := &div1alpha2.DIJob{}
 	err := r.ctx.Get(ctx, req.NamespacedName, job)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			log.Error(err, "failed to get DIJob", "job", req.NamespacedName)
+			log.Error(err, "failed to get job")
 		}
 		return ctrl.Result{}, nil
 	}
 
-	pods, err := r.ctx.ListPods(job)
+	pods, err := r.ctx.ListJobPods(job)
 	if err != nil {
-		log.Error(err, "failed to list pods of DIJob", "job", req.NamespacedName)
+		log.Error(err, "failed to list pods")
 		return ctrl.Result{}, nil
 	}
 
-	services, err := r.ctx.ListServices(job)
+	services, err := r.ctx.ListJobServices(job)
 	if err != nil {
-		log.Error(err, "failed to list services of DIJob", "job", req.NamespacedName)
+		log.Error(err, "failed to list services")
 		return ctrl.Result{}, nil
 	}
 
-	// check the phase of DIJob
+	// check job phase
 	if diutil.IsSucceeded(job) || diutil.IsFailed(job) {
 		if err := r.ctx.DeletePodsAndServices(job, pods, services); err != nil {
-			log.Error(err, "failed to delete pods and services of DIJob", "job", req.NamespacedName)
+			log.Error(err, "failed to delete pods and services")
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, nil
 	}
 
 	if err := r.reconcileReplicas(ctx, job, pods, services); err != nil {
-		log.Error(err, "failed to reconcile pods", "job", req.NamespacedName)
+		log.Error(err, "failed to reconcile pods")
 		return ctrl.Result{}, nil
 	}
 
@@ -114,10 +114,13 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &div1alpha2.DIJob{}},
 			&dihandler.EventHandler{
 				OnCreateHandlers: []func(obj client.Object){
-					r.onJobAdd,
+					r.onJobAddHandler,
+				},
+				OnUpdateHandlers: []func(old, new client.Object){
+					r.onJobUpdateHandler,
 				},
 				OnDeleteHandlers: []func(obj client.Object){
-					r.onJobDelete,
+					r.onJobDeleteHandler,
 				},
 			},
 			builder.Predicates{},
@@ -141,33 +144,56 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // addDIJob is the event handler responsible for handling job add events
-func (r *DIJobReconciler) onJobAdd(obj client.Object) {
+func (r *DIJobReconciler) onJobAddHandler(obj client.Object) {
 	jobkey := diutil.NamespacedName(obj.GetNamespace(), obj.GetName())
-	log := r.ctx.Log.WithValues("dijob", jobkey)
+	log := r.ctx.Log.WithName("onJobAddHandler").WithValues("job", jobkey)
 	job, ok := obj.(*div1alpha2.DIJob)
 	if !ok {
-		log.Error(fmt.Errorf("failed to convert object DIJob: %s", jobkey), "")
+		log.Error(fmt.Errorf("failed to convert object to DIJob"), "")
 		r.ctx.MarkIncorrectJobFailed(obj)
 		return
 	}
 	oldStatus := job.Status.DeepCopy()
 
 	// update job status
-	msg := fmt.Sprintf("DIJob %s created", job.Name)
+	msg := "job created."
 	if job.Status.Phase == "" {
 		r.ctx.UpdateJobStatus(job, div1alpha2.JobPending, dicontext.DIJobPendingReason, msg)
+		r.ctx.Recorder.Eventf(job, corev1.EventTypeNormal, dicontext.DIJobPendingReason, msg)
 	}
 
-	log.Info(fmt.Sprintf("DIJob %s created", jobkey))
 	if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
 		if err := r.ctx.UpdateDIJobStatusInCluster(job); err != nil {
-			log.Error(err, fmt.Sprintf("failed to update DIJob %s status", jobkey))
+			log.Error(err, "failed to update job status")
 		}
 	}
 }
 
-func (r *DIJobReconciler) onJobDelete(obj client.Object) {
+func (r *DIJobReconciler) onJobUpdateHandler(old, new client.Object) {
+	jobkey := diutil.NamespacedName(old.GetNamespace(), old.GetName())
+	log := r.ctx.Log.WithName("onJobUpdateHandler").WithValues("job", jobkey)
+	oldjob, ok := old.(*div1alpha2.DIJob)
+	if !ok {
+		log.Error(fmt.Errorf("failed to convert object to DIJob"), "")
+		return
+	}
+	newjob, ok := new.(*div1alpha2.DIJob)
+	if !ok {
+		log.Error(fmt.Errorf("failed to convert object to DIJob"), "")
+		return
+	}
+	staleStatus := newjob.Status.DeepCopy()
+
+	HandleJobStatus(r.ctx, oldjob, newjob)
+	if !apiequality.Semantic.DeepEqual(*staleStatus, newjob.Status) {
+		if err := r.ctx.UpdateDIJobStatusInCluster(newjob); err != nil {
+			log.Error(err, "failed to update job status")
+		}
+	}
+}
+
+func (r *DIJobReconciler) onJobDeleteHandler(obj client.Object) {
 	jobkey := diutil.NamespacedName(obj.GetNamespace(), obj.GetName())
-	log := r.ctx.Log.WithValues("dijob", jobkey)
-	log.Info(fmt.Sprintf("DIJob %s deleted", jobkey))
+	log := r.ctx.Log.WithName("onJobDeleteHandler").WithValues("job", jobkey)
+	log.Info("job deleted.")
 }

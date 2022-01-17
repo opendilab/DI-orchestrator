@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	ditypes "opendilab.org/di-orchestrator/pkg/allocator/types"
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	dihandler "opendilab.org/di-orchestrator/pkg/common/handler"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
@@ -46,7 +46,7 @@ func (a *Allocator) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resul
 	a.updateLastTime()
 
 	jobkey := req.NamespacedName
-	job := &div1alpha2.DIJob{}
+	job := &div2alpha1.DIJob{}
 	if err := a.ctx.Get(ctx, jobkey, job); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -81,9 +81,9 @@ func (a *Allocator) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resul
 // SetupWithManager sets up the controller with the Manager.
 func (a *Allocator) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&div1alpha2.DIJob{}).
+		For(&div2alpha1.DIJob{}).
 		Watches(
-			&source.Kind{Type: &div1alpha2.DIJob{}},
+			&source.Kind{Type: &div2alpha1.DIJob{}},
 			&dihandler.EventHandler{
 				OnCreateHandlers: []func(obj client.Object){
 					a.onJobAddHandler,
@@ -105,7 +105,7 @@ func (a *Allocator) SetupWithManager(mgr ctrl.Manager) error {
 // onJobAddHandler handle the event when a job is created.
 func (a *Allocator) onJobAddHandler(obj client.Object) {
 	log := a.ctx.Log.WithName("onJobAddHandler").WithValues("job", diutil.NamespacedName(obj.GetNamespace(), obj.GetName()))
-	job := obj.(*div1alpha2.DIJob)
+	job := obj.(*div2alpha1.DIJob)
 
 	if err := a.allocate(job); err != nil {
 		log.Error(err, "failed to allocate")
@@ -121,7 +121,7 @@ func (a *Allocator) updateLastTime() {
 	a.last = time.Now()
 }
 
-func (a *Allocator) allocate(job *div1alpha2.DIJob) error {
+func (a *Allocator) allocate(job *div2alpha1.DIJob) error {
 	log := a.ctx.Log.WithName("allocate").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	status := job.Status.DeepCopy()
 	// allocate job if preemptible, otherwise just update status.replicas

@@ -4,12 +4,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ditypes "opendilab.org/di-orchestrator/pkg/allocator/types"
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	"opendilab.org/di-orchestrator/pkg/common"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
-func getJobInfo(job *div1alpha2.DIJob) (ditypes.JobInfo, error) {
+func getJobInfo(job *div2alpha1.DIJob) (ditypes.JobInfo, error) {
 	res, err := getJobResources(job)
 	if err != nil {
 		return ditypes.JobInfo{}, err
@@ -24,7 +24,7 @@ func getJobInfo(job *div1alpha2.DIJob) (ditypes.JobInfo, error) {
 	return *jobinfo, nil
 }
 
-func getJobResources(job *div1alpha2.DIJob) (corev1.ResourceRequirements, error) {
+func getJobResources(job *div2alpha1.DIJob) (corev1.ResourceRequirements, error) {
 	res, err := common.GetDIJobDefaultResources()
 	if err != nil {
 		return corev1.ResourceRequirements{}, err

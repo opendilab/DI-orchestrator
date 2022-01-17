@@ -24,6 +24,7 @@ spec:
       containers:
       - command:
         - /di-orchestrator
+        - --zap-devel=true
         - operator
         args:
         - "--probe-addr=:8080"

@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	gpualloc "opendilab.org/di-orchestrator/pkg/common/gpuallocator"
 	serverdynamic "opendilab.org/di-orchestrator/pkg/server/dynamic"
 	serverhttp "opendilab.org/di-orchestrator/pkg/server/http"
@@ -93,8 +93,8 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	go dif.Start(stopCh)
 
 	diGVR := schema.GroupVersionResource{
-		Group:    div1alpha2.GroupVersion.Group,
-		Version:  div1alpha2.GroupVersion.Version,
+		Group:    div2alpha1.GroupVersion.Group,
+		Version:  div2alpha1.GroupVersion.Version,
 		Resource: "dijobs",
 	}
 	diclient := dynamicClient.Resource(diGVR)

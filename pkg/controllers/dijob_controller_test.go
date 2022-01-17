@@ -12,7 +12,7 @@ package controllers
 // 	"k8s.io/apimachinery/pkg/types"
 // 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-// 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+// 	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 // 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 // 	commontypes "opendilab.org/di-orchestrator/pkg/common/types"
 // 	diutil "opendilab.org/di-orchestrator/pkg/utils"
@@ -31,7 +31,7 @@ package controllers
 // 			checkCoordinatorCreated(ctx, dijob)
 
 // 			By("Checking the created DIJob is in Created state")
-// 			checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha2.JobPending)
+// 			checkDIJobPhase(ctx, k8sClient, jobKey, div2alpha1.JobPending)
 
 // 			replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
 // 			podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
@@ -42,26 +42,26 @@ package controllers
 // 			By("Checking the created DIJob has enough coordinator")
 // 			coorStatus := make([]int, 3)
 // 			coorStatus[0] = 1
-// 			replicasStatuses := map[div1alpha2.ReplicaType][]int{
-// 				div1alpha2.ReplicaTypeCoordinator: coorStatus,
+// 			replicasStatuses := map[div2alpha1.ReplicaType][]int{
+// 				div2alpha1.ReplicaTypeCoordinator: coorStatus,
 // 			}
 // 			checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
 
 // 			By("Checking the created DIJob is in Running state")
-// 			checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha2.JobRunning)
+// 			checkDIJobPhase(ctx, k8sClient, jobKey, div2alpha1.JobRunning)
 
 // 			By("Update coordinator to Succeeded")
 // 			err = testutil.UpdatePodPhase(ctx, k8sClient, podKey, corev1.PodSucceeded)
 // 			Expect(err).NotTo(HaveOccurred())
 
 // 			By("Checking the job is succeeded")
-// 			checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha2.JobSucceeded)
+// 			checkDIJobPhase(ctx, k8sClient, jobKey, div2alpha1.JobSucceeded)
 
 // 			By("Checking the coordinator is succeeded")
 // 			coorStatus = make([]int, 3)
 // 			coorStatus[2] = 1
-// 			replicasStatuses = map[div1alpha2.ReplicaType][]int{
-// 				div1alpha2.ReplicaTypeCoordinator: coorStatus,
+// 			replicasStatuses = map[div2alpha1.ReplicaType][]int{
+// 				div2alpha1.ReplicaTypeCoordinator: coorStatus,
 // 			}
 // 			checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
 
@@ -73,12 +73,12 @@ package controllers
 // 		It("DIJob status changed with components status", func() {
 // 			type testCase struct {
 // 				coorStatus   corev1.PodPhase
-// 				expectStatus div1alpha2.Phase
+// 				expectStatus div2alpha1.Phase
 // 			}
 // 			testCases := []testCase{
-// 				{coorStatus: corev1.PodRunning, expectStatus: div1alpha2.JobRunning},
-// 				{coorStatus: corev1.PodFailed, expectStatus: div1alpha2.JobFailed},
-// 				{coorStatus: corev1.PodSucceeded, expectStatus: div1alpha2.JobSucceeded},
+// 				{coorStatus: corev1.PodRunning, expectStatus: div2alpha1.JobRunning},
+// 				{coorStatus: corev1.PodFailed, expectStatus: div2alpha1.JobFailed},
+// 				{coorStatus: corev1.PodSucceeded, expectStatus: div2alpha1.JobSucceeded},
 // 			}
 // 			for i := range testCases {
 // 				c := testCases[i]
@@ -107,8 +107,8 @@ package controllers
 // 				case corev1.PodSucceeded:
 // 					coorStatus[2] = 1
 // 				}
-// 				replicasStatuses := map[div1alpha2.ReplicaType][]int{
-// 					div1alpha2.ReplicaTypeCoordinator: coorStatus,
+// 				replicasStatuses := map[div2alpha1.ReplicaType][]int{
+// 					div2alpha1.ReplicaTypeCoordinator: coorStatus,
 // 				}
 // 				checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
 
@@ -133,7 +133,7 @@ package controllers
 // 			dijob, jobKey := createDIJob(ctx, k8sClient, jobTmpl)
 
 // 			By("Checking the created DIJob is in Created state")
-// 			checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha2.JobPending)
+// 			checkDIJobPhase(ctx, k8sClient, jobKey, div2alpha1.JobPending)
 
 // 			By("Cleaning up")
 // 			err = testutil.CleanUpJob(ctx, k8sClient, &dijob)
@@ -192,7 +192,7 @@ package controllers
 // 				podKey := types.NamespacedName{Namespace: dijob.Namespace, Name: replicaName}
 
 // 				// build owner reference
-// 				ownRefer := diutil.NewOwnerReference(div1alpha2.GroupVersion.String(), div1alpha2.KindDIJob, dijob.Name, dijob.UID, true)
+// 				ownRefer := diutil.NewOwnerReference(div2alpha1.GroupVersion.String(), div2alpha1.KindDIJob, dijob.Name, dijob.UID, true)
 
 // 				By(fmt.Sprintf("Create replicas for DIJob %s", dijob.Name))
 // 				colStatus := make([]int, 3)
@@ -206,9 +206,9 @@ package controllers
 // 				}
 
 // 				By("Checking the ReplicaStatus is as expected")
-// 				replicasStatuses := map[div1alpha2.ReplicaType][]int{
-// 					div1alpha2.ReplicaTypeCollector: colStatus,
-// 					div1alpha2.ReplicaTypeLearner:   lrStatus,
+// 				replicasStatuses := map[div2alpha1.ReplicaType][]int{
+// 					div2alpha1.ReplicaTypeCollector: colStatus,
+// 					div2alpha1.ReplicaTypeLearner:   lrStatus,
 // 				}
 // 				checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
 
@@ -224,7 +224,7 @@ package controllers
 // 				Expect(err).NotTo(HaveOccurred())
 
 // 				By("Checking the job is successfully succeeded")
-// 				checkDIJobPhase(ctx, k8sClient, jobKey, div1alpha2.JobSucceeded)
+// 				checkDIJobPhase(ctx, k8sClient, jobKey, div2alpha1.JobSucceeded)
 
 // 				By("Checking the ReplicaStatus is as expected")
 // 				coorStatus := make([]int, 3)
@@ -239,10 +239,10 @@ package controllers
 // 				lrFinishedStatus[1] = lrStatus[1]
 // 				lrFinishedStatus[2] = lrStatus[0] + lrStatus[2]
 
-// 				replicasStatuses = map[div1alpha2.ReplicaType][]int{
-// 					div1alpha2.ReplicaTypeCoordinator: coorStatus,
-// 					div1alpha2.ReplicaTypeCollector:   colFinishedStatus,
-// 					div1alpha2.ReplicaTypeLearner:     lrFinishedStatus,
+// 				replicasStatuses = map[div2alpha1.ReplicaType][]int{
+// 					div2alpha1.ReplicaTypeCoordinator: coorStatus,
+// 					div2alpha1.ReplicaTypeCollector:   colFinishedStatus,
+// 					div2alpha1.ReplicaTypeLearner:     lrFinishedStatus,
 // 				}
 // 				checkReplicasStatuses(ctx, k8sClient, jobKey, replicasStatuses)
 
@@ -275,7 +275,7 @@ package controllers
 // 				checkCoordinatorCreated(ctx, dijob)
 
 // 				// build owner reference
-// 				ownRefer := diutil.NewOwnerReference(div1alpha2.GroupVersion.String(), div1alpha2.KindDIJob, dijob.Name, dijob.UID, true)
+// 				ownRefer := diutil.NewOwnerReference(div2alpha1.GroupVersion.String(), div2alpha1.KindDIJob, dijob.Name, dijob.UID, true)
 
 // 				By(fmt.Sprintf("Create replicas for DIJob %s", dijob.Name))
 // 				pod := buildPod(c.name, dijob.Name, dicommon.DDPLearnerName, ownRefer)
@@ -306,8 +306,8 @@ package controllers
 // 	})
 // })
 
-// func createDIJob(ctx context.Context, k8sClient client.Client, dijob *div1alpha2.DIJob) (
-// 	div1alpha2.DIJob, types.NamespacedName) {
+// func createDIJob(ctx context.Context, k8sClient client.Client, dijob *div2alpha1.DIJob) (
+// 	div2alpha1.DIJob, types.NamespacedName) {
 // 	name := diutil.GenerateName(dijob.Name)
 // 	dijob.SetName(name)
 
@@ -316,7 +316,7 @@ package controllers
 
 // 	By(fmt.Sprintf("Checking the DIJob %s is successfully created", name))
 // 	key := types.NamespacedName{Namespace: dijob.Namespace, Name: dijob.Name}
-// 	createdDIjob := div1alpha2.DIJob{}
+// 	createdDIjob := div2alpha1.DIJob{}
 // 	Eventually(func() bool {
 // 		err := k8sClient.Get(ctx, key, &createdDIjob)
 // 		return err == nil
@@ -325,7 +325,7 @@ package controllers
 // 	return createdDIjob, key
 // }
 
-// func checkCoordinatorCreated(ctx context.Context, dijob div1alpha2.DIJob) {
+// func checkCoordinatorCreated(ctx context.Context, dijob div2alpha1.DIJob) {
 // 	By("Checking coordinator are created")
 // 	replicaName := diutil.ReplicaPodName(dijob.Name, "coordinator")
 // 	var pod corev1.Pod
@@ -373,20 +373,20 @@ package controllers
 // 	}
 // }
 
-// func checkDIJobPhase(ctx context.Context, k8sClient client.Client, jobKey types.NamespacedName, phase div1alpha2.Phase) {
-// 	var dijob div1alpha2.DIJob
-// 	Eventually(func() div1alpha2.Phase {
+// func checkDIJobPhase(ctx context.Context, k8sClient client.Client, jobKey types.NamespacedName, phase div2alpha1.Phase) {
+// 	var dijob div2alpha1.DIJob
+// 	Eventually(func() div2alpha1.Phase {
 // 		err := k8sClient.Get(ctx, jobKey, &dijob)
 // 		if err != nil {
-// 			return div1alpha2.JobUnknown
+// 			return div2alpha1.JobUnknown
 // 		}
 // 		return dijob.Status.Phase
 // 	}, timeout, interval).Should(Equal(phase))
 // }
 
-// func checkReplicasStatuses(ctx context.Context, k8sClient client.Client, jobKey types.NamespacedName, replicasStatuses map[div1alpha2.ReplicaType][]int) {
+// func checkReplicasStatuses(ctx context.Context, k8sClient client.Client, jobKey types.NamespacedName, replicasStatuses map[div2alpha1.ReplicaType][]int) {
 // 	for rtype, status := range replicasStatuses {
-// 		var dijob div1alpha2.DIJob
+// 		var dijob div2alpha1.DIJob
 // 		Eventually(func() []int {
 // 			err := k8sClient.Get(ctx, jobKey, &dijob)
 // 			if err != nil {

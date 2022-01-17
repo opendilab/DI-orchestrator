@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1alpha2 contains API Schema definitions for the  v1alpha2 API group
+// Package v2alpha1 contains API Schema definitions for the  v2alpha1 API group
 //+kubebuilder:object:generate=true
 //+groupName=diengine.opendilab.org
-package v1alpha2
+package v2alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -28,11 +28,8 @@ var (
 	// KindDIJob is kind of DIJob
 	KindDIJob = "DIJob"
 
-	// KindAGConfig is kind of AGConfig
-	KindAGConfig = "AggregatorConfig"
-
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "diengine.opendilab.org", Version: "v1alpha2"}
+	GroupVersion = schema.GroupVersion{Group: "diengine.opendilab.org", Version: "v2alpha1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}

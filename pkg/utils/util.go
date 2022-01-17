@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 )
 
@@ -45,12 +45,12 @@ func ReplicaName(jobName string, generation, rank int) string {
 	return fmt.Sprintf("%s-%d-%d", jobName, generation, rank)
 }
 
-func IsSucceeded(job *div1alpha2.DIJob) bool {
-	return job.Status.Phase == div1alpha2.JobSucceeded
+func IsSucceeded(job *div2alpha1.DIJob) bool {
+	return job.Status.Phase == div2alpha1.JobSucceeded
 }
 
-func IsFailed(job *div1alpha2.DIJob) bool {
-	return job.Status.Phase == div1alpha2.JobFailed
+func IsFailed(job *div2alpha1.DIJob) bool {
+	return job.Status.Phase == div2alpha1.JobFailed
 }
 
 func IsTerminating(pod *corev1.Pod) bool {
@@ -96,7 +96,7 @@ func AddPortToPod(pod *corev1.Pod, port corev1.ContainerPort) {
 	}
 }
 
-func GenLabels(job div1alpha2.DIJob) map[string]string {
+func GenLabels(job div2alpha1.DIJob) map[string]string {
 	return map[string]string{
 		dicommon.LabelGroup:    job.Spec.Group,
 		dicommon.LabelJob:      strings.Replace(job.Name, "/", "-", -1),

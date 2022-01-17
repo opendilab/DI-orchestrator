@@ -43,7 +43,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	serverdynamic "opendilab.org/di-orchestrator/pkg/server/dynamic"
 	//+kubebuilder:scaffold:imports
 )
@@ -90,7 +90,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = div1alpha2.AddToScheme(scheme.Scheme)
+	err = div2alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -118,8 +118,8 @@ var _ = BeforeSuite(func() {
 	kubeClient = kubernetes.NewForConfigOrDie(cfg)
 	dynamicClient := dynamic.NewForConfigOrDie(cfg)
 	diGVR := schema.GroupVersionResource{
-		Group:    div1alpha2.GroupVersion.Group,
-		Version:  div1alpha2.GroupVersion.Version,
+		Group:    div2alpha1.GroupVersion.Group,
+		Version:  div2alpha1.GroupVersion.Version,
 		Resource: "dijobs",
 	}
 	diclient := dynamicClient.Resource(diGVR)

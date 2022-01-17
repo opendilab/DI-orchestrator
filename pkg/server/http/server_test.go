@@ -16,7 +16,7 @@ package http
 // 	"k8s.io/apimachinery/pkg/api/resource"
 // 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-// 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+// 	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 // 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 // 	commontypes "opendilab.org/di-orchestrator/pkg/common/types"
 // 	diutil "opendilab.org/di-orchestrator/pkg/utils"
@@ -25,7 +25,7 @@ package http
 
 // var _ = Describe("Server Test", func() {
 // 	Context("When send request to server", func() {
-// 		It("Should have correct response when request /v1alpha2/replicas and /v1alpha2/replicas/failed", func() {
+// 		It("Should have correct response when request /v2alpha1/replicas and /v2alpha1/replicas/failed", func() {
 // 			job := testutil.NewDIJob()
 // 			name := diutil.GenerateName(job.Name)
 // 			job.SetName(name)
@@ -36,10 +36,10 @@ package http
 // 			err = creatDIJob(ctx, job)
 // 			Expect(err).NotTo(HaveOccurred())
 
-// 			By("Send request on POST /v1alpha2/replicas")
+// 			By("Send request on POST /v2alpha1/replicas")
 // 			coorname := diutil.ReplicaPodName(job.Name, "coordinator")
 // 			addr := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
-// 			rurl := fmt.Sprintf("http://%s/v1alpha2/replicas", addr)
+// 			rurl := fmt.Sprintf("http://%s/v2alpha1/replicas", addr)
 // 			var cn, ln int = 2, 3
 // 			req := commontypes.DIJobRequest{
 // 				Namespace:   job.Namespace,
@@ -60,7 +60,7 @@ package http
 // 			Expect(len(diresp.Collectors)).Should(Equal(cn))
 // 			Expect(len(diresp.Learners)).Should(Equal(ln))
 
-// 			By("Send request on GET /v1alpha2/replicas")
+// 			By("Send request on GET /v2alpha1/replicas")
 // 			gurl := fmt.Sprintf("%s?namespace=%s&coordinator=%s", rurl, job.Namespace, coorname)
 // 			resp, err := http.Get(gurl)
 // 			Expect(err).NotTo(HaveOccurred())
@@ -69,8 +69,8 @@ package http
 // 			Expect(len(gdiresp.Collectors)).Should(Equal(cn))
 // 			Expect(len(gdiresp.Learners)).Should(Equal(ln))
 
-// 			By("Send request on POST /v1alpha2/replicas/failed")
-// 			furl := fmt.Sprintf("http://%s/v1alpha2/replicas/failed", addr)
+// 			By("Send request on POST /v2alpha1/replicas/failed")
+// 			furl := fmt.Sprintf("http://%s/v2alpha1/replicas/failed", addr)
 // 			freq := commontypes.DIJobResponse{
 // 				Namespace:   job.Namespace,
 // 				Coordinator: coorname,
@@ -101,7 +101,7 @@ package http
 // 				return len(pods)
 // 			}, timeout, interval).Should(Equal(totalPods))
 
-// 			By("Send request on DELETE /v1alpha2/replicas")
+// 			By("Send request on DELETE /v2alpha1/replicas")
 // 			var dcn, dln int = 1, 1
 // 			dreq := commontypes.DIJobRequest{
 // 				Namespace:   job.Namespace,
@@ -144,9 +144,9 @@ package http
 // 			Expect(err).NotTo(HaveOccurred())
 // 			Expect(hresp.StatusCode).Should(Equal(http.StatusOK))
 
-// 			By("Send request on POST /v1alpha2/replicas")
+// 			By("Send request on POST /v2alpha1/replicas")
 // 			coorname := diutil.ReplicaPodName(job.Name, "coordinator")
-// 			rurl := fmt.Sprintf("http://%s/v1alpha2/replicas", addr)
+// 			rurl := fmt.Sprintf("http://%s/v2alpha1/replicas", addr)
 // 			var cn, ln int = 2, 3
 // 			req := commontypes.DIJobRequest{
 // 				Namespace:   job.Namespace,
@@ -167,16 +167,16 @@ package http
 // 			Expect(len(diresp.Collectors)).Should(Equal(cn))
 // 			Expect(len(diresp.Learners)).Should(Equal(ln))
 
-// 			By("Send not found resource on POST /v1alpha2/replicas")
+// 			By("Send not found resource on POST /v2alpha1/replicas")
 // 			req.Coordinator = "not-exists"
 // 			rbody, err = json.Marshal(req)
 // 			Expect(err).NotTo(HaveOccurred())
 
-// 			By("Send bad request on POST /v1alpha2/replicas")
+// 			By("Send bad request on POST /v2alpha1/replicas")
 // 			_, err = sendRequest(http.MethodPost, rbody, rurl, http.StatusNotFound, false)
 // 			Expect(err).NotTo(HaveOccurred())
 
-// 			By("Send not implemented method on /v1alpha2/replicas")
+// 			By("Send not implemented method on /v2alpha1/replicas")
 // 			_, err = sendRequest(http.MethodPatch, rbody, rurl, http.StatusNotImplemented, false)
 // 			Expect(err).NotTo(HaveOccurred())
 
@@ -184,7 +184,7 @@ package http
 // 			_, err = sendRequest(http.MethodPost, rbody, rurl, http.StatusBadRequest, false)
 // 			Expect(err).NotTo(HaveOccurred())
 
-// 			By("Send request on GET /v1alpha2/replicas with namespace and coordinator")
+// 			By("Send request on GET /v2alpha1/replicas with namespace and coordinator")
 // 			gurl := fmt.Sprintf("%s?namespace=%s&coordinator=%s", rurl, job.Namespace, coorname)
 // 			resp, err := http.Get(gurl)
 // 			Expect(err).NotTo(HaveOccurred())
@@ -193,7 +193,7 @@ package http
 // 			Expect(len(gdiresp.Collectors)).Should(Equal(cn))
 // 			Expect(len(gdiresp.Learners)).Should(Equal(ln))
 
-// 			By("Send request on GET /v1alpha2/replicas with namespace")
+// 			By("Send request on GET /v2alpha1/replicas with namespace")
 // 			gurl = fmt.Sprintf("%s?namespace=%s", rurl, job.Namespace)
 // 			resp, err = http.Get(gurl)
 // 			Expect(err).NotTo(HaveOccurred())
@@ -204,7 +204,7 @@ package http
 // 			Expect(resp.StatusCode).Should(Equal(http.StatusOK))
 // 			Expect(nresp.Success).Should(BeTrue())
 
-// 			By("Send request on GET /v1alpha2/replicas")
+// 			By("Send request on GET /v2alpha1/replicas")
 // 			gurl = rurl
 // 			resp, err = http.Get(gurl)
 // 			Expect(err).NotTo(HaveOccurred())
@@ -214,8 +214,8 @@ package http
 // 			Expect(resp.StatusCode).Should(Equal(http.StatusOK))
 // 			Expect(nresp.Success).Should(BeTrue())
 
-// 			By("Send request on POST /v1alpha2/replicas/failed")
-// 			furl := fmt.Sprintf("http://%s/v1alpha2/replicas/failed", addr)
+// 			By("Send request on POST /v2alpha1/replicas/failed")
+// 			furl := fmt.Sprintf("http://%s/v2alpha1/replicas/failed", addr)
 // 			freq := commontypes.DIJobResponse{
 // 				Namespace:   job.Namespace,
 // 				Coordinator: coorname,
@@ -246,8 +246,8 @@ package http
 // 				return len(pods)
 // 			}, timeout, interval).Should(Equal(totalPods))
 
-// 			By("Send request on POST /v1alpha2/replicas/failed with duplicate replicas")
-// 			fdurl := fmt.Sprintf("http://%s/v1alpha2/replicas/failed", addr)
+// 			By("Send request on POST /v2alpha1/replicas/failed with duplicate replicas")
+// 			fdurl := fmt.Sprintf("http://%s/v2alpha1/replicas/failed", addr)
 // 			fdreq := commontypes.DIJobResponse{
 // 				Namespace:   job.Namespace,
 // 				Coordinator: coorname,
@@ -280,7 +280,7 @@ package http
 // 				return len(pods)
 // 			}, timeout, interval).Should(Equal(dtotalPods))
 
-// 			By("Send request on DELETE /v1alpha2/replicas")
+// 			By("Send request on DELETE /v2alpha1/replicas")
 // 			var dcn, dln int = 1, 1
 // 			dreq := commontypes.DIJobRequest{
 // 				Namespace:   job.Namespace,
@@ -337,9 +337,9 @@ package http
 // 				err = creatDIJob(ctx, job)
 // 				Expect(err).NotTo(HaveOccurred())
 
-// 				By("Send request on POST /v1alpha2/replicas")
+// 				By("Send request on POST /v2alpha1/replicas")
 // 				coorname := diutil.ReplicaPodName(job.Name, "coordinator")
-// 				rurl := fmt.Sprintf("http://%s/v1alpha2/replicas", addr)
+// 				rurl := fmt.Sprintf("http://%s/v2alpha1/replicas", addr)
 // 				var ln int = c.ln
 // 				req := commontypes.DIJobRequest{
 // 					Namespace:   job.Namespace,
@@ -369,7 +369,7 @@ package http
 // 				Expect(err).NotTo(HaveOccurred())
 // 				Expect(len(aggs.Items)).Should(Equal(c.expectedAgg))
 
-// 				By("Send request on GET /v1alpha2/replicas with namespace and coordinator")
+// 				By("Send request on GET /v2alpha1/replicas with namespace and coordinator")
 // 				gurl := fmt.Sprintf("%s?namespace=%s&coordinator=%s", rurl, job.Namespace, coorname)
 // 				resp, err := http.Get(gurl)
 // 				Expect(err).NotTo(HaveOccurred())
@@ -379,7 +379,7 @@ package http
 // 				Expect(len(gdiresp.Learners)).Should(Equal(c.expectedLearner + c.expectedAgg))
 
 // 				if len(aggs.Items) > 0 {
-// 					By("Send request on GET /v1alpha2/replicas with namespace and aggregator")
+// 					By("Send request on GET /v2alpha1/replicas with namespace and aggregator")
 // 					agg := aggs.Items[0]
 // 					aurl := fmt.Sprintf("%s?namespace=%s&aggregator=%s", rurl, job.Namespace, agg.Name)
 // 					aresp, err := http.Get(aurl)
@@ -390,8 +390,8 @@ package http
 // 					expectedDDPLs := c.expectedDDPLPorts / c.ln
 // 					Expect(len(adiresp.Learners)).Should(Equal(expectedDDPLs))
 
-// 					By("Send request on POST /v1alpha2/replicas/failed to report failure of aggregator")
-// 					aurl = fmt.Sprintf("http://%s/v1alpha2/replicas/failed", addr)
+// 					By("Send request on POST /v2alpha1/replicas/failed to report failure of aggregator")
+// 					aurl = fmt.Sprintf("http://%s/v2alpha1/replicas/failed", addr)
 // 					areq := commontypes.DIJobResponse{
 // 						Namespace:   job.Namespace,
 // 						Coordinator: coorname,
@@ -415,7 +415,7 @@ package http
 // 	})
 // })
 
-// func creatDIJob(ctx context.Context, job *div1alpha2.DIJob) error {
+// func creatDIJob(ctx context.Context, job *div2alpha1.DIJob) error {
 // 	var err error
 // 	err = k8sClient.Create(ctx, job, &client.CreateOptions{})
 // 	if err != nil {
@@ -423,7 +423,7 @@ package http
 // 	}
 
 // 	By("Create coordinator")
-// 	ownRefer := diutil.NewOwnerReference(div1alpha2.GroupVersion.String(), div1alpha2.KindDIJob, job.Name, job.UID, true)
+// 	ownRefer := diutil.NewOwnerReference(div2alpha1.GroupVersion.String(), div2alpha1.KindDIJob, job.Name, job.UID, true)
 
 // 	coorname := diutil.ReplicaPodName(job.Name, "coordinator")
 // 	coorpod := testutil.NewPod(coorname, job.Name, ownRefer)

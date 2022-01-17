@@ -30,7 +30,7 @@ import (
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
 	alloc "opendilab.org/di-orchestrator/pkg/allocator"
 	alloctypes "opendilab.org/di-orchestrator/pkg/allocator/types"
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	"opendilab.org/di-orchestrator/pkg/controllers"
 )
@@ -95,7 +95,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(div1alpha2.AddToScheme(scheme))
+	utilruntime.Must(div2alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

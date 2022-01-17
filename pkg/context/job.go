@@ -9,12 +9,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
-func (c *Context) CleanUpJob(job *div1alpha2.DIJob) error {
+func (c *Context) CleanUpJob(job *div2alpha1.DIJob) error {
 	err := c.Delete(c.ctx, job, &client.DeleteOptions{})
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func (c *Context) CleanUpJob(job *div1alpha2.DIJob) error {
 	return nil
 }
 
-func (c *Context) WaitForAllReplicas(job *div1alpha2.DIJob, phase corev1.PodPhase) error {
+func (c *Context) WaitForAllReplicas(job *div2alpha1.DIJob, phase corev1.PodPhase) error {
 	if err := wait.Poll(100*time.Millisecond, 5*time.Minute, func() (bool, error) {
 		pods, err := c.ListJobPods(job)
 		if err != nil {
@@ -78,7 +78,7 @@ var (
 	}
 )
 
-func OnTopologyHandler(job *div1alpha2.DIJob, rank int, pod *corev1.Pod) {
+func OnTopologyHandler(job *div2alpha1.DIJob, rank int, pod *corev1.Pod) {
 	envs := make(map[string]string)
 	subdomain := job.Name
 	pworkers := int(job.Spec.EngineFields.ParallelWorkers)
@@ -98,12 +98,12 @@ func OnTopologyHandler(job *div1alpha2.DIJob, rank int, pod *corev1.Pod) {
 
 	attachedNodesArgValue := ""
 	switch job.Spec.EngineFields.Topology {
-	case div1alpha2.TopologyAlone:
+	case div2alpha1.TopologyAlone:
 		// do nothing
-	case div1alpha2.TopologyStar:
+	case div2alpha1.TopologyStar:
 		worker0 := diutil.ReplicaName(job.Name, int(job.Status.Generation), 0)
 		attachedNodesArgValue = buildArg(dicommon.DIArgAttachedNodes, buildURL(dicommon.DINodeURLPrefix, worker0, subdomain, dicommon.DefaultPort))
-	case div1alpha2.TopologyMesh:
+	case div2alpha1.TopologyMesh:
 		var nodes []string
 		for i := 0; i < rank; i++ {
 			workerName := diutil.ReplicaName(job.Name, int(job.Status.Generation), i)

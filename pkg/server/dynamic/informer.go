@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 )
 
 var (
@@ -27,8 +27,8 @@ type Informers struct {
 func NewDynamicInformer(dif dynamicinformer.DynamicSharedInformerFactory) Informers {
 	// add DIJob informer
 	diGVR := schema.GroupVersionResource{
-		Group:    div1alpha2.GroupVersion.Group,
-		Version:  div1alpha2.GroupVersion.Version,
+		Group:    div2alpha1.GroupVersion.Group,
+		Version:  div2alpha1.GroupVersion.Version,
 		Resource: "dijobs",
 	}
 

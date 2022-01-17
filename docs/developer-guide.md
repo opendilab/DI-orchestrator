@@ -12,7 +12,7 @@ kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
 
 ## CRD Design
 
-Update codes in [dijob_types.go](./api/v1alpha2/dijob_types.go) with your requirements, and generate deepcopy functions.
+Update codes in [dijob_types.go](./api/v2alpha1/dijob_types.go) with your requirements, and generate deepcopy functions.
 
 ```bash
 make generate

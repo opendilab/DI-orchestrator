@@ -16,7 +16,7 @@ package e2e
 // 	"k8s.io/apimachinery/pkg/util/yaml"
 // 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-// 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+// 	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 // 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 // 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 // 	testutil "opendilab.org/di-orchestrator/pkg/utils/testutils"
@@ -81,13 +81,13 @@ package e2e
 
 // 				By("Waiting for job to be succeeded")
 // 				jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
-// 				Eventually(func() div1alpha2.Phase {
+// 				Eventually(func() div2alpha1.Phase {
 // 					err := k8sClient.Get(ctx, jobKey, job)
 // 					if err != nil {
-// 						return div1alpha2.JobUnknown
+// 						return div2alpha1.JobUnknown
 // 					}
 // 					return job.Status.Phase
-// 				}, timeout, interval).Should(Equal(div1alpha2.JobSucceeded))
+// 				}, timeout, interval).Should(Equal(div2alpha1.JobSucceeded))
 
 // 				testutil.CleanUpJob(ctx, k8sClient, job)
 // 			}
@@ -132,13 +132,13 @@ package e2e
 
 // 			By("Waiting for job to be succeeded")
 // 			jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
-// 			Eventually(func() div1alpha2.Phase {
+// 			Eventually(func() div2alpha1.Phase {
 // 				err := k8sClient.Get(ctx, jobKey, job)
 // 				if err != nil {
-// 					return div1alpha2.JobUnknown
+// 					return div2alpha1.JobUnknown
 // 				}
 // 				return job.Status.Phase
-// 			}, timeout, interval).Should(Equal(div1alpha2.JobSucceeded))
+// 			}, timeout, interval).Should(Equal(div2alpha1.JobSucceeded))
 
 // 			testutil.CleanUpJob(ctx, k8sClient, job)
 // 		})
@@ -190,13 +190,13 @@ package e2e
 
 // 				By("Waiting for job to be succeeded")
 // 				jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
-// 				Eventually(func() div1alpha2.Phase {
+// 				Eventually(func() div2alpha1.Phase {
 // 					err := k8sClient.Get(ctx, jobKey, job)
 // 					if err != nil {
-// 						return div1alpha2.JobUnknown
+// 						return div2alpha1.JobUnknown
 // 					}
 // 					return job.Status.Phase
-// 				}, timeout, interval).Should(Equal(div1alpha2.JobSucceeded))
+// 				}, timeout, interval).Should(Equal(div2alpha1.JobSucceeded))
 
 // 				testutil.CleanUpJob(ctx, k8sClient, job)
 // 			}
@@ -281,11 +281,11 @@ package e2e
 // 	})
 // })
 
-// func buildDIJob(jobPath, sharedVolumePath string) *div1alpha2.DIJob {
+// func buildDIJob(jobPath, sharedVolumePath string) *div2alpha1.DIJob {
 // 	yamlFile, err := ioutil.ReadFile(jobPath)
 // 	Expect(err).NotTo(HaveOccurred())
 
-// 	var job div1alpha2.DIJob
+// 	var job div2alpha1.DIJob
 // 	err = yaml.Unmarshal(yamlFile, &job)
 // 	Expect(err).NotTo(HaveOccurred())
 

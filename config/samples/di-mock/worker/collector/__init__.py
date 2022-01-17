@@ -1,1 +1,0 @@
-from .collector import MockCollector

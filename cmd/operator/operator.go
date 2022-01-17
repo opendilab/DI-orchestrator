@@ -25,6 +25,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
 	alloc "opendilab.org/di-orchestrator/pkg/allocator"
@@ -35,18 +36,21 @@ import (
 )
 
 type CreateOptions struct {
+	cmdcommon.GenericFlags
+
 	SyncPeriod           *time.Duration
 	MetricAddress        string
 	ProbeAddress         string
 	EnableLeaderElection bool
 }
 
-func NewCreateOptions() *CreateOptions {
+func NewCreateOptions(genFlags cmdcommon.GenericFlags) *CreateOptions {
 	DefaultSyncPeriod := 1 * time.Minute
 	DefaultMetricAddress := ":8443"
 	DefaultProbeAddress := ":8080"
 	DefaultEnableLeaderElection := false
 	return &CreateOptions{
+		GenericFlags:         genFlags,
 		SyncPeriod:           &DefaultSyncPeriod,
 		MetricAddress:        DefaultMetricAddress,
 		ProbeAddress:         DefaultProbeAddress,
@@ -63,8 +67,8 @@ func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
 			"Enabling this will ensure there is only one active controller manager.")
 }
 
-func NewCmdOperator() *cobra.Command {
-	o := NewCreateOptions()
+func NewCmdOperator(genFlags cmdcommon.GenericFlags) *cobra.Command {
+	o := NewCreateOptions(genFlags)
 	var operatorCmd = &cobra.Command{
 		Use:   "operator",
 		Short: "Command to run di-operator ",
@@ -96,7 +100,8 @@ func init() {
 }
 
 func runCommand(cmd *cobra.Command, options *CreateOptions) error {
-	ctrl.SetLogger(cmdcommon.Logger)
+	logger := zap.New(zap.UseFlagOptions(&options.GenericFlags.ZapOpts))
+	ctrl.SetLogger(logger)
 
 	config := ctrl.GetConfigOrDie()
 	mgr, err := ctrl.NewManager(config, ctrl.Options{

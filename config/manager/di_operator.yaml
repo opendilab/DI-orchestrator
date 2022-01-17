@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: di-operator
+  name: di-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: di-operator
+  namespace: di-system
+  labels:
+    control-plane: di-operator
+spec:
+  selector:
+    matchLabels:
+      control-plane: di-operator
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        control-plane: di-operator
+    spec:
+      containers:
+      - command:
+        - /di-orchestrator
+        - operator
+        args:
+        - "--probe-addr=:8080"
+        - "--metric-addr=:8443"
+        - "--leader-elect"
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        imagePullPolicy: Always
+        name: manager
+        securityContext:
+          allowPrivilegeEscalation: false
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 100m
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 500Mi
+      terminationGracePeriodSeconds: 10

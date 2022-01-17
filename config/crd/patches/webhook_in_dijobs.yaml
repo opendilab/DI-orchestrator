@@ -1,0 +1,17 @@
+# The following patch enables a conversion webhook for the CRD
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: dijobs.diengine.opendilab.org
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        service:
+          namespace: $(SERVICE_NAMESPACE)
+          name: $(SERVICE_NAME)
+          path: /mutate-diengine-opendilab-org-v1alpha1-dijob
+      conversionReviewVersions:
+      - "v1"
+      - "v1beta1"

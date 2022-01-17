@@ -1,0 +1,12 @@
+# Build the di-orchestrator binary
+
+# Use distroless as minimal base image to package the di-orchestrator binary
+# Refer to https://github.com/GoogleContainerTools/distroless for more details
+FROM registry.sensetime.com/cloudnative4ai/ubi:v1.0.0 as di-orchestrator
+LABEL maintainer="opendilab.contact@gmail.com"
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+WORKDIR /
+COPY ./bin/di-orchestrator  .
+
+ENTRYPOINT ["/di-orchestrator"]
+

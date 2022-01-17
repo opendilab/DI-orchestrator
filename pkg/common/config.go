@@ -2,9 +2,9 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
-	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -57,18 +57,21 @@ func GetDIServerURL() string {
 	return url
 }
 
-func GetDIJobDefaultResources() corev1.ResourceRequirements {
+func GetDIJobDefaultResources() (corev1.ResourceRequirements, error) {
 	defaultResource := corev1.ResourceList{
 		corev1.ResourceCPU:    resource.MustParse("1"),
 		corev1.ResourceMemory: resource.MustParse("2Gi"),
 	}
 	resjson := os.Getenv("DI_JOB_DEFAULT_RESOURCES")
 	if resjson == "" {
-		return corev1.ResourceRequirements{Requests: defaultResource, Limits: defaultResource}
+		return corev1.ResourceRequirements{Requests: defaultResource, Limits: defaultResource}, nil
 	}
-	resourceRequire := corev1.ResourceRequirements{}
+	resourceRequire := map[string]corev1.ResourceRequirements{}
 	if err := json.Unmarshal([]byte(resjson), &resourceRequire); err != nil {
-		logr.Discard().WithName("GetDIJobDefaultResources").Error(err, "failed to unmarshal", "resource requirements", resjson)
+		return corev1.ResourceRequirements{}, fmt.Errorf("failed to unmarshal resource requirements: %v", err)
 	}
-	return resourceRequire
+	if _, ok := resourceRequire["resources"]; !ok {
+		return corev1.ResourceRequirements{}, fmt.Errorf("failed to unmarshal resource requirements")
+	}
+	return resourceRequire["resources"], nil
 }

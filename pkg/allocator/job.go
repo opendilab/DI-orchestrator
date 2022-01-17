@@ -9,8 +9,11 @@ import (
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
-func getJobInfo(job *div1alpha2.DIJob) ditypes.JobInfo {
-	res := getJobResources(job)
+func getJobInfo(job *div1alpha2.DIJob) (ditypes.JobInfo, error) {
+	res, err := getJobResources(job)
+	if err != nil {
+		return ditypes.JobInfo{}, err
+	}
 	jobinfo := ditypes.NewJobInfo(
 		types.NamespacedName{
 			Namespace: job.Namespace, Name: job.Name,
@@ -18,11 +21,14 @@ func getJobInfo(job *div1alpha2.DIJob) ditypes.JobInfo {
 		res, int(job.Spec.MinReplicas), int(job.Spec.MaxReplicas),
 		job.Spec.Preemptible,
 	)
-	return *jobinfo
+	return *jobinfo, nil
 }
 
-func getJobResources(job *div1alpha2.DIJob) corev1.ResourceRequirements {
-	res := common.GetDIJobDefaultResources()
+func getJobResources(job *div1alpha2.DIJob) (corev1.ResourceRequirements, error) {
+	res, err := common.GetDIJobDefaultResources()
+	if err != nil {
+		return corev1.ResourceRequirements{}, err
+	}
 	jobres := diutil.GetPodResources(&job.Spec.Template.Spec)
 	if jobres.Requests != nil {
 		if jobres.Requests.Cpu() != nil {
@@ -44,5 +50,5 @@ func getJobResources(job *div1alpha2.DIJob) corev1.ResourceRequirements {
 	if _, ok := res.Requests[corev1.ResourceName(common.ResourceGPU)]; !ok {
 		res.Requests[corev1.ResourceName(common.ResourceGPU)] = res.Limits[corev1.ResourceName(common.ResourceGPU)]
 	}
-	return res
+	return res, nil
 }

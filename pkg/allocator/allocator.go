@@ -51,7 +51,11 @@ func (a *Allocator) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resul
 		return ctrl.Result{}, err
 	}
 
-	jobinfo := getJobInfo(job)
+	jobinfo, err := getJobInfo(job)
+	if err != nil {
+		log.Error(err, "get jobinfo failed")
+		return ctrl.Result{}, err
+	}
 	nodes, err := a.ctx.ListNodes()
 	if err != nil {
 		log.Error(err, "list nodes failed")
@@ -122,7 +126,11 @@ func (a *Allocator) allocate(job *div1alpha2.DIJob) error {
 	status := job.Status.DeepCopy()
 	// allocate job if preemptible, otherwise just update status.replicas
 	if job.Spec.Preemptible {
-		jobinfo := getJobInfo(job)
+		jobinfo, err := getJobInfo(job)
+		if err != nil {
+			log.Error(err, "get jobinfo failed")
+			return err
+		}
 		nodes, err := a.ctx.ListNodes()
 		if err != nil {
 			return err

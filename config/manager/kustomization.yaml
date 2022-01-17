@@ -1,4 +1,5 @@
 resources:
+- di_config.yaml
 - di_operator.yaml
 - di_server.yaml
 # - di_webhook.yaml

@@ -11,18 +11,10 @@ resources:
   domain: opendilab.org
   group: diengine
   kind: DIJob
-  path: opendilab.org/di-orchestrator/api/v1alpha2
-  version: v1alpha2
+  path: opendilab.org/di-orchestrator/api/v2alpha1
+  version: v2alpha1
   webhooks:
     defaulting: true
     validation: true
     webhookVersion: v1
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: opendilab.org
-  group: diengine
-  kind: AggregatorConfig
-  path: opendilab.org/di-operator/api/v1alpha2
-  version: v1alpha2
 version: "3"

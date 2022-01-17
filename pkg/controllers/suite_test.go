@@ -33,7 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	v2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	//+kubebuilder:scaffold:imports
 )
@@ -72,7 +72,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = div1alpha2.AddToScheme(scheme.Scheme)
+	err = v2alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme

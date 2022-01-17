@@ -15,7 +15,7 @@ package e2e
 // 	"sigs.k8s.io/controller-runtime/pkg/client"
 // 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 
-// 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+// 	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 // )
 
 // func TestE2E(t *testing.T) {
@@ -66,7 +66,7 @@ package e2e
 // 	// uses the current context in kubeconfig
 // 	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 // 	Expect(err).NotTo(HaveOccurred())
-// 	err = div1alpha2.AddToScheme(scheme.Scheme)
+// 	err = div2alpha1.AddToScheme(scheme.Scheme)
 // 	Expect(err).NotTo(HaveOccurred())
 
 // 	//+kubebuilder:scaffold:scheme
@@ -78,7 +78,7 @@ package e2e
 // 	clientset, err = kubernetes.NewForConfig(cfg)
 // 	Expect(err).NotTo(HaveOccurred())
 
-// 	k8sClient.DeleteAllOf(context.Background(), &div1alpha2.DIJob{},
+// 	k8sClient.DeleteAllOf(context.Background(), &div2alpha1.DIJob{},
 // 		client.InNamespace(namespace), client.MatchingLabels{"stability-test": "dijobs"})
 // })
 

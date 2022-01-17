@@ -9,12 +9,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
-func (c *Context) BuildPod(job *div1alpha2.DIJob, rank int, allocation []string) *corev1.Pod {
+func (c *Context) BuildPod(job *div2alpha1.DIJob, rank int, allocation []string) *corev1.Pod {
 	generation := int(job.Status.Generation)
 	replicas := int(job.Status.Replicas)
 	nodeName := ""
@@ -62,7 +62,7 @@ func (c *Context) BuildPod(job *div1alpha2.DIJob, rank int, allocation []string)
 	return pod
 }
 
-func (c *Context) BuildService(job *div1alpha2.DIJob) *corev1.Service {
+func (c *Context) BuildService(job *div2alpha1.DIJob) *corev1.Service {
 	labels := diutil.GenLabels(*job)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -86,7 +86,7 @@ func (c *Context) BuildService(job *div1alpha2.DIJob) *corev1.Service {
 	}
 }
 
-func (c *Context) CreatePod(job *div1alpha2.DIJob, pod *corev1.Pod) error {
+func (c *Context) CreatePod(job *div2alpha1.DIJob, pod *corev1.Pod) error {
 	log := c.Log.WithName("CreatePod").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	if err := c.Create(c.ctx, pod, &client.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
 		msg := fmt.Sprintf("failed to create pod: %s error: %v", pod.Name, err)
@@ -99,7 +99,7 @@ func (c *Context) CreatePod(job *div1alpha2.DIJob, pod *corev1.Pod) error {
 	return nil
 }
 
-func (c *Context) CreateService(job *div1alpha2.DIJob, service *corev1.Service) error {
+func (c *Context) CreateService(job *div2alpha1.DIJob, service *corev1.Service) error {
 	log := c.Log.WithName("CreateService").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	if err := c.Create(c.ctx, service, &client.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
 		msg := fmt.Sprintf("failed to create service: %s error: %v", service.Name, err)
@@ -112,7 +112,7 @@ func (c *Context) CreateService(job *div1alpha2.DIJob, service *corev1.Service) 
 	return nil
 }
 
-func (c *Context) DeletePodsAndServices(job *div1alpha2.DIJob, pods []*corev1.Pod, services []*corev1.Service) error {
+func (c *Context) DeletePodsAndServices(job *div2alpha1.DIJob, pods []*corev1.Pod, services []*corev1.Service) error {
 	log := c.Log.WithName("DeletePodsAndServices").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	if len(pods) == 0 {
 		return nil
@@ -122,15 +122,15 @@ func (c *Context) DeletePodsAndServices(job *div1alpha2.DIJob, pods []*corev1.Po
 			return err
 		}
 	}
-	if job.Spec.CleanPodPolicy != div1alpha2.CleanPodPolicyAll &&
-		job.Spec.CleanPodPolicy != div1alpha2.CleanPodPolicyRunning {
+	if job.Spec.CleanPodPolicy != div2alpha1.CleanPodPolicyAll &&
+		job.Spec.CleanPodPolicy != div2alpha1.CleanPodPolicyRunning {
 		return nil
 	}
 
 	for _, pod := range pods {
 		// Just delete running pod when the cleanPodPolicy is Running
 		needsDelete := true
-		if job.Spec.CleanPodPolicy == div1alpha2.CleanPodPolicyRunning {
+		if job.Spec.CleanPodPolicy == div2alpha1.CleanPodPolicyRunning {
 			if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
 				continue
 			}
@@ -161,7 +161,7 @@ func (c *Context) DeletePodsAndServices(job *div1alpha2.DIJob, pods []*corev1.Po
 	return nil
 }
 
-func (c *Context) DeletePods(job *div1alpha2.DIJob, pods []*corev1.Pod) error {
+func (c *Context) DeletePods(job *div2alpha1.DIJob, pods []*corev1.Pod) error {
 	var err error
 	for _, pod := range pods {
 		if err1 := c.DeletePod(job, pod); err != nil {
@@ -171,7 +171,7 @@ func (c *Context) DeletePods(job *div1alpha2.DIJob, pods []*corev1.Pod) error {
 	return err
 }
 
-func (c *Context) DeletePod(job *div1alpha2.DIJob, pod *corev1.Pod) error {
+func (c *Context) DeletePod(job *div2alpha1.DIJob, pod *corev1.Pod) error {
 	log := c.Log.WithName("DeletePod").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	if err := c.Delete(c.ctx, pod,
 		&client.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !errors.IsNotFound(err) {
@@ -185,7 +185,7 @@ func (c *Context) DeletePod(job *div1alpha2.DIJob, pod *corev1.Pod) error {
 	return nil
 }
 
-func (c *Context) DeleteService(job *div1alpha2.DIJob, service *corev1.Service) error {
+func (c *Context) DeleteService(job *div2alpha1.DIJob, service *corev1.Service) error {
 	log := c.Log.WithName("DeleteService").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	if err := c.Delete(c.ctx, service,
 		&client.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !errors.IsNotFound(err) {
@@ -199,7 +199,7 @@ func (c *Context) DeleteService(job *div1alpha2.DIJob, service *corev1.Service) 
 	return nil
 }
 
-func (c *Context) ListJobPods(job *div1alpha2.DIJob) ([]*corev1.Pod, error) {
+func (c *Context) ListJobPods(job *div2alpha1.DIJob) ([]*corev1.Pod, error) {
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: diutil.GenLabels(*job),
 	})
@@ -215,7 +215,7 @@ func (c *Context) ListJobPods(job *div1alpha2.DIJob) ([]*corev1.Pod, error) {
 	return pods, nil
 }
 
-func (c *Context) ListJobServices(job *div1alpha2.DIJob) ([]*corev1.Service, error) {
+func (c *Context) ListJobServices(job *div2alpha1.DIJob) ([]*corev1.Service, error) {
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: diutil.GenLabels(*job),
 	})

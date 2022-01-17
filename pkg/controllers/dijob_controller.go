@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	dihandler "opendilab.org/di-orchestrator/pkg/common/handler"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
@@ -68,7 +68,7 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	log := r.ctx.Log.WithName("Reconcile").WithValues("job", req.NamespacedName)
 
 	// get DIJob object
-	job := &div1alpha2.DIJob{}
+	job := &div2alpha1.DIJob{}
 	err := r.ctx.Get(ctx, req.NamespacedName, job)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -109,9 +109,9 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 // SetupWithManager sets up the controller with the Manager.
 func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&div1alpha2.DIJob{}).
+		For(&div2alpha1.DIJob{}).
 		Watches(
-			&source.Kind{Type: &div1alpha2.DIJob{}},
+			&source.Kind{Type: &div2alpha1.DIJob{}},
 			&dihandler.EventHandler{
 				OnCreateHandlers: []func(obj client.Object){
 					r.onJobAddHandler,
@@ -129,7 +129,7 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &corev1.Pod{}},
 			&handler.EnqueueRequestForOwner{
 				IsController: true,
-				OwnerType:    &div1alpha2.DIJob{},
+				OwnerType:    &div2alpha1.DIJob{},
 			},
 			builder.Predicates{},
 		).
@@ -137,7 +137,7 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&source.Kind{Type: &corev1.Service{}},
 			&handler.EnqueueRequestForOwner{
 				IsController: true,
-				OwnerType:    &div1alpha2.DIJob{},
+				OwnerType:    &div2alpha1.DIJob{},
 			},
 		).
 		Complete(r)
@@ -147,7 +147,7 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *DIJobReconciler) onJobAddHandler(obj client.Object) {
 	jobkey := diutil.NamespacedName(obj.GetNamespace(), obj.GetName())
 	log := r.ctx.Log.WithName("onJobAddHandler").WithValues("job", jobkey)
-	job, ok := obj.(*div1alpha2.DIJob)
+	job, ok := obj.(*div2alpha1.DIJob)
 	if !ok {
 		log.Error(fmt.Errorf("failed to convert object to DIJob"), "")
 		r.ctx.MarkIncorrectJobFailed(obj)
@@ -158,7 +158,7 @@ func (r *DIJobReconciler) onJobAddHandler(obj client.Object) {
 	// update job status
 	msg := "job created."
 	if job.Status.Phase == "" {
-		r.ctx.UpdateJobStatus(job, div1alpha2.JobPending, dicontext.DIJobPendingReason, msg)
+		r.ctx.UpdateJobStatus(job, div2alpha1.JobPending, dicontext.DIJobPendingReason, msg)
 		r.ctx.Recorder.Eventf(job, corev1.EventTypeNormal, dicontext.DIJobPendingReason, msg)
 	}
 
@@ -172,12 +172,12 @@ func (r *DIJobReconciler) onJobAddHandler(obj client.Object) {
 func (r *DIJobReconciler) onJobUpdateHandler(old, new client.Object) {
 	jobkey := diutil.NamespacedName(old.GetNamespace(), old.GetName())
 	log := r.ctx.Log.WithName("onJobUpdateHandler").WithValues("job", jobkey)
-	oldjob, ok := old.(*div1alpha2.DIJob)
+	oldjob, ok := old.(*div2alpha1.DIJob)
 	if !ok {
 		log.Error(fmt.Errorf("failed to convert object to DIJob"), "")
 		return
 	}
-	newjob, ok := new.(*div1alpha2.DIJob)
+	newjob, ok := new.(*div2alpha1.DIJob)
 	if !ok {
 		log.Error(fmt.Errorf("failed to convert object to DIJob"), "")
 		return

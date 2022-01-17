@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	apiVersion  = "v1alpha2"
+	apiVersion  = "v2alpha1"
 	replicasAPI = "/replicas"
 )
 

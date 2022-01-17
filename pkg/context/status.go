@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
@@ -38,16 +38,16 @@ const (
 	statusUpdatedPauseDuration = 50 * time.Millisecond
 )
 
-func (c *Context) CheckJobCompletion(job *div1alpha2.DIJob, pods []*corev1.Pod) (completed bool) {
+func (c *Context) CheckJobCompletion(job *div2alpha1.DIJob, pods []*corev1.Pod) (completed bool) {
 	succeeded, failed := c.checkPodsCompletion(pods, job.Spec.Preemptible)
 	completed = false
 	if succeeded != 0 && succeeded == len(pods) {
 		msg := "job succeeded since all the replicas are succeeded."
-		c.UpdateJobStatus(job, div1alpha2.JobSucceeded, DIJobSucceededReason, msg)
+		c.UpdateJobStatus(job, div2alpha1.JobSucceeded, DIJobSucceededReason, msg)
 		completed = true
 	} else if failed != 0 {
 		msg := fmt.Sprintf("job failed since %d replicas failed.", failed)
-		c.UpdateJobStatus(job, div1alpha2.JobFailed, DIJobFailedReason, msg)
+		c.UpdateJobStatus(job, div2alpha1.JobFailed, DIJobFailedReason, msg)
 		completed = true
 	}
 	return
@@ -95,7 +95,7 @@ func (c *Context) checkPodsCompletion(pods []*corev1.Pod, preemptable bool) (suc
 	return succeeded, failed
 }
 
-func (c *Context) DetectRestart(job *div1alpha2.DIJob, pods []*corev1.Pod, allocation []string, replicas int) bool {
+func (c *Context) DetectRestart(job *div2alpha1.DIJob, pods []*corev1.Pod, allocation []string, replicas int) bool {
 	log := c.Log.WithName("DetectRestart").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	for _, pod := range pods {
 		areplicas, err := strconv.Atoi(pod.Annotations[dicommon.AnnotationReplicas])
@@ -126,12 +126,12 @@ func (c *Context) MarkIncorrectJobFailed(obj client.Object) {
 	}
 
 	// build status
-	failedConvertDIJob := fmt.Sprintf("failed to convert type %T to v1alpha2.DIJob", obj)
-	status := div1alpha2.DIJobStatus{
-		Phase: div1alpha2.JobFailed,
-		Conditions: []div1alpha2.DIJobCondition{
+	failedConvertDIJob := fmt.Sprintf("failed to convert type %T to v2alpha1.DIJob", obj)
+	status := div2alpha1.DIJobStatus{
+		Phase: div2alpha1.JobFailed,
+		Conditions: []div2alpha1.DIJobCondition{
 			{
-				Type:    div1alpha2.JobFailed,
+				Type:    div2alpha1.JobFailed,
 				Status:  corev1.ConditionTrue,
 				Message: failedConvertDIJob,
 			},
@@ -145,8 +145,8 @@ func (c *Context) MarkIncorrectJobFailed(obj client.Object) {
 
 	// get dijob
 	dijobRes := schema.GroupVersionResource{
-		Group:    div1alpha2.GroupVersion.Group,
-		Version:  div1alpha2.GroupVersion.Version,
+		Group:    div2alpha1.GroupVersion.Group,
+		Version:  div2alpha1.GroupVersion.Version,
 		Resource: "dijobs",
 	}
 	un, err := dclient.Resource(dijobRes).Namespace(obj.GetNamespace()).Get(context.Background(), obj.GetName(), metav1.GetOptions{})
@@ -167,10 +167,10 @@ func (c *Context) MarkIncorrectJobFailed(obj client.Object) {
 	}
 }
 
-func (c *Context) UpdateDIJobStatusInCluster(job *div1alpha2.DIJob) error {
+func (c *Context) UpdateDIJobStatusInCluster(job *div2alpha1.DIJob) error {
 	var err error
 	for i := 0; i < statusUpdateRetries; i++ {
-		newJob := &div1alpha2.DIJob{}
+		newJob := &div2alpha1.DIJob{}
 		err := c.Get(c.ctx, types.NamespacedName{Namespace: job.Namespace, Name: job.Name}, newJob)
 		if err != nil {
 			break
@@ -185,19 +185,19 @@ func (c *Context) UpdateDIJobStatusInCluster(job *div1alpha2.DIJob) error {
 }
 
 func (c *Context) UpdateJobStatus(
-	job *div1alpha2.DIJob, phase div1alpha2.Phase, reason string, msg string) {
+	job *div2alpha1.DIJob, phase div2alpha1.Phase, reason string, msg string) {
 	log := c.Log.WithName("UpdateJobStatus").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	log.Info(msg)
 	updateDIJobConditions(job, phase, reason, msg)
 	job.Status.Phase = phase
 }
 
-func updateDIJobConditions(job *div1alpha2.DIJob, conditionType div1alpha2.Phase, reason, msg string) {
+func updateDIJobConditions(job *div2alpha1.DIJob, conditionType div2alpha1.Phase, reason, msg string) {
 	newCondition := newCondition(conditionType, reason, msg)
 
 	if diutil.IsSucceeded(job) || diutil.IsFailed(job) {
 		for i := range job.Status.Conditions {
-			if job.Status.Conditions[i].Type == div1alpha2.JobRunning {
+			if job.Status.Conditions[i].Type == div2alpha1.JobRunning {
 				job.Status.Conditions[i].Status = corev1.ConditionFalse
 				job.Status.Conditions[i].LastTransitionTime = metav1.Now()
 				job.Status.Conditions[i].LastUpdateTime = metav1.Now()
@@ -207,8 +207,8 @@ func updateDIJobConditions(job *div1alpha2.DIJob, conditionType div1alpha2.Phase
 	setCondition(&job.Status, newCondition)
 }
 
-func newCondition(conditionType div1alpha2.Phase, reason, msg string) *div1alpha2.DIJobCondition {
-	return &div1alpha2.DIJobCondition{
+func newCondition(conditionType div2alpha1.Phase, reason, msg string) *div2alpha1.DIJobCondition {
+	return &div2alpha1.DIJobCondition{
 		Type:               conditionType,
 		Status:             corev1.ConditionTrue,
 		Reason:             reason,
@@ -219,7 +219,7 @@ func newCondition(conditionType div1alpha2.Phase, reason, msg string) *div1alpha
 }
 
 // setCondition sets the condition for the job, skip if the condition is already exists with the same status and reason
-func setCondition(status *div1alpha2.DIJobStatus, condition *div1alpha2.DIJobCondition) {
+func setCondition(status *div2alpha1.DIJobStatus, condition *div2alpha1.DIJobCondition) {
 	currentCondition := getCondition(status, condition.Type)
 
 	if currentCondition != nil && currentCondition.Reason == condition.Reason && currentCondition.Status == condition.Status {
@@ -235,7 +235,7 @@ func setCondition(status *div1alpha2.DIJobStatus, condition *div1alpha2.DIJobCon
 	status.Conditions = append(conditions, *condition)
 }
 
-func getCondition(status *div1alpha2.DIJobStatus, conditionType div1alpha2.Phase) *div1alpha2.DIJobCondition {
+func getCondition(status *div2alpha1.DIJobStatus, conditionType div2alpha1.Phase) *div2alpha1.DIJobCondition {
 	for _, condition := range status.Conditions {
 		if condition.Type == conditionType {
 			return &condition
@@ -244,8 +244,8 @@ func getCondition(status *div1alpha2.DIJobStatus, conditionType div1alpha2.Phase
 	return nil
 }
 
-func filterOutConditions(conditions []div1alpha2.DIJobCondition, conditionType div1alpha2.Phase) []div1alpha2.DIJobCondition {
-	newConditions := []div1alpha2.DIJobCondition{}
+func filterOutConditions(conditions []div2alpha1.DIJobCondition, conditionType div2alpha1.Phase) []div2alpha1.DIJobCondition {
+	newConditions := []div2alpha1.DIJobCondition{}
 
 	for _, condition := range conditions {
 		if condition.Type == conditionType {

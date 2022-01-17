@@ -9,7 +9,7 @@ package controllers
 // 	corev1 "k8s.io/api/core/v1"
 // 	"k8s.io/apimachinery/pkg/types"
 
-// 	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+// 	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 // 	dicommon "opendilab.org/di-orchestrator/pkg/common"
 // 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 // 	testutil "opendilab.org/di-orchestrator/pkg/utils/testutils"
@@ -19,10 +19,10 @@ package controllers
 
 // 	Context("When creating a DIJob with different CleanPodPolicy", func() {
 // 		It("Should execute different pods deletion policy with different CleanPodPolicy", func() {
-// 			cleanPodPolicies := []div1alpha2.CleanPodPolicy{
-// 				div1alpha2.CleanPodPolicyAll,
-// 				div1alpha2.CleanPodPolicyRunning,
-// 				div1alpha2.CleanPodPolicyNone,
+// 			cleanPodPolicies := []div2alpha1.CleanPodPolicy{
+// 				div2alpha1.CleanPodPolicyAll,
+// 				div2alpha1.CleanPodPolicyRunning,
+// 				div2alpha1.CleanPodPolicyNone,
 // 			}
 // 			for _, policy := range cleanPodPolicies {
 // 				type replica struct {
@@ -77,7 +77,7 @@ package controllers
 // 					checkCoordinatorCreated(ctx, dijob)
 
 // 					// build owner reference
-// 					ownRefer := diutil.NewOwnerReference(div1alpha2.GroupVersion.String(), div1alpha2.KindDIJob, dijob.Name, dijob.UID, true)
+// 					ownRefer := diutil.NewOwnerReference(div2alpha1.GroupVersion.String(), div2alpha1.KindDIJob, dijob.Name, dijob.UID, true)
 // 					By(fmt.Sprintf("ownRefer: %s %s", ownRefer.APIVersion, ownRefer.Kind))
 // 					colStatus := make([]int, 3)
 // 					for _, col := range c.collectors {
@@ -106,18 +106,18 @@ package controllers
 // 					}
 
 // 					By("Checking the job is succeeded")
-// 					Eventually(func() div1alpha2.Phase {
+// 					Eventually(func() div2alpha1.Phase {
 // 						err := k8sClient.Get(ctx, jobKey, &dijob)
 // 						if err != nil {
-// 							return div1alpha2.JobUnknown
+// 							return div2alpha1.JobUnknown
 // 						}
 // 						return dijob.Status.Phase
-// 					}, timeout, interval).Should(Equal(div1alpha2.JobSucceeded))
+// 					}, timeout, interval).Should(Equal(div2alpha1.JobSucceeded))
 
 // 					By("Checking all the pods and services are deleted")
 
 // 					switch policy {
-// 					case div1alpha2.CleanPodPolicyAll:
+// 					case div2alpha1.CleanPodPolicyAll:
 // 						Eventually(func() int {
 // 							pods, err := diutil.ListPods(ctx, k8sClient, &dijob)
 // 							if err != nil {
@@ -132,7 +132,7 @@ package controllers
 // 							}
 // 							return len(svcs)
 // 						}, timeout, interval).Should(Equal(0))
-// 					case div1alpha2.CleanPodPolicyNone:
+// 					case div2alpha1.CleanPodPolicyNone:
 // 						Consistently(func() int {
 // 							pods, err := diutil.ListPods(ctx, k8sClient, &dijob)
 // 							if err != nil {
@@ -147,7 +147,7 @@ package controllers
 // 							}
 // 							return len(svcs)
 // 						}, duration, interval).Should(Equal(0))
-// 					case div1alpha2.CleanPodPolicyRunning:
+// 					case div2alpha1.CleanPodPolicyRunning:
 // 						Eventually(func() int {
 // 							pods, err := diutil.ListPods(ctx, k8sClient, &dijob)
 // 							if err != nil {

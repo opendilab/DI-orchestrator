@@ -9,7 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	div1alpha2 "opendilab.org/di-orchestrator/pkg/api/v1alpha2"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	commontypes "opendilab.org/di-orchestrator/pkg/common/types"
 )
 
@@ -18,12 +18,12 @@ var (
 	statusUpdatedPauseDuration = 50 * time.Millisecond
 )
 
-func (s *DIServer) getDIJob(namespace, name string) (*div1alpha2.DIJob, error) {
+func (s *DIServer) getDIJob(namespace, name string) (*div2alpha1.DIJob, error) {
 	diUn, err := s.DIClient.Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
-	var job div1alpha2.DIJob
+	var job div2alpha1.DIJob
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(diUn.UnstructuredContent(), &job)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to convert unstructured: %s", diUn.UnstructuredContent())
@@ -32,7 +32,7 @@ func (s *DIServer) getDIJob(namespace, name string) (*div1alpha2.DIJob, error) {
 	return &job, nil
 }
 
-func (s *DIServer) getCachedDIJobByKey(key string) (*div1alpha2.DIJob, error) {
+func (s *DIServer) getCachedDIJobByKey(key string) (*div2alpha1.DIJob, error) {
 	obj, exists, err := s.dyi.DIInformer.Informer().GetIndexer().GetByKey(key)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to get DIJob: %s", err)
@@ -44,7 +44,7 @@ func (s *DIServer) getCachedDIJobByKey(key string) (*div1alpha2.DIJob, error) {
 	}
 
 	diUn := obj.(*unstructured.Unstructured)
-	var diJob div1alpha2.DIJob
+	var diJob div2alpha1.DIJob
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(diUn.UnstructuredContent(), &diJob)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to convert unstructured: %s", diUn.UnstructuredContent())
@@ -68,10 +68,10 @@ func (s *DIServer) needMultiDDPLearnerPod(resource commontypes.ResourceQuantity)
 	return false, nil
 }
 
-func (s *DIServer) updateDIJobStatusInCluster(job *div1alpha2.DIJob) error {
+func (s *DIServer) updateDIJobStatusInCluster(job *div2alpha1.DIJob) error {
 	var err error
 	for i := 0; i < statusUpdateRetries; i++ {
-		newJob := &div1alpha2.DIJob{}
+		newJob := &div2alpha1.DIJob{}
 		job, err := s.getDIJob(job.Namespace, job.Name)
 		if err != nil {
 			break

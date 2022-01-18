@@ -17,6 +17,7 @@ package operator
 
 import (
 	"context"
+	"flag"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -100,7 +101,8 @@ func init() {
 }
 
 func runCommand(cmd *cobra.Command, options *CreateOptions) error {
-	logger := zap.New(zap.UseFlagOptions(&options.GenericFlags.ZapOpts))
+	flag.Parse()
+	logger := zap.New(zap.UseFlagOptions(options.GenericFlags.ZapOpts))
 	ctrl.SetLogger(logger)
 
 	config := ctrl.GetConfigOrDie()

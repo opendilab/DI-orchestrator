@@ -16,6 +16,7 @@ limitations under the License.
 package server
 
 import (
+	"flag"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -78,7 +79,8 @@ Examples:
 }
 
 func runCommand(cmd *cobra.Command, options *CreateOptions) error {
-	logger := zap.New(zap.UseFlagOptions(&options.GenericFlags.ZapOpts))
+	flag.Parse()
+	logger := zap.New(zap.UseFlagOptions(options.GenericFlags.ZapOpts))
 	cfg, err := ctrl.GetConfig()
 	if err != nil {
 		return err

@@ -50,7 +50,6 @@ func Execute() {
 func init() {
 	genFlags := common.NewGenericFlags()
 	genFlags.AddFlags(rootCmd)
-	goflag.Parse()
 	rootCmd.AddCommand(server.NewCmdServer(*genFlags))
 	rootCmd.AddCommand(operator.NewCmdOperator(*genFlags))
 

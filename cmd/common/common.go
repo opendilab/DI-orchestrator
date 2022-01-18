@@ -23,12 +23,12 @@ import (
 )
 
 type GenericFlags struct {
-	ZapOpts zap.Options
+	ZapOpts *zap.Options
 }
 
 func NewGenericFlags() *GenericFlags {
 	return &GenericFlags{
-		ZapOpts: zap.Options{},
+		ZapOpts: &zap.Options{},
 	}
 }
 

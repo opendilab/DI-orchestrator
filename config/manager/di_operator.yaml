@@ -24,9 +24,9 @@ spec:
       containers:
       - command:
         - /di-orchestrator
-        - --zap-devel=true
         - operator
         args:
+        - "--zap-devel=true"
         - "--probe-addr=:8080"
         - "--metric-addr=:8443"
         - "--leader-elect"

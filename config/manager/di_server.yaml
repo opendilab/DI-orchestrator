@@ -19,6 +19,7 @@ spec:
         - /di-orchestrator
         - server
         args:
+        - --zap-devel=true
         - --server-bind-address=:8080
         - --gpu-alloc-policy=simple
         image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0

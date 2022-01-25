@@ -77,7 +77,7 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -110,16 +110,19 @@ var _ = BeforeSuite(func() {
 		fmt.Printf("node: %s added to cluster\n", node.Name)
 	}
 
+	metricPort := config.GinkgoConfig.ParallelNode + 8200
+	metricAddress := fmt.Sprintf(":%d", metricPort)
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme: scheme.Scheme,
+		Scheme:             scheme.Scheme,
+		MetricsBindAddress: metricAddress,
 	})
 	Expect(err).NotTo(HaveOccurred())
 
 	ctx := dicontext.NewContext(context.Background(),
 		cfg,
 		mgr.GetClient(),
-		mgr.GetEventRecorderFor("di-operator"),
-		ctrl.Log.WithName("di-operator"))
+		mgr.GetEventRecorderFor("di-server"),
+		ctrl.Log.WithName("di-server"))
 
 	localServingPort = port + config.GinkgoConfig.ParallelNode
 	addrPort := fmt.Sprintf("%s:%d", localServingHost, localServingPort)

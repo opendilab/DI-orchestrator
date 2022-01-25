@@ -87,7 +87,7 @@ lint:
 test: ginkgo ## Run tests.
 	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./pkg/... 
 	go tool cover -func=./pkg/controllers/coverage.out 
-	go tool cover -func=./pkg/server/http/coverage.out 
+	go tool cover -func=./pkg/server/coverage.out 
 	go tool cover -func=./pkg/common/gpuallocator/coverage.out
 
 ##@ Build

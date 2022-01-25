@@ -4125,6 +4125,7 @@ rules:
   - ""
   resources:
   - events
+  - nodes
   - pods
   - services
   verbs:
@@ -4139,7 +4140,6 @@ rules:
   - ""
   resources:
   - namespaces
-  - nodes
   verbs:
   - get
   - list
@@ -4285,12 +4285,12 @@ spec:
     spec:
       containers:
       - args:
+        - --zap-devel=true
         - --probe-addr=:8080
         - --metric-addr=:8443
         - --leader-elect
         command:
         - /di-orchestrator
-        - --zap-devel=true
         - operator
         envFrom:
         - configMapRef:
@@ -4340,8 +4340,8 @@ spec:
     spec:
       containers:
       - args:
-        - --server-bind-address=:8080
-        - --gpu-alloc-policy=simple
+        - --zap-devel=true
+        - --server-bind-address=:8081
         command:
         - /di-orchestrator
         - server

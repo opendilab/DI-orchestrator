@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package http
+package server
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"net"
 	"path/filepath"
@@ -32,11 +31,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/dynamicinformer"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
@@ -44,7 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
-	serverdynamic "opendilab.org/di-orchestrator/pkg/server/dynamic"
+	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -67,7 +63,6 @@ var (
 // var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
-var kubeClient *kubernetes.Clientset
 
 func TestServer(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -82,7 +77,7 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -115,38 +110,26 @@ var _ = BeforeSuite(func() {
 		fmt.Printf("node: %s added to cluster\n", node.Name)
 	}
 
-	kubeClient = kubernetes.NewForConfigOrDie(cfg)
-	dynamicClient := dynamic.NewForConfigOrDie(cfg)
-	diGVR := schema.GroupVersionResource{
-		Group:    div2alpha1.GroupVersion.Group,
-		Version:  div2alpha1.GroupVersion.Version,
-		Resource: "dijobs",
-	}
-	diclient := dynamicClient.Resource(diGVR)
+	metricPort := config.GinkgoConfig.ParallelNode + 8200
+	metricAddress := fmt.Sprintf(":%d", metricPort)
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme:             scheme.Scheme,
+		MetricsBindAddress: metricAddress,
+	})
+	Expect(err).NotTo(HaveOccurred())
 
-	dif := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, serverdynamic.ResyncPeriod, corev1.NamespaceAll, nil)
-
-	dyi := serverdynamic.NewDynamicInformer(dif)
-
-	// start dynamic informer
-	stopCh := make(chan struct{})
-	go dif.Start(stopCh)
-
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
-
-	logger := zap.New(zap.UseFlagOptions(&opts))
-
-	gpuAllocPolicy := "simple"
-	diServer := NewDIServer(kubeClient, diclient, logger, dyi, gpuAllocPolicy)
+	ctx := dicontext.NewContext(context.Background(),
+		cfg,
+		mgr.GetClient(),
+		mgr.GetEventRecorderFor("di-server"),
+		ctrl.Log.WithName("di-server"))
 
 	localServingPort = port + config.GinkgoConfig.ParallelNode
 	addrPort := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
 	go func() {
-		err := diServer.Start(addrPort)
+		diServer := NewDIServer(ctx, addrPort)
+		mgr.Add(diServer)
+		err := mgr.Start(ctrl.SetupSignalHandler())
 		fmt.Println(err.Error())
 	}()
 

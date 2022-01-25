@@ -4,19 +4,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-type DIJobRequestParams struct {
-	JobID      []string `json:"jobID"`
-	Generation []string `json:"generation"`
-}
-
-const (
-	RequestParamTypeJobID      string = "job_id"
-	RequestParamTypeGeneration string = "generation"
-)
-
 type DIJobRequest struct {
-	JobID    string `json:"jobID"`
-	Replicas int    `json:"replicas"`
+	Replicas int `json:"replicas"`
 }
 
 type ResourceQuantity struct {

@@ -16,61 +16,51 @@ limitations under the License.
 package server
 
 import (
-	"fmt"
+	"context"
+	"flag"
 
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/dynamicinformer"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	cmdcommon "opendilab.org/di-orchestrator/cmd/common"
-	gpualloc "opendilab.org/di-orchestrator/pkg/common/gpuallocator"
-	serverdynamic "opendilab.org/di-orchestrator/pkg/server/dynamic"
-	serverhttp "opendilab.org/di-orchestrator/pkg/server/http"
-)
-
-var (
-	DefaultAGConfigNamespace = "di-system"
-	DefaultAGConfigName      = "aggregator-config"
+	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
+	dicontext "opendilab.org/di-orchestrator/pkg/context"
+	"opendilab.org/di-orchestrator/pkg/server"
 )
 
 type CreateOptions struct {
-	*cmdcommon.GenericFlags
+	cmdcommon.GenericFlags
 
 	ServerBindAddress string
-	GPUAllocPolicy    string
-
-	AGConfigNamespace string
-	AGCconfigName     string
+	ProbeAddress      string
+	MetricAddress     string
 }
 
-func NewCreateOptions() *CreateOptions {
+func NewCreateOptions(genFlags cmdcommon.GenericFlags) *CreateOptions {
 	return &CreateOptions{
-		GenericFlags:      cmdcommon.NewGenericFlags(),
-		ServerBindAddress: ":8080",
-		GPUAllocPolicy:    gpualloc.SimpleGPUAllocPolicy,
-		AGConfigNamespace: DefaultAGConfigNamespace,
-		AGCconfigName:     DefaultAGConfigName,
+		GenericFlags:      genFlags,
+		ServerBindAddress: ":8081",
+		ProbeAddress:      ":8080",
+		MetricAddress:     ":8089",
 	}
 }
 
 func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&o.ServerBindAddress, "server-bind-address", "b", o.ServerBindAddress,
+	cmd.Flags().StringVarP(&o.ServerBindAddress, "server-bind-address", "s", o.ServerBindAddress,
 		"The address for server to bind to.")
-	cmd.Flags().StringVarP(&o.GPUAllocPolicy, "gpu-alloc-policy", "p", o.GPUAllocPolicy,
-		"The policy for server to allocate gpus to pods.")
-
-	cmd.Flags().StringVar(&o.AGConfigNamespace, "agconfig-namespace", o.AGConfigNamespace,
-		"The AggregatorConfig namespace to manage actors and learners.")
-	cmd.Flags().StringVar(&o.AGCconfigName, "agconfig-name", o.AGCconfigName,
-		"The AggregatorConfig name to manage actors and learners.")
+	cmd.Flags().StringVarP(&o.ProbeAddress, "probe-address", "p", o.ProbeAddress,
+		"The address for probe to connect to.")
+	cmd.Flags().StringVar(&o.MetricAddress, "metric-addr", o.MetricAddress, "The address the metric endpoint binds to.")
 }
 
 // serverCmd represents the server command
-func NewCmdServer() *cobra.Command {
-	o := NewCreateOptions()
+func NewCmdServer(genFlags cmdcommon.GenericFlags) *cobra.Command {
+	o := NewCreateOptions(genFlags)
 	var serverCmd = &cobra.Command{
 		Use:   "server",
 		Short: "Command to run di-server ",
@@ -89,28 +79,55 @@ Examples:
 	return serverCmd
 }
 
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	utilruntime.Must(div2alpha1.AddToScheme(scheme))
+	//+kubebuilder:scaffold:scheme
+}
+
 func runCommand(cmd *cobra.Command, options *CreateOptions) error {
-	cfg, err := ctrl.GetConfig()
+	flag.Parse()
+	logger := zap.New(zap.UseFlagOptions(options.GenericFlags.ZapOpts))
+	ctrl.SetLogger(logger)
+
+	config := ctrl.GetConfigOrDie()
+	mgr, err := ctrl.NewManager(config, ctrl.Options{
+		Scheme:                 scheme,
+		MetricsBindAddress:     options.MetricAddress,
+		HealthProbeBindAddress: options.ProbeAddress,
+	})
 	if err != nil {
+		setupLog.Error(err, "unable to start manager")
 		return err
 	}
 
-	kubeClient := kubernetes.NewForConfigOrDie(cfg)
-	dynamicClient := dynamic.NewForConfigOrDie(cfg)
+	ctx := dicontext.NewContext(context.Background(),
+		config,
+		mgr.GetClient(),
+		mgr.GetEventRecorderFor("di-operator"),
+		ctrl.Log.WithName("di-operator"))
+	diServer := server.NewDIServer(ctx, options.ServerBindAddress)
+	mgr.Add(diServer)
 
-	dif := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynamicClient, serverdynamic.ResyncPeriod, corev1.NamespaceAll, nil)
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up health check")
+		return err
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to set up ready check")
+		return err
+	}
 
-	dyi := serverdynamic.NewDynamicInformer(dif)
-
-	// start dynamic informer
-	stopCh := make(chan struct{})
-	go dif.Start(stopCh)
-
-	agconfig := fmt.Sprintf("%s/%s", options.AGConfigNamespace, options.AGCconfigName)
-	diServer := serverhttp.NewDIServer(kubeClient, dynamicClient, cmdcommon.Logger, agconfig, dyi, options.GPUAllocPolicy)
-
-	if err := diServer.Start(options.ServerBindAddress); err != nil {
-		return fmt.Errorf("failed to start di-server: %v", err)
+	setupLog.Info("starting manager")
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		setupLog.Error(err, "problem running manager")
+		return err
 	}
 	return nil
 }

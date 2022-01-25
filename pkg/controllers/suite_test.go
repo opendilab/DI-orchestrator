@@ -21,12 +21,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,8 +33,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	div1alpha1 "opendilab.org/di-orchestrator/pkg/api/v1alpha1"
-	testutil "opendilab.org/di-orchestrator/pkg/utils/testutils"
+	v2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
+	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -44,9 +42,9 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 const (
-	timeout  = 5 * time.Second
-	interval = 250 * time.Millisecond
-	duration = 200 * time.Millisecond
+// timeout  = 5 * time.Second
+// interval = 250 * time.Millisecond
+// duration = 200 * time.Millisecond
 )
 
 // var cfg *rest.Config
@@ -74,7 +72,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = div1alpha1.AddToScheme(scheme.Scheme)
+	err = v2alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -82,24 +80,6 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-
-	By("Apply AggregatorConfig")
-	ctx := context.Background()
-	agconfig := testutil.NewAggregatorConfig()
-
-	err = k8sClient.Create(ctx, testutil.NewNamespace(agconfig.Namespace), &client.CreateOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	err = k8sClient.Create(ctx, agconfig, &client.CreateOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	By("Agconfig successfully created")
-	key := types.NamespacedName{Namespace: agconfig.Namespace, Name: agconfig.Name}
-	createdAg := div1alpha1.AggregatorConfig{}
-	Eventually(func() bool {
-		err := k8sClient.Get(ctx, key, &createdAg)
-		return err == nil
-	}, timeout, interval).Should(BeTrue())
 
 	// create controller manager
 	metricPort := config.GinkgoConfig.ParallelNode + 8200
@@ -110,13 +90,15 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = (&DIJobReconciler{
-		Scheme:   k8sManager.GetScheme(),
-		Client:   k8sManager.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("DIJob"),
-		AGConfig: key.String(),
-		Recorder: k8sManager.GetEventRecorderFor("di-orchestrator"),
-	}).SetupWithManager(k8sManager)
+	ctx := dicontext.NewContext(context.Background(),
+		cfg,
+		k8sManager.GetClient(),
+		k8sManager.GetEventRecorderFor("di-operator"),
+		ctrl.Log.WithName("di-operator"))
+	reconciler := NewDIJobReconciler(k8sManager.GetScheme(), ctx)
+	if err = reconciler.SetupWithManager(k8sManager); err != nil {
+		Expect(err).NotTo(HaveOccurred())
+	}
 
 	Expect(err).NotTo(HaveOccurred())
 

@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: di-server
-  namespace: di-system
   labels:
     control-plane: di-server
 spec:
@@ -20,11 +19,14 @@ spec:
         - /di-orchestrator
         - server
         args:
-        - --server-bind-address=:8080
-        - --gpu-alloc-policy=simple
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        - --zap-devel=true
+        - --server-bind-address=:8081
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         name: server
+        envFrom:
+        - configMapRef:
+            name: di-config
         securityContext:
           allowPrivilegeEscalation: false
         livenessProbe:

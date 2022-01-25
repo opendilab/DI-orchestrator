@@ -4,25 +4,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-type DIJobRequestParams struct {
-	Namespace   []string `json:"namespace"`
-	Coordinator []string `json:"coordinator"`
-	Name        []string `json:"name"`
-	Aggregator  []string `json:"aggregator"`
-}
-
-const (
-	RequestParamTypeNamespace   string = "namespace"
-	RequestParamTypeCoordinator string = "coordinator"
-	RequestParamTypeName        string = "name"
-	RequestParamTypeAggregator  string = "aggregator"
-)
-
 type DIJobRequest struct {
-	Namespace   string           `json:"namespace"`
-	Coordinator string           `json:"coordinator"`
-	Collectors  ResourceQuantity `json:"collectors"`
-	Learners    ResourceQuantity `json:"learners"`
+	Replicas int `json:"replicas"`
 }
 
 type ResourceQuantity struct {
@@ -51,27 +34,13 @@ func NewResourceQuantity(replicas int, cpu, gpu, memory string) *ResourceQuantit
 }
 
 type Response struct {
-	Success bool        `json:"success"`
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data"`
+	Success bool     `json:"success"`
+	Code    int      `json:"code"`
+	Message string   `json:"message"`
+	Data    []string `json:"data"`
 }
 
 const (
 	CodeSuccess = iota
 	CodeFailed
 )
-
-type DIJobResponse struct {
-	Namespace   string   `json:"namespace"`
-	Coordinator string   `json:"coordinator"`
-	Collectors  []string `json:"collectors"`
-	Learners    []string `json:"learners"`
-}
-
-type ReplicaResponse struct {
-	Namespace   string `json:"namespace"`
-	Coordinator string `json:"coordinator"`
-	ReplicaType string `json:"replicaType"`
-	Name        string `json:"name"`
-}

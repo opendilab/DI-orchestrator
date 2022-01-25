@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: di-webhook
-  namespace: di-system
   labels:
     control-plane: di-webhook
 spec:
@@ -23,7 +22,7 @@ spec:
         - "--probe-addr=:8080"
         - "--metric-addr=:8443"
         - --port=9443
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v0.3.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
         imagePullPolicy: Always
         name: webhook
         securityContext:

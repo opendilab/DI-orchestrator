@@ -21,9 +21,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"opendilab.org/di-orchestrator/cmd/common"
 	"opendilab.org/di-orchestrator/cmd/operator"
 	"opendilab.org/di-orchestrator/cmd/server"
-	"opendilab.org/di-orchestrator/cmd/webhook"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -48,9 +48,10 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.AddCommand(server.NewCmdServer())
-	rootCmd.AddCommand(operator.NewCmdOperator())
-	rootCmd.AddCommand(webhook.NewCmdWebhook())
+	genFlags := common.NewGenericFlags()
+	genFlags.AddFlags(rootCmd)
+	rootCmd.AddCommand(server.NewCmdServer(*genFlags))
+	rootCmd.AddCommand(operator.NewCmdOperator(*genFlags))
 
 	// add all the flags in go flagset into pflagset
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)

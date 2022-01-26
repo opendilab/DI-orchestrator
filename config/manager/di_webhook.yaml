@@ -22,7 +22,7 @@ spec:
         - "--probe-addr=:8080"
         - "--metric-addr=:8443"
         - --port=9443
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.1
         imagePullPolicy: Always
         name: webhook
         securityContext:

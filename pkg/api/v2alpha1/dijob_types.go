@@ -149,11 +149,10 @@ type Phase string
 
 const (
 	// JobPending means the job has been submitted to the cluster,
-	// but not all the pods and services have been created,
-	// or not pods are running
+	// but not all the pods and services have been created
 	JobPending Phase = "Pending"
 
-	// JobStarted means the job has been scheduled and waits for running.
+	// JobStarted means the job has been created and waits for running.
 	JobStarting Phase = "Starting"
 
 	// JobRestarting means the job has been rescheduled and waits for restarting.

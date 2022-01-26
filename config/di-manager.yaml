@@ -4260,9 +4260,9 @@ metadata:
   namespace: di-system
 spec:
   ports:
-  - port: 8080
+  - port: 8081
     protocol: TCP
-    targetPort: 8080
+    targetPort: 8081
   selector:
     control-plane: di-server
 ---
@@ -4295,7 +4295,7 @@ spec:
         envFrom:
         - configMapRef:
             name: di-config
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -4348,7 +4348,7 @@ spec:
         envFrom:
         - configMapRef:
             name: di-config
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

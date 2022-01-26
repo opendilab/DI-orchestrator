@@ -151,13 +151,13 @@ The following http interfaces are provided:
 
 | method  |  path |  description |
 |---|---|---|
-| GET  | /v1alpha2/replicas  |  list all collectors and learners |
-| GET  | /v1alpha2/replicas?namespace=xxx  | list all collectors and learners in namespace  |
-| GET  | /v1alpha2/replicas?namespace=xxx&coordinator=xxx  | list all replicas belongs to coordinator  |
-| GET  | /v1alpha2/replicas?namespace=xxx&aggregator=xxx  | get learners belongs to aggregator  |
-| DELETE  | /v1alpha2/replicas  | delete some replicas. put data in request body  |
-| POST  | /v1alpha2/replicas  | create replicas. put data in request body  |
-| POST  | /v1alpha2/replicas/failed  | post failed replicas and request for recreation. put data in request body  |
+| GET  | /v2alpha1/replicas  |  list all collectors and learners |
+| GET  | /v2alpha1/replicas?namespace=xxx  | list all collectors and learners in namespace  |
+| GET  | /v2alpha1/replicas?namespace=xxx&coordinator=xxx  | list all replicas belongs to coordinator  |
+| GET  | /v2alpha1/replicas?namespace=xxx&aggregator=xxx  | get learners belongs to aggregator  |
+| DELETE  | /v2alpha1/replicas  | delete some replicas. put data in request body  |
+| POST  | /v2alpha1/replicas  | create replicas. put data in request body  |
+| POST  | /v2alpha1/replicas/failed  | post failed replicas and request for recreation. put data in request body  |
 
 
 ## Advantages of DI Orchestrator

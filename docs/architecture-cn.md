@@ -121,32 +121,36 @@ Controller控制循环用于调谐DIJob的状态，包括生命周期管理、wo
 
 ## DI Server
 
-di-server是一个为DI-engine框架定制的http服务器，提供新增、删除和查询workers的功能。di-server利用[gin](https://github.com/gin-gonic/gin) web框架提供http服务能力
+Server是一个为DI-engine框架定制的http服务器，提供新增、删除和查询workers的功能。Server利用[gin](https://github.com/gin-gonic/gin) web框架提供http服务能力
 
-下面将对di-server的设计进行简要介绍，包括用于动态新增、删除和查询workers的http接口以及用户汇报训练任务profilings数据的接口。
+下面将对Server的设计进行简要介绍，包括用于动态新增、删除和查询workers的http接口以及用户汇报训练任务profilings数据的接口。
 
 ### http接口
 
-为了支持DIJob动态增删collector/learner的需求，di-server提供http接口用于对collector/learner进行新增、删除和查询的功能，如下图所示：
-
-
-提供如下接口：
+为了支持DIJob动态增删workers，Server提供http接口用于对workers进行新增、删除和查询，提供如下接口：
 
 | method | path                                             | description                                                               |
 | ------ | ------------------------------------------------ | ------------------------------------------------------------------------- |
-| GET    | /v2alpha1/replicas                               | list all collectors and learners                                          |
-| GET    | /v2alpha1/replicas?namespace=xxx                 | list all collectors and learners in namespace                             |
-| GET    | /v2alpha1/replicas?namespace=xxx&coordinator=xxx | list all replicas belongs to coordinator                                  |
-| GET    | /v2alpha1/replicas?namespace=xxx&aggregator=xxx  | get learners belongs to aggregator                                        |
-| DELETE | /v2alpha1/replicas                               | delete some replicas. put data in request body                            |
-| POST   | /v2alpha1/replicas                               | create replicas. put data in request body                                 |
-| POST   | /v2alpha1/replicas/failed                        | post failed replicas and request for recreation. put data in request body |
+| GET    | /v2alpha1/[job_id]/replicas                               | get job replicas                                          |
+| DELETE | /v2alpha1/[job_id]/replicas                               | delete some replicas. put data in request body                            |
+| POST   | /v2alpha1/[job_id]/replicas                               | create replicas. put data in request body                                 |
+| POST   | /v2alpha1/[job_id]/profilings                       | post job profiling data. put data in request body |
 
+job_id由`namespace.name.generation`三元组构成。
+- create和delete请求：Request Body="{"replicas": n}"，Server读取Request Body中的replicas，直接修改`job.status.replicas`，真正的创建和删除操作由Operator完成。（注：Server只会对preemptible的DIJob进行操作）
+- get请求：Server查询DIJob的replicas，并将访问每个replicas的[ip:port]返回。
+- Post profilings请求：Request Body="{"data": {}}"，Server读取Request Body中的data，将data patch到`job.status.profilings`中。
+
+## 任务运行流程
+
+用户提交的任务按照以下流程在集群中运行，由Allocator进行调度、Controller进行容器编排、Server进行任务profilings的汇报。
+![](images/di-engine-schedule.png)
 ## DI Orchestrator的优势
 
-DI Orchestrator为DI-engine框架提供了分布式场景下基于K8s的容器运行方案。对于用户提交的DIJob，di-operator负责对DI-engine的各个模块进行编排，使得各个模块可以正常运行并执行训练任务。通过调用di-server的接口，赋予coordinator新增、删除和查询其所有的collector、learner和aggregator的功能，提升DI-engine框架资源动态分配的能力。总结DI Orchestrator提供了以下优势：
+DI Orchestrator为DI-engine框架提供了分布式场景下基于K8s的容器运行方案。对于用户提交的DIJob，Operator负责对DI-engine的各个模块进行编排，使得各个模块可以正常运行并执行训练任务；通过子模块Allocator为DI-engine框架提供资源动态分配与调度的能力。通过调用Server的接口，赋予用户新增、删除和查询任务的workers的功能。总结DI Orchestrator提供了以下优势：
 
-1. 封装性。依赖di-operator的编排能力，部署DI-engine分布式RL训练的细节（包括pod创建、服务发现）对用户来说是透明的。根据DI-engine框架对分布式RL训练的部署需求，di-operator会将coordinator创建出来，然后coordinator再请求di-server创建其他模块，di-operator会把每个模块的pod的状态记录到DIJob的状态中。DIJob的生命周期也由di-operator维护，向用户展示DIJob在不同阶段的状态。
-2. 易用性。用户只需要在DIJob的yaml文件中定义好coordinator、collector、learner的配置之后，一键提交到K8s集群即可，di-operator将负责完成部署工作，将用户从K8s集群中复杂的分布式RL训练部署中解放出来。
-3. 鲁棒性。依赖K8s的pod重启机制，保证pod在意外退出的情况下能自动重启，coordinator能够迅速响应并重新连接。
-4. 动态扩展。DIJob所需的collector/learner/aggregator是动态变化的，因此di-server提供了http接口可以动态调整collector/learner的数目，使得DIJob可以根据自身需求调整collector和learner的比例，优化吞吐量。
+1. 封装性。依赖Operator的编排能力，部署DI-engine分布式RL训练的细节（包括pod创建、服务发现）对用户来说是透明的。根据DI-engine框架对分布式RL训练的部署需求，Operator为任务创建workers，Operator会把每个worker的状态记录到DIJob的状态中。DIJob的生命周期也由Operator维护，向用户展示DIJob在不同阶段的状态。
+2. 易用性。用户只需要在DIJob的yaml文件中定义好任务的配置之后，一键提交到K8s集群即可，Operator将负责完成部署工作，将用户从K8s集群中复杂的分布式RL训练部署中解放出来。同时可以借助命令行工具一键提交DIJob。
+3. 鲁棒性。依赖Operator的重启机制，保证workers在意外退出的情况下能自动重启。
+4. 动态扩展。DIJob所需的workers是动态变化的，因此Server提供了http接口可以动态调整workers的数目，使得DIJob可以根据自身需求调整workers数目，优化吞吐量。
+5. 动态调度。依赖Operator子组件Allocator，针对DI-engine任务进行动态调度变得简单。Allocator提供了针对单任务和多任务的调度策略，可以在不影响正常训练的情况下优化全局任务完成时间。

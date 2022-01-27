@@ -28,11 +28,11 @@ New CRD files will be generated in [./config/crd/bases](./config/crd/bases)
 
 ## Controller Logic
 
-Referenced to [controllers](./controllers)
+Referenced to [controllers](./pkg/controllers)
 
 ## DI Server Logic
 
-Referenced to [server](./server)
+Referenced to [server](./pkg/server)
 
 ## Installation
 

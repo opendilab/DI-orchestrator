@@ -4231,8 +4231,8 @@ subjects:
 apiVersion: v1
 data:
   DI_JOB_DEFAULT_RESOURCES: '{"resources": {"requests": {"cpu": 1, "memory": "2Gi"}}}'
-  DI_ORCHESTRATOR_VERSION: v1.0.0
-  DI_SERVER_URL: http://di-server.di-system:8080
+  DI_ORCHESTRATOR_VERSION: v1.0.1
+  DI_SERVER_URL: http://di-server.di-system:8081
 kind: ConfigMap
 metadata:
   name: di-config

@@ -4,5 +4,5 @@ metadata:
   name: di-config
 data:
   DI_SERVER_URL: "http://di-server.di-system:8081"
-  DI_ORCHESTRATOR_VERSION: v1.0.0
+  DI_ORCHESTRATOR_VERSION: v1.0.1
   DI_JOB_DEFAULT_RESOURCES: '{"resources": {"requests": {"cpu": 1, "memory": "2Gi"}}}'

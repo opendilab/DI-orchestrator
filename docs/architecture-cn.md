@@ -115,7 +115,7 @@ type Policy interface {
 用户可根据自身需求实现自己的调度算法。
 
 当`job.spec.preemptible==false`时，Allocator将不会对该任务进行调度，只会根据`job.spec.minReplicas`为该任务分配固定数目的workers，分配结果写到`job.status.replicas`。不过，用户可以通过修改`job.status.replicas`来变更该任务的workers数目。
-> Note：不能直接通过`kubectl apply`或者`kubectl edit`命令直接修改`job.status.replicas`，因为`job.status`被定义为SubResource，对于DIJob的所有的PUT和POST请求都会忽略`job.status`字段。见[Kubernetes API Conversion](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status)
+> Note：不能直接通过`kubectl apply`或者`kubectl edit`命令直接修改`job.status.replicas`，因为`job.status`被定义为SubResource，对于DIJob的所有的PUT和POST请求都会忽略`job.status`字段，见[Kubernetes API Conversion](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status)。可以执行`go run ./hack/update_replicas.go --ns [your-job-namespace] --n [your-job-name] --r [expected-replicas]`实现修改replicas的操作。
 #### Controller控制循环
 Controller控制循环用于调谐DIJob的状态，包括生命周期管理、workers的创建和删除等，如前文所述状态转移图。
 
@@ -145,6 +145,23 @@ job_id由`namespace.name.generation`三元组构成。
 
 用户提交的任务按照以下流程在集群中运行，由Allocator进行调度、Controller进行容器编排、Server进行任务profilings的汇报。
 ![](images/di-engine-schedule.png)
+
+1. 用户提交DIJob到K8s集群中。
+2. Allocator进行初始分配：
+   1. 对不允许抢占的job，根据`job.spec.minReplicas`修改`job.status.replicas`的值。
+   2. 对允许抢占的job，根据`job.spec.minReplicas`修改`job.status.allocation`的值。
+3. Controller获取K8s集群中job的变更。
+4. Controller创建相应数目的replicas。
+   1. 对不允许抢占的job，根据`job.status.replicas`创建对应数目的replicas。
+   2. 对允许抢占的job，根据`job.status.allocation`创建对应数目的replicas，并为每个replicas指定在哪个节点运行。
+5. replicas启动并开始训练，一段时间后将采集到的profilings数据汇报到Server端。
+6. Server将profilings数目更新到`job.status.profilings`中。
+7. 每个固定调度周期，Allocator重新调度所有jobs：
+   1. 对不允许抢占的jobs，这里不做重调度。
+   2. 对允许抢占的jobs，根据Allocator Policy中定义的调度策略进行全局调度，并修改每个jobs的`job.status.allocation`。
+8. Controller获取K8s集群中jobs的变更。
+9. Controller创建相应数目的replicas。
+
 ## DI Orchestrator的优势
 
 DI Orchestrator为DI-engine框架提供了分布式场景下基于K8s的容器运行方案。对于用户提交的DIJob，Operator负责对DI-engine的各个模块进行编排，使得各个模块可以正常运行并执行训练任务；通过子模块Allocator为DI-engine框架提供资源动态分配与调度的能力。通过调用Server的接口，赋予用户新增、删除和查询任务的workers的功能。总结DI Orchestrator提供了以下优势：

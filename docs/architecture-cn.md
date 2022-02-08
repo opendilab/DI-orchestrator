@@ -88,7 +88,7 @@ const (
 )
 ```
 
-一个正常运行并结束的DIJob会经历Pending、Starting、Running和Succeeded三个阶段，状态转移图如下图所示：
+一个正常运行并结束的DIJob会经历Pending、Starting、Running和Succeeded四个阶段，状态转移图如下图所示：
 ![](images/di-engine-status-machine.png)
 
 - 当DIJob提交后，进入Pending阶段。
@@ -149,7 +149,7 @@ job_id由`namespace.name.generation`三元组构成。
 1. 用户提交DIJob到K8s集群中。
 2. Allocator进行初始分配：
    1. 对不允许抢占的job，根据`job.spec.minReplicas`修改`job.status.replicas`的值。
-   2. 对允许抢占的job，根据`job.spec.minReplicas`修改`job.status.allocation`的值。
+   2. 对允许抢占的job，根据`job.spec.minReplicas`修改`job.status.allocation`的值，`job.status.allocation`是一个节点list，表示每个replicas放置的节点。
 3. Controller获取K8s集群中job的变更。
 4. Controller创建相应数目的replicas。
    1. 对不允许抢占的job，根据`job.status.replicas`创建对应数目的replicas。
@@ -158,13 +158,13 @@ job_id由`namespace.name.generation`三元组构成。
 6. Server将profilings数目更新到`job.status.profilings`中。
 7. 每个固定调度周期，Allocator重新调度所有jobs：
    1. 对不允许抢占的jobs，这里不做重调度。
-   2. 对允许抢占的jobs，根据Allocator Policy中定义的调度策略进行全局调度，并修改每个jobs的`job.status.allocation`。
+   2. 对允许抢占的jobs，利用每个job的`job.status.profilings`并根据Allocator Policy中定义的调度策略进行全局调度，并修改每个jobs的`job.status.allocation`。
 8. Controller获取K8s集群中jobs的变更。
 9. Controller创建相应数目的replicas。
 
 ## DI Orchestrator的优势
 
-DI Orchestrator为DI-engine框架提供了分布式场景下基于K8s的容器运行方案。对于用户提交的DIJob，Operator负责对DI-engine的各个模块进行编排，使得各个模块可以正常运行并执行训练任务；通过子模块Allocator为DI-engine框架提供资源动态分配与调度的能力。通过调用Server的接口，赋予用户新增、删除和查询任务的workers的功能。总结DI Orchestrator提供了以下优势：
+DI Orchestrator为DI-engine框架提供了分布式场景下基于K8s的容器运行方案。对于用户提交的DIJob，Operator负责对DI-engine的workers进行编排，使得各个worker可以正常运行并执行训练任务；通过子模块Allocator为DI-engine框架提供资源动态分配与调度的能力。通过调用Server的接口，赋予用户新增、删除和查询任务的workers的功能。总结DI Orchestrator提供了以下优势：
 
 1. 封装性。依赖Operator的编排能力，部署DI-engine分布式RL训练的细节（包括pod创建、服务发现）对用户来说是透明的。根据DI-engine框架对分布式RL训练的部署需求，Operator为任务创建workers，Operator会把每个worker的状态记录到DIJob的状态中。DIJob的生命周期也由Operator维护，向用户展示DIJob在不同阶段的状态。
 2. 易用性。用户只需要在DIJob的yaml文件中定义好任务的配置之后，一键提交到K8s集群即可，Operator将负责完成部署工作，将用户从K8s集群中复杂的分布式RL训练部署中解放出来。同时可以借助命令行工具一键提交DIJob。

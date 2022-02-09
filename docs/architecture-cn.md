@@ -18,7 +18,7 @@ di-operator是负责在K8s系统中编排DIJob，采用K8s [operator pattern](ht
 
 ### API定义
 
-根据DI-engine框架的特性，我们利用K8s Custom Resource定义了DIJob资源，用来定义一个RL任务运行所期望达成的状态，包括镜像、启动命令、挂载存储、workers数目等。
+根据DI-engine框架的特性，我们利用K8s Custom Resource定义了DIJob资源，用来定义一个DI-engine强化学习（Reinforcement Learning，RL）任务运行所期望达成的状态，包括镜像、启动命令、挂载存储、workers数目等。
 
 DIJobSpec中各字段定义及含义：
 
@@ -169,5 +169,5 @@ DI Orchestrator为DI-engine框架提供了分布式场景下基于K8s的容器�
 1. 封装性。依赖Operator的编排能力，部署DI-engine分布式RL训练的细节（包括pod创建、服务发现）对用户来说是透明的。根据DI-engine框架对分布式RL训练的部署需求，Operator为任务创建workers，Operator会把每个worker的状态记录到DIJob的状态中。DIJob的生命周期也由Operator维护，向用户展示DIJob在不同阶段的状态。
 2. 易用性。用户只需要在DIJob的yaml文件中定义好任务的配置之后，一键提交到K8s集群即可，Operator将负责完成部署工作，将用户从K8s集群中复杂的分布式RL训练部署中解放出来。同时可以借助命令行工具一键提交DIJob。
 3. 鲁棒性。依赖Operator的重启机制，保证workers在意外退出的情况下能自动重启。
-4. 动态扩展。DIJob所需的workers是动态变化的，因此Server提供了http接口可以动态调整workers的数目，使得DIJob可以根据自身需求调整workers数目，优化吞吐量。
+4. 动态扩展。DIJob所需的workers是动态变化的，因此用户可以通过K8s client直接修改DIJob来更改workers数目；同时，Server提供了HTTP接口可以动态调整workers的数目。动态扩展使得用户可以根据自身需求调整workers数目，优化吞吐量。
 5. 动态调度。依赖Operator子组件Allocator，针对DI-engine任务进行动态调度变得简单。Allocator提供了针对单任务和多任务的调度策略，可以在不影响正常训练的情况下优化全局任务完成时间。

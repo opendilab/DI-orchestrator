@@ -1,76 +1,77 @@
 # DI Operator architecture
-DI-engine framework consists of 3 important modules, namely coordinator, collector and learner. In general, a DI-engine training job has only one coordinator, and the number of learners and collectors can vary. The roles of the three modules are:
-- Coordinator. Maintain connections with collectors and learners, accept meta-infos requests and posts from collectors and learners, and send tasks to collectors and learners.
-- Collector. Request path to RL model stored in storage middleware from coordinator, load the RL model, and then generate data frames according to the RL model's steps from environment. Store the data frames back to the storage middleware, and report meta-infos (the storage path, size, etc.) of the data frames to coordinator.
-- Learner: Request data frames storage path from coordinator and load the data frames from storage middleware to start training the RL model. After the training is completed, store the model into the storage middleware, and report model meta-infos (storage path, size, etc.) to coordinator. Because we often need to use distributed mechanism of data parallel training, to avoid confusion, we call the module interacting with coordinator the logic learner, which is the basic unit for coordinator to issue tasks. And the single learner process in the data parallel training is called ddp learner, and multiple ddp learner processes provide data parallel services. One logic learner can correspond to one ddp learner (single-gpu) or multiple ddp learners (multi-gpu). In addition, to provide data parallel training services, an additional aggregator module needs to be introduced. The aggregator is responsible for summarizing the training results of multiple ddp learners and sending them to coordinator. That is, the aggregator and multiple ddp learners form a logic learner, and coordinator will only interact with logic learners.
+The v1 version of the DI-engine framework consists of three important modules, namely coordinator, collector and learner which is corresponding to DI Orchestrator v1 version.
 
-For the introduction of DI-engine, please refer to [DI-engine developer tutorial](https://opendilab.github.io/DI-engine/tutorial_dev/index.html).
+The v2 version of the DI-engine framework integrates the three modules, so that the complete training process can be completed within the same worker, and a new worker can be added directly without restarting. This article will describe the DI Orchestrator v2 version for the DI-engine v2 version in detail.
 
-In order to provide running support for DI-engine in Kubernetes (K8s), we designed `DI Orchestrator`. This article will explain how to use DI Orchestrator, how each module of DI-engine is created on K8s and discovers each other, how to start training, etc. The architecture of DI Orchestrator is shown in the figure below:
+For more details about the DI-engine framework, please refer to [DI-engine Documentation](https://opendilab.github.io/DI-engine/index.html)
 
-![](images/di-arch.svg)
+In order to support for DI-engine running in Kubernetes (K8s), we designed DI Orchestrator. This article will explain how DI-engine components are created on K8s system using DI Orchestrator, how components to discover each other, how components to start training, etc. The architecture of DI Orchestrator is shown in the following figure:
 
-There are two main modules that is `di-server` and `di-operator`. 
-`DDPL` represents ddp learner, `Lm` represents logic learner, `Cn` represents collector, and `Aggregator+DDPL` constructs a logic learner. In the following pages, we will first introduce how `DI Orchestrator` creates and starts each module of DI-engine after a DI-engine job is submitted to K8s, and then introduces the architecture of `di-server` and `di-operator`.
+![](images/di-engine-arch.png)
 
-## Job creation process
-Here is a description of the job creation process, illustrating the entire life cycle of a DI-engine job from creation to execution in K8s.
-- Edit the AggregatorConfig yaml file to define the aggregator template, which will be used to create aggregators when DIJob is created later. Aggregator can provide data parallel training services.
-- Edit the DIJob yaml file to define the template of coordinator, collector and learner, and submit it to K8s.
-- After di-operator received the event of DIJob submission, it creates a coordinator, and creates an accessible domain name for the coordinator.
-- After the coordinator started, it sends an HTTP request to di-server to create a certain number of collectors and learners according to the coordinator's default configuration.
-- After di-server receives the coordinator's creation request, it reads the collector and learner templates from DIJob object, and creates the corresponding number of collectors (Cn in the above figure) and learners (Lm in the above figure), and returns the URLs accessible to the collectors and learners. At the same time, di-server will determine whether to create an aggregator for each learner according to the number of GPUs applied for in each learner. That is, when the number of GPUs requested by the learner is greater than 1, an aggregator is created for the learner, otherwise no aggregator is created.
-- Coordinator waits for collectors and learners (an aggregator and its multiple ddp learners are regarded as a logic learner) to connect, and then starts to issue tasks to start training.
-- We can manually send a request to di-server to add/delete collectors or learners, and the coordinator will periodically query the number of available collectors and learners and decide to create or disconnect connections to them.
-- When the training is completed, di-operator will delete all collectors, learners by default, while coordinator will be reserved for users to view logs and other operations.
+DI Orchestrator consists of two modules, namely `di-operator` and `di-server`. This article will explain the two modules one by one.
 
 ## DI Operator
-Di-operator is a component responsible for orchestrating DIJob in K8s. It uses K8s [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) to monitor the status of DIJob objects in K8s cluster through the control loop in [controller pattern](https://kubernetes.io/docs/concepts/architecture/controller/), and to update the status of DIJob when necessary. The status is modified so that the actual status of DIJob is as consistent as possible with our predefined status.
 
-### API definition
-According to the characteristics of each module, we have defined two Custom Resources, namely DIJob and AggregatorConfig. The former is used to define the prerequisites for coordinator, collector and learner to start running, including docker images, startup commands, computing and storage resources, environment variables, etc. The latter is used to define the prerequisites for aggregator.
+DI Operator is responsible for orchestrating DIJob in K8s system, using K8s [operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/), monitoring the status of DIJob in K8s cluster through the control loop with [controller pattern](https://kubernetes.io/docs/concepts/architecture/controller/), and reconciling DIJob when a DIJob event occurred. Make sure the actual DIJob state is as consistent as possible with the expected state.
 
-DIJob definition is described as below:
+### API Definitions
+
+According to the characteristics of DI-engine framework, we use K8s Custom Resource to define the DIJob resource, which is used to define the desired state of a DI-engine Reinforcement Learning(RL) job, including images, startup commands, mount volumes, and the number of workers, etc..
+
+Definition and meaning of each field in DIJobSpec is as follows:
+
 ```go
 type DIJobSpec struct {
-	// Group is a collection of DIJobs
+	// Group is a collection of DIJobs.
 	Group string `json:"group,omitempty"`
 
-	//Priority labels the priority of DIJob
-	PriorityClassName PriorityClassName `json:"priorityClassName,omitempty"`
+	// Priority labels the priority of DIJob.
+	Priority Priority `json:"priority,omitempty"`
 
-	// CleanPodPolicy defines the policy to clean pods after DIJob completed
+	// EngineFields defines features of the DI-engine framework.
+	EngineFields EngineFields `json:"engineFields,omitempty"`
+
+	// CleanPodPolicy defines the policy to clean pods after DIJob completed.
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
 
-	// Volumes defines the shared volumes for DI-engine components
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
+	// Preemptible defines whether the dijob can be preempted.
+	Preemptible bool `json:"preemptible,omitempty"`
 
-	Coordinator CoordinatorSpec `json:"coordinator"`
+	// MinReplicas defines the minimum number of replicas of DIJob.
+	MinReplicas int32 `json:"minReplicas,omitempty"`
 
-	Collector CollectorSpec `json:"collector,"`
+	// MaxReplicas defines the maximum number of replicas of DIJob.
+	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 
-	Learner LearnerSpec `json:"learner,"`
+	// Template defines the pod template for DIJob.
+	Template corev1.PodTemplateSpec `json:"template"`
+}
+
+type EngineFields struct {
+	// Topology defines the topology among the workers of the job.
+	Topology Topology `json:"topology,omitempty"`
+
+	// ParallelWorkers defines the number of parallel workers in each worker.
+	ParallelWorkers int32 `json:"parallelWorkers,omitempty"`
 }
 ```
 
-AggregatorConfig definition is described as below:
-```go
-type AggregatorConfigSpec struct {
-	Aggregator AggregatorSpec `json:"aggregator,"`
-}
-```
+### Phase Definitions
 
-> **Why should aggregator be defined alone?**
-    Aggregator is common module for all RL training jobs using DI-engine framework, so we define the aggregator as a global and shared resource named AggregatorConfig. After RL jobs are submitted, di-server will read the global AggregatorConfig in K8s cluster to create aggregators for these RL jobs. In addition, aggregator is only for most common data parallel training. You need to define a new Custom Resource if other parallel training methods are used.
-### Status definition
-After DIJob is submitted, di-operator takes over the management of the life cycle of the DIJob. In order to facilitate the user to have a better view of the DIJob's status, we define the following phases:
+After a DIJob submitted, di-operator takes over the management of the life cycle of the DIJob. We define the following phases so that users can have a good opinion on the status of the DIJob.
 
 ```go
 const (
-	// JobCreated means the job has been submitted to the cluster,
-	// but not all the pods and services have been created,
-	// or no pods are running
-	JobCreated Phase = "Created"
+	// JobPending means the job has been submitted to the cluster,
+	// but not all the pods and services have been created
+	JobPending Phase = "Pending"
+
+	// JobStarted means the job has been created and waits for running.
+	JobStarting Phase = "Starting"
+
+	// JobRestarting means the job has been rescheduled and waits for restarting.
+	JobRestarting Phase = "Restarting"
 
 	// JobRunning means all the pods are in running state
 	JobRunning Phase = "Running"
@@ -85,84 +86,93 @@ const (
 	JobUnknown Phase = "Unknown"
 )
 ```
-A normal DIJob that runs and ends successfully will go through three stages, that is Created, Running and Succeeded:
-- When DIJob is submitted, di-operator will enter the Created phase after creating the coordinator.
-- When the coordinator pod is in the Running phase, DIJob enters the Running phase.
-- When the coordinator pod is in the Completed phase, DIJob enters the Succeeded phase.
 
-In addition, when the coordinator pod is in the Failed phase, DIJob will also enter the Failed phase. The aggregators, collectors, and learners will restart immediately after failure, but they will not affect DIJob's phase.
+A DIJob that runs and ends normally will go through four phases: Pending, Starting, Running and Succeeded. The state transition diagram is shown in the following figure
 
-Unknown phase has not been defined.
+![](images/di-engine-status-machine.png)
 
-### Control loop
-Built upon [kubebuilder v3](https://github.com/kubernetes-sigs/kubebuilder/releases/download/v3.0.0/kubebuilder_linux_amd64), components such as [reflectors, informers, indexers](https://github.com/kubernetes/sample-controller/blob/master/docs/controller-client-go.md) and controllers required by operator are all encapsulated in [manager](https://github.com/kubernetes-sigs/controller-runtime/blob/master/pkg/manager/manager.go) of [controller-runtime](https://github.com/kubernetes-sigs/controller-runtime). Kubebuilder only exposes a common function named `Reconcile` to us to implement reconcile logic for DIJob.
+- When a DIJob is submitted, it enters the Pending phase.
+- After di-operator creates the workers, DIJob enters the Starting phase.
+- When all workers are ready, DIJob enters the Running phase.
+- When all workers are Succeeded, DIJob enters Succeeded phase.
+- When a worker fails, DIJob enters the Failed phase.
+- When the DIJob is rescheduled or the number of workers is not as expected, DIJob enters the Restarting phase.
+
+Unknown phase is not used yet.
+
+### Control Loop
+Inspired from [Adaptdl](https://github.com/petuum/adaptdl), the v2 version architecture refactors the operator reconciling logic, and divides the scheduling and reconciling logic into Allocator and Controller respectively, which makes the division of modules' responsibilities more clear.
+
+#### Allocator Control Loop
+
+Allocator is a new module in the v2 architecture for scheduling DIJob, responsible for assigning workers and placing workers. We define two methods (allocate and allocateAll) for single-job and multi-job scheduling. In order to provide different scheduling policies, we define the scheduling policy as an interface named `Policy`, in which two methods are defined, `Allocate` and `Optimize`, the former is used to perform initial scheduling for the job when the job is submitted; the latter is used for global scheduling of all jobs.
+
+The Policy interface is defined as follows, you can implement your own scheduling algorithm using the interface:
+
 ```go
-func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-    // your reconcile logic here
-    return ctrl.Result{}, nil
+type Policy interface {
+	Allocate(job JobInfo, nodes map[string]*NodeInfo) (NodeList, error)
+	Optimize(jobs map[string]JobInfo, nodes map[string]*NodeInfo, prevAllocations map[string]NodeList) (map[string]NodeList, error)
 }
 ```
 
-When DIJob is submitted, we firstly list pods that belong to DIJob in the Reconcile function and find that the coordinator has not been created. Then we read the coordinator template defined in DIJob and create the corresponding coordinator pod (used to run coordinator main process) and service (used for inter-pod communication), and write some environment variables into the pod, including the name of the pod, the namespace of the pod, the port which coordinator listens to, and the URL to access the coordinator.
+When `job.spec.preemptible==false`, Allocator will not schedule the job, but will only allocate a fixed number of workers to the job according to `job.spec.minReplicas`, and the allocation result will be written to `job.status .replicas`. However, you can change the number of workers for the job by modifying `job.status.replicas`.
 
-The port occupied by each module of the DI-engine framework has a default value, as shown below:
+> Note: You cannot directly modify `job.status.replicas` through `kubectl apply` or `kubectl edit` commands, because `job.status` is defined as a SubResource. `job.status` is ignored for all PUT and POST requests of DIJob. See [Kubernetes API Conversion](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status). You can execute `go run ./hack/update_replicas.go --ns [your-job-namespace] --n [your-job-name] --r [expected-replicas]` to modify replicas.
 
-```go
-DefaultCollectorPort   = 22270
-DefaultLearnerPort     = 22271
-DefaultAggregatorPort  = 22272
-DefaultCoordinatorPort = 22273
-```
+#### Controller Loop
 
-After the coordinator is created, di-operator will monitor the status of the pod and modify the status of the DIJob. After DIJob is completed (Succeeded or Failed), di-operator will delete all services of the DIJob, and all pods that are in the Running phase of the DIJob by default.
-
-### Webhook
-There may be some mistakes when submitting a DIJob, such as spelling mistakes in DIJob's fields, field value miss matched with predefined, etc., resulting in potential errors when managing DIJob's life cycle. For the other hand, it is necessary to set default values for some fields of DIJob. If the default value of DIJob can be set before DIJob is submitted, and a correctness check can be performed, it will help us find problems in advance.
-
-To achieve the above goals, we can configure webhooks in K8s. K8s webhook consists of MutatingWebhook and ValidatingWebhook. The former is used to modify the value of the K8s resource object, and the latter is used to verify the correctness of the K8s resource object.
-
-The webhook verification is implemented in di-operator. MutatingWebhook is created to set the default value for DIJob; ValidatingWebhook is created to verify the correctness of DIJob. For example, for the `CleanPodPolicy` field in DIJob, we set its default value in MutatingWebhook to `Running`, which means that all running pods will be deleted after DIJob is completed. We verify the value of the `CleanPodPolicy` field in ValidatingWebhook, if the value set by the user is not equal to any of `None`, `ALL`, or `Running`, the DIJob will be rejected.
+The Controller control loop is used to reconcile the state of DIJob, including life cycle management, creation and deletion of workers, etc., as described in the state transition diagram above.
 
 ## DI Server
-Di-server is an http server customized for DI-engine framework, providing the apis of adding, deleting, and querying collectors, learners, and aggregators. By calling the related apis of di-server, di-server can provide DIJob with the ability to dynamically scale collectors and learners. The following will briefly introduce the design of di-server, including the local cache for storing AggregatorConfig, DIJob and all pods of DIJob; the http interface design for dynamically adding, deleting and querying collectors, learners and aggregators.
 
-### Local cache
-In order to reduce the frequency of queries between di-server and K8s api server, thereby reducing the burden of K8s api server, we use [client-go](https://github.com/kubernetes/client-go)'s informer mechanism to store AggregatorConfig, DIJob and all pods of DIJob in local cache, as shown in the following figure
+Server is an http server customized for DI-engine framework, providing functions for adding, deleting and querying workers. Server uses the [gin](https://github.com/gin-gonic/gin) web framework to provide http service capabilities.
 
-[Schematic diagram](https://github.com/kubernetes/sample-controller/blob/master/docs/controller-client-go.md)
+The following will briefly introduce the design of Server, including the http interface for dynamically adding, deleting, and querying workers, and the interface for users to report training task profilings data.
 
-![](images/client-go-controller-interaction.jpeg)
+### HTTP Interface
 
-In the above figure, we only pay attention to the upper part. Reflector receives notifications of the existence of new resource instance through list & watch api, and puts the new resource instance into Delta Fifo queue, and informer gets the new resource instance from the Delta Fifo queue and passes it through indexer to store in local cache. The query operation can be completed by querying the local cache, reducing the number of requests to K8s api server. The query command is as following:
+In order to support DIJob to dynamically add and delete workers, Server provides http interfaces for adding, deleting and querying workers. The following interfaces are provided:
 
-```go
-genericInformer.Informer().GetIndexer().GetByKey(key)
-```
+| method | path                                             | description                                                               |
+| ------ | ------------------------------------------------ | ------------------------------------------------------------------------- |
+| GET    | /v2alpha1/[job_id]/replicas                               | get job replicas                                          |
+| DELETE | /v2alpha1/[job_id]/replicas                               | delete some replicas. put data in request body                            |
+| POST   | /v2alpha1/[job_id]/replicas                               | create replicas. put data in request body                                 |
+| POST   | /v2alpha1/[job_id]/profilings                       | post job profiling data. put data in request body |
 
-When the resource object changes, the reflector will also receive notifications and update the local cache. In addition, the informer will also periodically synchronize the local cache with K8s api server to be consistent with the resource objects in K8s cluster.
+job_id consists of `namespace.name.generation` triples.
+- Create and delete requests: Request Body="{"replicas": n}". Server reads the replicas in the Request Body and directly modifies `job.status.replicas`. The real create and delete operations are done by Operator. (Note: Server will only operate on preemptible DIJobs)
+- Get request: Server queries the replicas of DIJob and returns the [ip:port] of each replica.
+- Post profilings request: Request Body="{"data": {}}". Server reads the data in the Request Body and patches the data to `job.status.profilings`.
 
+## Job Running Process
 
-### HTTP interface
-In order to support dynamic scaling of collectors/learners for DIJobs, di-server implements some http interfaces for adding, deleting and querying collectors/learners, as shown in the following figure:
+Jobs submitted run in the cluster according to the process in the following figure. Allocator performs scheduling, Controller performs container orchestration, and Server performs task profilings reporting.
+![](images/di-engine-schedule.png)
 
-![](images/di-api.png)
-
-The following http interfaces are provided:
-
-| method  |  path |  description |
-|---|---|---|
-| GET  | /v1alpha2/replicas  |  list all collectors and learners |
-| GET  | /v1alpha2/replicas?namespace=xxx  | list all collectors and learners in namespace  |
-| GET  | /v1alpha2/replicas?namespace=xxx&coordinator=xxx  | list all replicas belongs to coordinator  |
-| GET  | /v1alpha2/replicas?namespace=xxx&aggregator=xxx  | get learners belongs to aggregator  |
-| DELETE  | /v1alpha2/replicas  | delete some replicas. put data in request body  |
-| POST  | /v1alpha2/replicas  | create replicas. put data in request body  |
-| POST  | /v1alpha2/replicas/failed  | post failed replicas and request for recreation. put data in request body  |
-
+1. User submits DIJob to K8s cluster.
+2. Allocator makes initial allocation:
+   1. For jobs that are not preemptible, modify the value of `job.status.replicas` according to `job.spec.minReplicas`.
+   2. For jobs that are preemptible, modify the value of `job.status.allocation` according to `job.spec.minReplicas`. `job.status.allocation` is a list of nodes, indicating the nodes where each replica is placed.
+3. Controller obtains the changes of the job in the K8s cluster.
+4. Controller creates the corresponding number of replicas.
+   1. For jobs that are not preemptible, create the corresponding number of replicas according to `job.status.replicas`.
+   2. For jobs that are preemptible, create a corresponding number of replicas according to `job.status.allocation`, and specify which node to run each replicas on.
+5. The replicas start training, and report the collected profilings data to Server after a period of time.
+6. Server updates profilings to `job.status.profilings`.
+7. Every fixed scheduling cycle, Allocator reschedules all jobs:
+   1. For jobs that are not preemptible, rescheduling will not be performed.
+   2. For jobs that are preemptible, use the `job.status.profilings` of each job and perform global scheduling according to the scheduling policy defined in the Allocator `Policy`, and modify `job.status.allocation` of each job.
+8. Controller obtains the changes of the jobs in the K8s cluster.
+9. Controller creates the corresponding number of replicas.
 
 ## Advantages of DI Orchestrator
-DI Orchestrator provides a K8s-based container-orchestration solution for the DI-engine framework in a distributed scenario. For a DIJob, di-operator is responsible for arranging the various modules of DI-engine so that each module can run normally and perform training tasks. By calling di-server’s HTTP interface, coordinator is given the ability to add, delete, and query all its collectors, learners, aggregators and improve the dynamic allocation of DI-engine framework resources. In summary, DI Orchestrator provides the following advantages:
-1. Encapsulation. Relying on the orchestration capabilities of di-operator, deploying DI-engine distributed RL training (including pod creation and service discovery) is transparent to us. According to the deployment requirements of the DI-engine framework for distributed RL training, di-operator will create coordinator, and then the coordinator will request di-server to create other modules. Di-operator will record the status of the pod of each module into the status of the DIJob. The life cycle of DIJob is also maintained by di-operator, providing us with status of DIJob in different stages.
-2. Ease of use. We only need to define the configuration of coordinator, collector, and learner in the yaml file of DIJob, and submit them to K8s cluster with one click. Di-operator will be responsible for deploying DI-engine RL training and liberating us from the complex distributed RL deployments in K8s cluster.
-3. Robustness. Relying on the pod restart mechanism of K8s, ensures that pods can automatically restart in the event of an unexpected exit, and the coordinator can respond quickly and reconnect.
-4. Dynamic expansion. Collectors/learners required by DIJob are dynamically changing, so di-server provides HTTP interfaces to allow us to dynamically adjust the number of collectors/learners, so that DIJob can adjust the ratio of collectors and learners according to its own needs to optimize throughput.
+
+DI Orchestrator provides a K8s-based container-orchestration solution for DI-engine framework in a distributed scenario. For a DIJob, Operator is responsible for orchestrating DI-engine workers so that each worker can run normally and perform training tasks. The sub-module Allocator in Operator provides DI-engine framework with the ability to dynamically allocate and schedule resources. By calling Server's HTTP interface, users are given the functions of adding, deleting, and querying workers for each job. In summary, DI Orchestrator provides the following advantages:
+
+1. Encapsulation. Depending on the orchestration capabilities of Operator, details of deploying DI-engine distributed RL training jobs(including pod creation, service discovery) are transparent to users. According to the deployment requirements of DI-engine jobs for distributed RL training, Operator creates workers for jobs, and writes the status of each worker to DIJob status. The life cycle of DIJob is also maintained by Operator, providing us with status of DIJob in different stages.
+2. Ease of use. Users only need to define the configuration of DI-engine job in the yaml file of DIJob and submit it to K8s cluster with one click, and Operator will be responsible for completing the deployment work, freeing users from the complex distributed RL training deployment in K8s cluster. At the same time, DIJob can be submitted with one click with the help of command line tools.
+3. Robustness. Rely on the Operator's restart mechanism to ensure that workers can automatically restart in the case of unexpected exit.
+4. Dynamic expansion. The number of workers required by DIJob changes dynamically, so users can directly modify DIJob through the K8s client to change the number of workers; at the same time, Server provides HTTP interfaces to dynamically adjust the number of workers. Dynamic expansion allows users to adjust the number of workers according to their own needs and optimize throughput.
+5. Dynamic scheduling. By relying on Operator's sub-module Allocator, dynamic scheduling for DI-engine jobs becomes simple. Allocator provides scheduling strategies for single-job and multi-jobs, which can optimize the global job completion time without affecting normal training.

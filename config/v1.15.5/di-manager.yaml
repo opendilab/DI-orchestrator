@@ -326,7 +326,7 @@ spec:
         command:
         - /di-orchestrator
         - operator
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -376,7 +376,7 @@ spec:
         command:
         - /di-orchestrator
         - server
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -421,7 +421,7 @@ spec:
         command:
         - /di-orchestrator
         - webhook
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

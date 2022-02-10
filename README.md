@@ -29,14 +29,34 @@ di-server-7b86ff8df4-jfgmp         1/1     Running   0          59s
 
 ```bash
 # submit DIJob
-$ kubectl create -f config/samples/dijob-cartpole.yaml
+$ kubectl create -f config/samples/dijob-gobigger.yaml
 
 # get pod and you will see coordinator is created by di-operator
 # a few seconds later, you will see collectors and learners created by di-server
 $ kubectl get pod
+NAME                READY   STATUS    RESTARTS   AGE
+gobigger-test-0-0   1/1     Running   0          4m17s
+gobigger-test-0-1   1/1     Running   0          4m17s
 
 # get logs of coordinator
-$ kubectl logs cartpole-dqn-coordinator
+$ kubectl logs -n xlab gobigger-test-0-0
+Bind subprocesses on these addresses: ['tcp://10.148.3.4:22270',
+'tcp://10.148.3.4:22271']
+[Warning] no enough data: 128/0
+...
+[Warning] no enough data: 128/120
+Current Training: Train Iter(0) Loss(102.256)
+Current Training: Train Iter(0) Loss(103.133)
+Current Training: Train Iter(20)        Loss(28.795)
+Current Training: Train Iter(20)        Loss(32.837)
+...
+Current Training: Train Iter(360)       Loss(12.850)
+Current Training: Train Iter(340)       Loss(11.812)
+Current Training: Train Iter(380)       Loss(12.892)
+Current Training: Train Iter(360)       Loss(13.621)
+Current Training: Train Iter(400)       Loss(15.183)
+Current Training: Train Iter(380)       Loss(14.187)
+Current Evaluation: Train Iter(404)     Eval Reward(-1788.326)
 ```
 
 ## User Guide

@@ -20,6 +20,17 @@ fi
 for f in ".gitlab-ci.yml"; do
     echo "update ci version to ${version}"
     sed -r "s|^(\s*)VERSION:(\s*)(.*)|\1VERSION: ${version}|" "$f" >.tmp
-    # sed -r "s|^(\s*)VERSION:(\s*)v[0-9+][\.0-9+]*|\1VERSION: ${version}|" "$f" > .tmp
+    mv .tmp "$f"
+done
+
+for f in "config/manager/di_config.yaml"; do
+    echo "update config map orchestrator version to ${version}"
+    sed -r "s|^(\s*)DI_ORCHESTRATOR_VERSION:(\s*)(.*)|\1DI_ORCHESTRATOR_VERSION: ${version}|" "$f" >.tmp
+    mv .tmp "$f"
+done
+
+for f in ".github/workflows/release.yaml"; do
+    echo "update github action version to ${version}"
+    sed -r "s|^(\s*)version:(\s*)(.*)|\1version: ${version}|" "$f" >.tmp
     mv .tmp "$f"
 done

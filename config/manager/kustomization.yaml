@@ -8,4 +8,4 @@ kind: Kustomization
 images:
 - name: registry.sensetime.com/cloudnative4ai/di-orchestrator
   newName: registry.sensetime.com/cloudnative4ai/di-orchestrator
-  newTag: v1.0.0
+  newTag: v1.0.1

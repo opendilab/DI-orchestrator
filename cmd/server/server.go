@@ -46,7 +46,7 @@ func NewCreateOptions(genFlags cmdcommon.GenericFlags) *CreateOptions {
 		GenericFlags:      genFlags,
 		ServerBindAddress: ":8081",
 		ProbeAddress:      ":8080",
-		MetricAddress:     ":8089",
+		MetricAddress:     ":8443",
 	}
 }
 

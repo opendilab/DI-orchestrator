@@ -3,8 +3,7 @@ module opendilab.org/di-orchestrator
 go 1.16
 
 require (
-	github.com/deckarep/golang-set v1.7.1
-	github.com/gin-gonic/gin v1.7.7 // indirect
+	github.com/gin-gonic/gin v1.7.7
 	github.com/go-logr/logr v0.4.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.15.0

@@ -4231,8 +4231,8 @@ subjects:
 apiVersion: v1
 data:
   DI_JOB_DEFAULT_RESOURCES: '{"resources": {"requests": {"cpu": 1, "memory": "2Gi"}}}'
-  DI_ORCHESTRATOR_VERSION: v1.0.0
-  DI_SERVER_URL: http://di-server.di-system:8080
+  DI_ORCHESTRATOR_VERSION: v1.0.1
+  DI_SERVER_URL: http://di-server.di-system:8081
 kind: ConfigMap
 metadata:
   name: di-config
@@ -4260,9 +4260,9 @@ metadata:
   namespace: di-system
 spec:
   ports:
-  - port: 8080
+  - port: 8081
     protocol: TCP
-    targetPort: 8080
+    targetPort: 8081
   selector:
     control-plane: di-server
 ---
@@ -4295,7 +4295,7 @@ spec:
         envFrom:
         - configMapRef:
             name: di-config
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -4348,7 +4348,7 @@ spec:
         envFrom:
         - configMapRef:
             name: di-config
-        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.0
+        image: registry.sensetime.com/cloudnative4ai/di-orchestrator:v1.0.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

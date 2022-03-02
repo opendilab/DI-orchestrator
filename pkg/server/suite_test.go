@@ -68,7 +68,7 @@ func TestServer(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecsWithDefaultAndCustomReporters(t,
-		"Server Suite",
+		"DI-Server Suite",
 		[]Reporter{printer.NewlineReporter{}})
 }
 

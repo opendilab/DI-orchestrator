@@ -97,6 +97,7 @@ tag:
     - cloudnative4ai-group-runner-phoenix
   services:
     - registry.sensetime.com/cloudnative4ai/docker:19.03.8-dind
+  when: manual
   allow_failure: false
   dependencies:
     - build-release

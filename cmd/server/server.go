@@ -68,7 +68,7 @@ func NewCmdServer(genFlags cmdcommon.GenericFlags) *cobra.Command {
 
 Examples:
 	# Start di-server with gpu allocation policy and bind address specified.
-	di-orchestrator server -p simple -b :8080
+	di-orchestrator server -p :8080 -s :8081
 `,
 		Run: func(cmd *cobra.Command, args []string) {
 			cobra.CheckErr(runCommand(cmd, o))

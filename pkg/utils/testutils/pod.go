@@ -15,9 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dicommon "opendilab.org/di-orchestrator/pkg/common"
+	dicontext "opendilab.org/di-orchestrator/pkg/context"
 )
 
-func NewPod(name, jobName string, ownRefer metav1.OwnerReference) *corev1.Pod {
+func NewPod(name, namespace string, ownRefer metav1.OwnerReference) *corev1.Pod {
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -25,7 +26,7 @@ func NewPod(name, jobName string, ownRefer metav1.OwnerReference) *corev1.Pod {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: DIJobNamespace,
+			Namespace: namespace,
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
@@ -41,9 +42,9 @@ func NewPod(name, jobName string, ownRefer metav1.OwnerReference) *corev1.Pod {
 	return pod
 }
 
-func UpdatePodPhase(ctx context.Context, k8sClient client.Client, podKey types.NamespacedName, phase corev1.PodPhase) error {
+func UpdatePodPhase(ctx dicontext.Context, podKey types.NamespacedName, phase corev1.PodPhase) error {
 	var pod corev1.Pod
-	err := k8sClient.Get(ctx, podKey, &pod)
+	err := ctx.Get(context.TODO(), podKey, &pod)
 	if err != nil {
 		return err
 	}
@@ -54,11 +55,11 @@ func UpdatePodPhase(ctx context.Context, k8sClient client.Client, podKey types.N
 		state := corev1.ContainerStateRunning{}
 		cstatus := corev1.ContainerStatus{Name: containerName, State: corev1.ContainerState{
 			Running: &state,
-		}}
+		}, Ready: true}
 		pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, cstatus)
 	}
 
-	err = k8sClient.Status().Update(ctx, &pod, &client.UpdateOptions{})
+	err = ctx.Status().Update(context.TODO(), &pod, &client.UpdateOptions{})
 	if err != nil {
 		return err
 	}

@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -42,20 +42,20 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 const (
-// timeout  = 5 * time.Second
-// interval = 250 * time.Millisecond
-// duration = 200 * time.Millisecond
+	timeout  = 5 * time.Second
+	interval = 250 * time.Millisecond
+	duration = 200 * time.Millisecond
 )
 
 // var cfg *rest.Config
-var k8sClient client.Client
+var ctx dicontext.Context
 var testEnv *envtest.Environment
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
+		"DI-Controller Suite",
 		[]Reporter{printer.NewlineReporter{}})
 }
 
@@ -77,10 +77,6 @@ var _ = BeforeSuite(func() {
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
-
 	// create controller manager
 	metricPort := config.GinkgoConfig.ParallelNode + 8200
 	metricAddress := fmt.Sprintf(":%d", metricPort)
@@ -90,11 +86,11 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	ctx := dicontext.NewContext(context.Background(),
+	ctx = dicontext.NewContext(context.Background(),
 		cfg,
 		k8sManager.GetClient(),
-		k8sManager.GetEventRecorderFor("di-operator"),
-		ctrl.Log.WithName("di-operator"))
+		k8sManager.GetEventRecorderFor("controller"),
+		ctrl.Log.WithName("controller"))
 	reconciler := NewDIJobReconciler(k8sManager.GetScheme(), ctx)
 	if err = reconciler.SetupWithManager(k8sManager); err != nil {
 		Expect(err).NotTo(HaveOccurred())

@@ -19,6 +19,9 @@ func NewDIJob() *div2alpha1.DIJob {
 			Namespace: DIJobNamespace,
 		},
 		Spec: div2alpha1.DIJobSpec{
+			MinReplicas: 1,
+			MaxReplicas: 4,
+			Preemptible: false,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{

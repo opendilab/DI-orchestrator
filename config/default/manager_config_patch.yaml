@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: di-operator
-  namespace: di-system
 spec:
   template:
     spec:

@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: di-server
+  namespace: di-system
   labels:
     control-plane: di-server
 spec:
@@ -16,17 +17,15 @@ spec:
     spec:
       containers:
       - command:
-        - /di-orchestrator
-        - server
+        - /di-server
         args:
-        - --zap-devel=true
-        - --server-bind-address=:8081
-        image: opendilab/di-orchestrator:v1.0.0
+        - "--server-bind-address=:8080"
+        - "--leader-elect"
+        - "--lease-lock-namespace=di-system"
+        - "--lease-lock-name=di-server"
+        image: opendilab/di-server:v0.2.2
         imagePullPolicy: Always
         name: server
-        envFrom:
-        - configMapRef:
-            name: di-config
         securityContext:
           allowPrivilegeEscalation: false
         livenessProbe:

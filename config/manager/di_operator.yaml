@@ -9,6 +9,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: di-operator
+  namespace: di-system
   labels:
     control-plane: di-operator
 spec:
@@ -23,31 +24,24 @@ spec:
     spec:
       containers:
       - command:
-        - /di-orchestrator
-        - operator
+        - /di-operator
         args:
-        - "--zap-devel=true"
-        - "--probe-addr=:8080"
-        - "--metric-addr=:8443"
-        - "--leader-elect"
-        image: opendilab/di-orchestrator:v1.0.0
+        - "--server-address=http://di-server.di-system:8080"
+        image: opendilab/di-operator:v0.2.2
         imagePullPolicy: Always
         name: manager
-        envFrom:
-        - configMapRef:
-            name: di-config
         securityContext:
           allowPrivilegeEscalation: false
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8080
+            port: 8081
           initialDelaySeconds: 15
           periodSeconds: 20
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 8080
+            port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:

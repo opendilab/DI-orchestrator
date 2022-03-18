@@ -11,7 +11,7 @@ spec:
         service:
           namespace: $(SERVICE_NAMESPACE)
           name: $(SERVICE_NAME)
-          path: /mutate-diengine-opendilab-org-v1alpha2-dijob
+          path: /mutate-diengine-opendilab-org-v1alpha1-dijob
       conversionReviewVersions:
       - "v1"
       - "v1beta1"

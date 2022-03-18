@@ -10,7 +10,6 @@ rules:
   - ""
   resources:
   - events
-  - nodes
   - pods
   - services
   verbs:
@@ -25,12 +24,14 @@ rules:
   - ""
   resources:
   - namespaces
+  - nodes
   verbs:
   - get
   - list
 - apiGroups:
   - diengine.opendilab.org
   resources:
+  - aggregatorconfigs
   - dijobs
   verbs:
   - create
@@ -43,12 +44,14 @@ rules:
 - apiGroups:
   - diengine.opendilab.org
   resources:
+  - aggregatorconfigs/finalizers
   - dijobs/finalizers
   verbs:
   - update
 - apiGroups:
   - diengine.opendilab.org
   resources:
+  - aggregatorconfigs/status
   - dijobs/status
   verbs:
   - get

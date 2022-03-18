@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: di-webhook
+  namespace: di-system
   labels:
     control-plane: di-webhook
 spec:
@@ -16,13 +17,8 @@ spec:
     spec:
       containers:
       - command:
-        - /di-orchestrator 
-        - webhook
-        args:
-        - "--probe-addr=:8080"
-        - "--metric-addr=:8443"
-        - --port=9443
-        image: opendilab/di-orchestrator:v1.0.0
+        - /di-webhook
+        image: opendilab/di-webhook:v0.2.2
         imagePullPolicy: Always
         name: webhook
         securityContext:
@@ -30,13 +26,13 @@ spec:
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8080
+            port: 8081
           initialDelaySeconds: 15
           periodSeconds: 20
         readinessProbe:
           httpGet:
             path: /readyz
-            port: 8080
+            port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:

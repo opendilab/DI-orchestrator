@@ -4,12 +4,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: di-operator
+  namespace: di-system
 spec:
   template:
     spec:
       containers:
       - name: manager
         args:
-        - "--probe-addr=:8080"
-        - "--metric-addr=:8443"
+        - "--health-probe-bind-address=:8081"
+        - "--metrics-bind-address=:8080"
         - "--leader-elect"

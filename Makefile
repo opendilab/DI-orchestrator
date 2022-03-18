@@ -1,6 +1,6 @@
 
 # di-operator version
-VERSION ?= v1.0.0
+VERSION ?= v0.2.2
 MASTER_VERSION := $(VERSION)
 
 COMMIT_SHORT_SHA=$(shell git log -n 1 | head -n 1 | sed -e 's/^commit //' | head -c 8)
@@ -16,10 +16,18 @@ VERSION := $(MASTER_VERSION)
 endif
 
 # Image URL to use all building/pushing image targets
-IMG_BASE ?= opendilab/di-orchestrator
+IMG_BASE ?= opendilab/di-operator
+SERVER_IMG_BASE ?= opendilab/di-server
+WEBHOOK_IMG_BASE ?= opendilab/di-webhook
 
 IMG ?= ${IMG_BASE}:${VERSION}
 MASTER_IMG ?= ${IMG_BASE}:${MASTER_VERSION}
+
+SERVER_IMG ?= ${SERVER_IMG_BASE}:${VERSION}
+MASTER_SERVER_IMG ?= ${SERVER_IMG_BASE}:${MASTER_VERSION}
+
+WEBHOOK_IMG ?= ${WEBHOOK_IMG_BASE}:${VERSION}
+MASTER_WEBHOOK_IMG ?= ${WEBHOOK_IMG_BASE}:${MASTER_VERSION}
 
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
@@ -53,18 +61,17 @@ help: ## Display this help.
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG}
+	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG} ${SERVER_IMG_BASE}=${MASTER_SERVER_IMG} ${WEBHOOK_IMG_BASE}=${MASTER_WEBHOOK_IMG}
 	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
 	./hack/update-version.sh ${MASTER_VERSION}
 ## generate installer scripts
 	$(KUSTOMIZE) build config/default > config/di-manager.yaml
 
-
 # dev-manifests will add COMMIT_SHORT_SHA to ci version, and image tag, so it is only used for development
 # used `make manifests` when commited git
 dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG}
+	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG} ${SERVER_IMG_BASE}=${SERVER_IMG} ${WEBHOOK_IMG_BASE}=${WEBHOOK_IMG}
 	./hack/update-image-tags.sh config/manager ${VERSION}
 	./hack/update-version.sh ${VERSION}
 
@@ -83,30 +90,53 @@ lint:
 
 .PHONY: test
 test: ginkgo ## Run tests.
-	# $(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./pkg/... 
-	$(GINKGO) -cover -coverprofile=coverage.out ./pkg/... 
-	go tool cover -func=./pkg/server/coverage.out 
-	go tool cover -func=./pkg/common/coverage.out
-	go tool cover -func=./pkg/controllers/coverage.out 
+	$(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./api/v1alpha1 ./controllers ./server/http ./common/gpuallocator 
+	go tool cover -func=./api/v1alpha1/coverage.out 
+	go tool cover -func=./controllers/coverage.out 
+	go tool cover -func=./server/http/coverage.out 
+	go tool cover -func=./common/gpuallocator/coverage.out
 
 ##@ Build
 
 build: generate  ## Build di-operator binary.
-	go build -o bin/di-orchestrator ./main.go
+	go build -o bin/di-operator cmd/operator/main.go
+	go build -o bin/di-server cmd/server/main.go
+	go build -o bin/di-webhook cmd/webhook/main.go
 
-docker-build: ## Build docker image with the di-operator.
-	docker build -t ${IMG} -f Dockerfile .
+run: manifests generate fmt vet ## Run a controller from your host.
+	go run ./cmd/operator/main.go
+
+operator-image:
+	docker build -t ${IMG} --target di-operator .
+
+webhook-image:
+	docker build -t ${WEBHOOK_IMG} --target di-webhook .
+
+server-image:
+	docker build -t ${SERVER_IMG} --target di-server .
+
+docker-build: operator-image webhook-image server-image ## Build docker image with the di-operator.
 
 dev-images: build
-	docker build -t ${IMG} -f Dockerfile.dev .
+	docker build -t ${IMG} -f Dockerfile.dev --target di-operator .
+	docker build -t ${WEBHOOK_IMG} -f Dockerfile.dev --target di-webhook .
+	docker build -t ${SERVER_IMG} -f Dockerfile.dev --target di-server .
 
 docker-push: ## Push docker image with the di-operator.
 	docker push ${IMG}
+	docker push ${SERVER_IMG}
+	docker push ${WEBHOOK_IMG}
 
 docker-release: ## Release docker image with the di-operator.
 	docker pull ${IMG}
+	docker pull ${SERVER_IMG}
+	docker pull ${WEBHOOK_IMG}
 	docker tag ${IMG} ${MASTER_IMG}
+	docker tag ${SERVER_IMG} ${MASTER_SERVER_IMG}
+	docker tag ${WEBHOOK_IMG} ${MASTER_WEBHOOK_IMG}
 	docker push ${MASTER_IMG} 
+	docker push ${MASTER_SERVER_IMG}
+	docker push ${MASTER_WEBHOOK_IMG}
 
 ##@ Deployment
 
@@ -130,7 +160,7 @@ dev-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/c
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.2)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.

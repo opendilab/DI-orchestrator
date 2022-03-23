@@ -4076,13 +4076,13 @@ metadata:
   labels:
     name: di-orchestrator
   name: di-orchestrator
-  namespace: phx-system
+  namespace: di-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: di-leader-election-role
-  namespace: phx-system
+  namespace: di-system
 rules:
 - apiGroups:
   - ""
@@ -4193,7 +4193,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: di-leader-election-rolebinding
-  namespace: phx-system
+  namespace: di-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -4201,7 +4201,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: di-orchestrator
-  namespace: phx-system
+  namespace: di-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -4214,7 +4214,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: di-orchestrator
-  namespace: phx-system
+  namespace: di-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -4227,7 +4227,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: di-orchestrator
-  namespace: phx-system
+  namespace: di-system
 ---
 apiVersion: v1
 data:
@@ -4237,7 +4237,7 @@ data:
 kind: ConfigMap
 metadata:
   name: di-config
-  namespace: phx-system
+  namespace: di-system
 ---
 apiVersion: v1
 kind: Service
@@ -4245,7 +4245,7 @@ metadata:
   labels:
     control-plane: di-operator
   name: di-operator-metrics-service
-  namespace: phx-system
+  namespace: di-system
 spec:
   ports:
   - name: https
@@ -4258,7 +4258,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: di-server
-  namespace: phx-system
+  namespace: di-system
 spec:
   ports:
   - port: 8081
@@ -4273,7 +4273,7 @@ metadata:
   labels:
     control-plane: di-operator
   name: di-operator
-  namespace: phx-system
+  namespace: di-system
 spec:
   replicas: 1
   selector:
@@ -4329,7 +4329,7 @@ metadata:
   labels:
     control-plane: di-server
   name: di-server
-  namespace: phx-system
+  namespace: di-system
 spec:
   replicas: 1
   selector:

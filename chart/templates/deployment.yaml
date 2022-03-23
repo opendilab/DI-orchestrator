@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: {{ .Values.operatorName }}
+  name: {{ .Values.operatorName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: {{ .Values.operatorName }}
+  template:
+    metadata:
+      labels:
+        control-plane: {{ .Values.operatorName }}
+    spec:
+      serviceAccount: {{ .Release.Name }}
+      containers:
+      - args:
+        - --zap-devel=true
+        - --probe-addr=:8080
+        - --metric-addr=:8443
+        - --leader-elect
+        command:
+        - /di-orchestrator
+        - operator
+        envFrom:
+        - configMapRef:
+            name: di-config
+        image: {{ .Values.registry }}/di-orchestrator:{{ .Values.tag }}
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 100m
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 500Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      terminationGracePeriodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: {{ .Values.serverName }}
+  name: {{ .Values.serverName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: {{ .Values.serverName }}
+  template:
+    metadata:
+      labels:
+        control-plane: {{ .Values.serverName }}
+    spec:
+      serviceAccount: {{ .Release.Name }}
+      containers:
+      - args:
+        - --zap-devel=true
+        - --server-bind-address=:8081
+        command:
+        - /di-orchestrator
+        - server
+        envFrom:
+        - configMapRef:
+            name: di-config
+        image: {{ .Values.registry }}/di-orchestrator:{{ .Values.tag }}
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: server
+        resources:
+          limits:
+            cpu: 100m
+            memory: 500Mi
+          requests:
+            cpu: 100m
+            memory: 500Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+      terminationGracePeriodSeconds: 10

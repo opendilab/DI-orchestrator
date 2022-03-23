@@ -11,3 +11,4 @@ resources:
 - auth_proxy_role_binding.yaml
 - auth_proxy_client_clusterrole.yaml
 - di_server_service.yaml
+- service_account.yaml

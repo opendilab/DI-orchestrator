@@ -1,0 +1,9 @@
+apiVersion: v1
+data:
+  DI_JOB_DEFAULT_RESOURCES: '{"resources": {"requests": {"cpu": 1, "memory": "2Gi"}}}'
+  DI_ORCHESTRATOR_VERSION: {{ .Values.tag }}
+  DI_SERVER_URL: http://{{ .Values.serverName }}.{{ .Release.Namespace }}.{{ .Values.serviceDomainName }}:{{ .Values.serverPort }}
+kind: ConfigMap
+metadata:
+  name: di-config
+  namespace: {{ .Release.Namespace }}

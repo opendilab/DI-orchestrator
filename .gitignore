@@ -29,3 +29,6 @@ bin
 coverage.out.*
 
 config/webhook/manifests.yaml
+
+hello/*
+tmp/*

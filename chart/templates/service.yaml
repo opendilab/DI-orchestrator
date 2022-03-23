@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: {{ .Values.operatorName }}
+  name: {{ .Values.operatorName }}-metrics-service
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - name: metrics-port
+    port: 8443
+    targetPort: 8443
+  selector:
+    control-plane: {{ .Values.operatorName }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.serverName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - port: {{ .Values.serverPort }}
+    protocol: TCP
+    targetPort: {{ .Values.serverPort }}
+  selector:
+    control-plane: {{ .Values.serverName }}

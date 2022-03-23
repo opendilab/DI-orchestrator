@@ -2,12 +2,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: di-leader-election-rolebinding
-  namespace: di-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: di-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: default
-  namespace: di-system
+  name: di-orchestrator

@@ -6,7 +6,7 @@ name: Release
 on: [push]
 
 env:
-  version: v0.2.2
+  version: v1.0.0
 
 jobs:
   docker:
@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         platform: [ linux/amd64 ]
-        target: [ di-operator, di-server, di-webhook ]
+        target: [ di-orchestrator ]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -26,12 +26,12 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           DOCKER_IMAGE=$DOCKERIO_ORG/$TARGET
-          VERSION=${version}-edge
+          VERSION=${version}-nightly
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             VERSION=${GITHUB_REF#refs/tags/}
           fi
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            VERSION=nightly
+            VERSION=edge
           fi
           TAGS="${DOCKER_IMAGE}:${VERSION}"
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
@@ -74,7 +74,7 @@ jobs:
           tags: ${{ steps.prep.outputs.tags }}
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
-          target: ${{ matrix.target }}
+          # target: ${{ matrix.target }}
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}

@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Values.operatorName }}-exporter
+  namespace: {{ .Release.Namespace }}
+  labels:
+    control-plane: {{ .Values.operatorName }}
+spec:
+  endpoints:
+  - interval: 60s
+    port: metrics-port
+    path: /metrics
+    scheme: http
+  jobLabel: control-plane
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      control-plane: {{ .Values.operatorName }}

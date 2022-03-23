@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: di-config
+data:
+  DI_SERVER_URL: "http://di-server.di-system.svc.cluster.local:8081"
+  DI_ORCHESTRATOR_VERSION: v1.0.0
+  DI_JOB_DEFAULT_RESOURCES: '{"resources": {"requests": {"cpu": 1, "memory": "2Gi"}}}'

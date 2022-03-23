@@ -1,16 +1,11 @@
 resources:
+- di_config.yaml
 - di_operator.yaml
 - di_server.yaml
-- di_webhook.yaml
+# - di_webhook.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
-- name: opendilab/di-operator
-  newName: opendilab/di-operator
-  newTag: v0.2.2
-- name: opendilab/di-server
-  newName: opendilab/di-server
-  newTag: v0.2.2
-- name: opendilab/di-webhook
-  newName: opendilab/di-webhook
-  newTag: v0.2.2
+- name: opendilab/di-orchestrator
+  newName: opendilab/di-orchestrator
+  newTag: v1.0.0

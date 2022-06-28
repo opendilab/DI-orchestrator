@@ -2,7 +2,7 @@
 set -eu -o pipefail
 
 version=$1
-
+app_version=$2
 if [[ "$version" =~ ^v ]]; then
     chart_version=${version:1}
 else
@@ -16,9 +16,17 @@ for f in "chart/Chart.yaml"; do
     mv .tmp "$f"
 done
 
-for f in "config/manager/di_config.yaml"; do
-    echo "update config map orchestrator version to ${version}"
-    sed -r "s|^(\s*)DI_ORCHESTRATOR_VERSION:(\s*)(.*)|\1DI_ORCHESTRATOR_VERSION: ${version}|" "$f" >.tmp
+# update chart app version
+for f in "chart/Chart.yaml"; do
+    echo "update chart app version to ${app_version}"
+    sed -r "s|^(\s*)appVersion:(\s*)(.*)|\1appVersion: ${app_version}|" "$f" >.tmp
+    mv .tmp "$f"
+done
+
+# update chart value tag
+for f in "chart/values.yaml"; do
+    echo "update chart value tag to ${version}"
+    sed -r "s|^(\s*)tag:(\s*)(.*)|\1tag: ${version}|" "$f" >.tmp
     mv .tmp "$f"
 done
 

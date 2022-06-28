@@ -14,11 +14,12 @@ func getJobInfo(job *div2alpha1.DIJob) (ditypes.JobInfo, error) {
 	if err != nil {
 		return ditypes.JobInfo{}, err
 	}
+	// TODO(liqingping): 重新定义 job info
 	jobinfo := ditypes.NewJobInfo(
 		types.NamespacedName{
 			Namespace: job.Namespace, Name: job.Name,
 		},
-		res, int(job.Spec.MinReplicas), int(job.Spec.MaxReplicas),
+		res, 1, 1,
 		job.Spec.Preemptible,
 	)
 	return *jobinfo, nil
@@ -29,24 +30,27 @@ func getJobResources(job *div2alpha1.DIJob) (corev1.ResourceRequirements, error)
 	if err != nil {
 		return corev1.ResourceRequirements{}, err
 	}
-	jobres := diutil.GetPodResources(&job.Spec.Template.Spec)
-	if jobres.Requests != nil {
-		if jobres.Requests.Cpu() != nil {
-			res.Requests[corev1.ResourceCPU] = *jobres.Requests.Cpu()
+	for index := 0; index < len(job.Spec.Tasks); index++ {
+		jobres := diutil.GetPodResources(&job.Spec.Tasks[index].Template.Spec)
+		if jobres.Requests != nil {
+			if jobres.Requests.Cpu() != nil {
+				res.Requests[corev1.ResourceCPU] = *jobres.Requests.Cpu()
+			}
+			if jobres.Requests.Memory() != nil {
+				res.Requests[corev1.ResourceMemory] = *jobres.Requests.Memory()
+			}
+			res.Requests[corev1.ResourceName(common.ResourceGPU)] = jobres.Requests[corev1.ResourceName(common.ResourceGPU)]
+		} else if jobres.Limits != nil {
+			if jobres.Limits.Cpu() != nil {
+				res.Limits[corev1.ResourceCPU] = *jobres.Limits.Cpu()
+			}
+			if jobres.Limits.Memory() != nil {
+				res.Limits[corev1.ResourceMemory] = *jobres.Limits.Memory()
+			}
+			res.Limits[corev1.ResourceName(common.ResourceGPU)] = jobres.Limits[corev1.ResourceName(common.ResourceGPU)]
 		}
-		if jobres.Requests.Memory() != nil {
-			res.Requests[corev1.ResourceMemory] = *jobres.Requests.Memory()
-		}
-		res.Requests[corev1.ResourceName(common.ResourceGPU)] = jobres.Requests[corev1.ResourceName(common.ResourceGPU)]
-	} else if jobres.Limits != nil {
-		if jobres.Limits.Cpu() != nil {
-			res.Limits[corev1.ResourceCPU] = *jobres.Limits.Cpu()
-		}
-		if jobres.Limits.Memory() != nil {
-			res.Limits[corev1.ResourceMemory] = *jobres.Limits.Memory()
-		}
-		res.Limits[corev1.ResourceName(common.ResourceGPU)] = jobres.Limits[corev1.ResourceName(common.ResourceGPU)]
 	}
+
 	if _, ok := res.Requests[corev1.ResourceName(common.ResourceGPU)]; !ok {
 		res.Requests[corev1.ResourceName(common.ResourceGPU)] = res.Limits[corev1.ResourceName(common.ResourceGPU)]
 	}

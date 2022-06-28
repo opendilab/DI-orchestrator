@@ -4,7 +4,7 @@ DI-engine框架v1版本分为3个重要的模块，分别是coordinator、collec
 
 DI-engine框架v2版本将各个模块进行了整合，使得在同一个worker内可以完成完整的训练过程，当有新的worker加入时也能直接加入而无需重启。本文将针对DI-engine v2版本对DI Orchestrator v2版本进行详细描述。
 
-有关DI-engine的详细介绍可参考[DI-engine developer tutorial](https://opendilab.github.io/DI-engine/tutorial_dev/index.html)。
+有关DI-engine的详细介绍可参考[DI-engine developer tutorial](https://di-engine-docs.readthedocs.io/zh_CN/latest/)，分布式相关的参考[DI-engine 分布式](https://di-engine-docs.readthedocs.io/zh_CN/latest/distributed/index_zh.html)。
 
 为了提供DI-engine在Kubernetes（K8s）中运行的支持，我们设计了DI Orchestrator，本文将说明利用DI Orchestrator，DI-engine的组件在K8s系统上如何被创建、如何相互发现、如何开始训练等。DI Orchestrator的架构如下图所示：
 
@@ -24,36 +24,55 @@ DIJobSpec中各字段定义及含义：
 
 ```go
 type DIJobSpec struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
 	// Group is a collection of DIJobs.
 	Group string `json:"group,omitempty"`
 
 	// Priority labels the priority of DIJob.
+	// +kubebuilder:default=normal
+	// +kubebuilder:validation:Enum=normal;high
 	Priority Priority `json:"priority,omitempty"`
 
 	// EngineFields defines features of the DI-engine framework.
 	EngineFields EngineFields `json:"engineFields,omitempty"`
 
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed.
+	// +kubebuilder:default=Running
+	// +kubebuilder:validation:Enum=Running;All;None
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
 
 	// Preemptible defines whether the dijob can be preempted.
+	// +kubebuilder:default=false
 	Preemptible bool `json:"preemptible,omitempty"`
 
+	// BackoffLimit defines the restart limit for DIJob.
+	// +kubebuilder:default=3
+	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
+
 	// MinReplicas defines the minimum number of replicas of DIJob.
+	// +kubebuilder:validation:Minimum=0
 	MinReplicas int32 `json:"minReplicas,omitempty"`
 
 	// MaxReplicas defines the maximum number of replicas of DIJob.
+	// +kubebuilder:validation:Minimum=1
 	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 
 	// Template defines the pod template for DIJob.
+	// +kubebuilder:validation:Required
 	Template corev1.PodTemplateSpec `json:"template"`
 }
 
 type EngineFields struct {
 	// Topology defines the topology among the workers of the job.
+	// +kubebuilder:default=star
+	// +kubebuilder:validation:Enum=star;alone;mesh
 	Topology Topology `json:"topology,omitempty"`
 
 	// ParallelWorkers defines the number of parallel workers in each worker.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
 	ParallelWorkers int32 `json:"parallelWorkers,omitempty"`
 }
 ```
@@ -73,6 +92,9 @@ const (
 
 	// JobRestarting means the job has been rescheduled and waits for restarting.
 	JobRestarting Phase = "Restarting"
+
+	// JobRescheduling means the job has been rescheduled and waits for restarting.
+	JobRescheduling Phase = "Rescheduling"
 
 	// JobRunning means all the pods are in running state
 	JobRunning Phase = "Running"
@@ -95,8 +117,9 @@ const (
 - 当di-operator将workers创建后，进入Starting状态。
 - 当所有workers都ready后，进入Running状态。
 - 当所有workers都Succeeded后，进入Succeeded状态。
-- 当有worker出现Failed，进入Failed状态。
-- 当DIJob被重调度或者workers数目与预期不符，进入Restarting状态。
+- 当有worker出现Failed，且未超过最大重启次数，进入Restarting状态。
+- 当有worker出现Failed，且超过最大重启次数，进入Failed状态。
+- 当DIJob被重调度或者workers数目与预期不符，进入Rescheduling状态。
 
 Unknown阶段暂时未作定义。
 

@@ -25,14 +25,16 @@ func registerJobStatusHandlers() {
 
 	registerEach(v2alpha1.JobPending, v2alpha1.JobPending, nothing)
 	registerEach(v2alpha1.JobPending, v2alpha1.JobStarting, onJobStarting)
-	registerEach(v2alpha1.JobPending, v2alpha1.JobRestarting, onJobRestarting, updateGeneration)
+	registerEach(v2alpha1.JobPending, v2alpha1.JobRestarting, onJobRestarting, increaseRestartCount)
+	registerEach(v2alpha1.JobPending, v2alpha1.JobRescheduling, onJobRescheduling, increaseRescheduleCount)
 	registerEach(v2alpha1.JobPending, v2alpha1.JobRunning, onJobRunning)
 	registerEach(v2alpha1.JobPending, v2alpha1.JobFailed, onJobFailed, updateReadyReplicas)
 	registerEach(v2alpha1.JobPending, v2alpha1.JobSucceeded, onJobSucceeded, updateReadyReplicas)
 
 	registerEach(v2alpha1.JobStarting, v2alpha1.JobPending, nothing)
 	registerEach(v2alpha1.JobStarting, v2alpha1.JobStarting, nothing)
-	registerEach(v2alpha1.JobStarting, v2alpha1.JobRestarting, onJobRestarting, updateGeneration)
+	registerEach(v2alpha1.JobStarting, v2alpha1.JobRestarting, onJobRestarting, increaseRestartCount)
+	registerEach(v2alpha1.JobStarting, v2alpha1.JobRescheduling, onJobRescheduling, increaseRescheduleCount)
 	registerEach(v2alpha1.JobStarting, v2alpha1.JobRunning, onJobRunning)
 	registerEach(v2alpha1.JobStarting, v2alpha1.JobFailed, onJobFailed, updateReadyReplicas)
 	registerEach(v2alpha1.JobStarting, v2alpha1.JobSucceeded, onJobSucceeded, updateReadyReplicas)
@@ -40,27 +42,39 @@ func registerJobStatusHandlers() {
 	registerEach(v2alpha1.JobRestarting, v2alpha1.JobPending, nothing)
 	registerEach(v2alpha1.JobRestarting, v2alpha1.JobStarting, onJobStarting)
 	registerEach(v2alpha1.JobRestarting, v2alpha1.JobRestarting, nothing)
+	registerEach(v2alpha1.JobRestarting, v2alpha1.JobRescheduling, onJobRescheduling, increaseRescheduleCount)
 	registerEach(v2alpha1.JobRestarting, v2alpha1.JobRunning, onJobRunning)
 	registerEach(v2alpha1.JobRestarting, v2alpha1.JobFailed, onJobFailed, updateReadyReplicas)
 	registerEach(v2alpha1.JobRestarting, v2alpha1.JobSucceeded, onJobSucceeded, updateReadyReplicas)
 
+	registerEach(v2alpha1.JobRescheduling, v2alpha1.JobPending, nothing)
+	registerEach(v2alpha1.JobRescheduling, v2alpha1.JobStarting, onJobStarting)
+	registerEach(v2alpha1.JobRescheduling, v2alpha1.JobRestarting, onJobRestarting, increaseRestartCount)
+	registerEach(v2alpha1.JobRescheduling, v2alpha1.JobRescheduling, nothing)
+	registerEach(v2alpha1.JobRescheduling, v2alpha1.JobRunning, onJobRunning)
+	registerEach(v2alpha1.JobRescheduling, v2alpha1.JobFailed, onJobFailed, updateReadyReplicas)
+	registerEach(v2alpha1.JobRescheduling, v2alpha1.JobSucceeded, onJobSucceeded, updateReadyReplicas)
+
 	registerEach(v2alpha1.JobRunning, v2alpha1.JobPending, nothing)
 	registerEach(v2alpha1.JobRunning, v2alpha1.JobStarting, onJobStarting)
-	registerEach(v2alpha1.JobRunning, v2alpha1.JobRestarting, onJobRestarting, updateGeneration)
+	registerEach(v2alpha1.JobRunning, v2alpha1.JobRestarting, onJobRestarting, increaseRestartCount)
+	registerEach(v2alpha1.JobRunning, v2alpha1.JobRescheduling, onJobRescheduling, increaseRescheduleCount)
 	registerEach(v2alpha1.JobRunning, v2alpha1.JobRunning, nothing)
 	registerEach(v2alpha1.JobRunning, v2alpha1.JobFailed, onJobFailed, updateReadyReplicas)
 	registerEach(v2alpha1.JobRunning, v2alpha1.JobSucceeded, onJobSucceeded, updateReadyReplicas)
 
 	registerEach(v2alpha1.JobFailed, v2alpha1.JobPending, nothing)
 	registerEach(v2alpha1.JobFailed, v2alpha1.JobStarting, onJobStarting)
-	registerEach(v2alpha1.JobFailed, v2alpha1.JobRestarting, onJobRestarting, updateGeneration)
+	registerEach(v2alpha1.JobFailed, v2alpha1.JobRestarting, onJobRestarting, increaseRestartCount)
+	registerEach(v2alpha1.JobFailed, v2alpha1.JobRescheduling, onJobRescheduling, increaseRescheduleCount)
 	registerEach(v2alpha1.JobFailed, v2alpha1.JobRunning, onJobRunning)
 	registerEach(v2alpha1.JobFailed, v2alpha1.JobFailed, nothing)
 	registerEach(v2alpha1.JobFailed, v2alpha1.JobSucceeded, onJobSucceeded, updateReadyReplicas)
 
 	registerEach(v2alpha1.JobSucceeded, v2alpha1.JobPending, nothing)
 	registerEach(v2alpha1.JobSucceeded, v2alpha1.JobStarting, onJobStarting)
-	registerEach(v2alpha1.JobSucceeded, v2alpha1.JobRestarting, onJobRestarting, updateGeneration)
+	registerEach(v2alpha1.JobSucceeded, v2alpha1.JobRestarting, onJobRestarting, increaseRestartCount)
+	registerEach(v2alpha1.JobFailed, v2alpha1.JobRescheduling, onJobRescheduling, increaseRescheduleCount)
 	registerEach(v2alpha1.JobSucceeded, v2alpha1.JobRunning, onJobRunning)
 	registerEach(v2alpha1.JobSucceeded, v2alpha1.JobFailed, onJobFailed, updateReadyReplicas)
 	registerEach(v2alpha1.JobSucceeded, v2alpha1.JobSucceeded, nothing)
@@ -78,8 +92,12 @@ func updateReadyReplicas(ctx dicontext.Context, job *v2alpha1.DIJob) {
 	job.Status.ReadyReplicas = 0
 }
 
-func updateGeneration(ctx dicontext.Context, job *v2alpha1.DIJob) {
-	job.Status.Generation++
+func increaseRestartCount(ctx dicontext.Context, job *v2alpha1.DIJob) {
+	job.Status.Restarts++
+}
+
+func increaseRescheduleCount(ctx dicontext.Context, job *v2alpha1.DIJob) {
+	job.Status.Reschedules++
 }
 
 func onJobStarting(ctx dicontext.Context, job *v2alpha1.DIJob) {
@@ -95,6 +113,11 @@ func onJobRunning(ctx dicontext.Context, job *v2alpha1.DIJob) {
 func onJobRestarting(ctx dicontext.Context, job *v2alpha1.DIJob) {
 	msg := "job is restarting since conditions changed."
 	ctx.Recorder.Eventf(job, corev1.EventTypeWarning, dicontext.DIJobRestartingReason, msg)
+}
+
+func onJobRescheduling(ctx dicontext.Context, job *v2alpha1.DIJob) {
+	msg := "job is rescheduling since replicas or allocation changed."
+	ctx.Recorder.Eventf(job, corev1.EventTypeWarning, dicontext.DIJobReschedulingReason, msg)
 }
 
 func onJobFailed(ctx dicontext.Context, job *v2alpha1.DIJob) {

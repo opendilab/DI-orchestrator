@@ -1,6 +1,7 @@
 
 # di-operator version
-VERSION ?= v1.0.0
+APP_VERSION ?= 0.1.0
+VERSION ?= v1.1.0
 MASTER_VERSION := $(VERSION)
 
 COMMIT_SHORT_SHA=$(shell git log -n 1 | head -n 1 | sed -e 's/^commit //' | head -c 8)
@@ -55,7 +56,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${MASTER_IMG}
 	./hack/update-image-tags.sh config/manager ${MASTER_VERSION}
-	./hack/update-version.sh ${MASTER_VERSION}
+	./hack/update-version.sh ${MASTER_VERSION} ${APP_VERSION}
 ## generate installer scripts
 	$(KUSTOMIZE) build config/default > config/di-manager.yaml
 
@@ -66,7 +67,8 @@ dev-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and 
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=di-operator-cluster-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	cd config/manager && $(KUSTOMIZE) edit set image ${IMG_BASE}=${IMG}
 	./hack/update-image-tags.sh config/manager ${VERSION}
-	./hack/update-version.sh ${VERSION}
+	./hack/update-version.sh ${VERSION} ${APP_VERSION}
+	$(KUSTOMIZE) build config/default > config/di-manager.yaml
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
@@ -78,7 +80,8 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 # Run golangci-lint
-lint:
+# lint: golangci-lint
+lint: 
 	golangci-lint run -v --timeout=5m
 
 .PHONY: test
@@ -88,6 +91,10 @@ test: ginkgo ## Run tests.
 	go tool cover -func=./pkg/server/coverage.out 
 	go tool cover -func=./pkg/common/coverage.out
 	go tool cover -func=./pkg/controllers/coverage.out 
+
+.PHONY: test-e2e
+test-e2e: ginkgo dev-deploy ## Run e2e tests
+	${GINKGO} -cover ./test/e2e
 
 ##@ Build
 
@@ -139,6 +146,10 @@ kustomize: ## Download kustomize locally if necessary.
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/ginkgo@v1.14.1)
+
+GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
+golangci-lint: ## Download golangci-lint locally if necessary.
+	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.2)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))

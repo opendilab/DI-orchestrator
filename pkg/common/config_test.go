@@ -21,7 +21,7 @@ func TestConfig(t *testing.T) {
 
 var _ = Describe("Test common config", func() {
 	Context("Get DIJob default resources", func() {
-		It("returns the default resources", func() {
+		It("return the default resources", func() {
 			type testCase struct {
 				resource  string
 				expectCPU string
@@ -41,6 +41,48 @@ var _ = Describe("Test common config", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(r.Requests.Cpu().Equal(resource.MustParse(c.expectCPU))).Should(BeTrue())
 				Expect(r.Requests.Memory().Equal(resource.MustParse(c.expectMem))).Should(BeTrue())
+			}
+		})
+
+		It("return k8s domain name", func() {
+			type testCase struct {
+				domainName   string
+				expectDomain string
+			}
+			testCases := []testCase{
+				{domainName: "svc.k8s.cluster", expectDomain: "svc.k8s.cluster"},
+				{domainName: "svc.cluster.local", expectDomain: "svc.cluster.local"},
+				{domainName: "", expectDomain: "svc.cluster.local"},
+			}
+			for i := range testCases {
+				c := testCases[i]
+				By(fmt.Sprintf("Create the %dth DIJob", i+1))
+				err := os.Setenv(ENVDomainName, c.domainName)
+				Expect(err).NotTo(HaveOccurred())
+				SetServiceDomainName(c.expectDomain)
+				domainName := GetServiceDomainName()
+				Expect(domainName).To(Equal(c.expectDomain))
+			}
+		})
+
+		It("return server url", func() {
+			type testCase struct {
+				url       string
+				expectURL string
+			}
+			testCases := []testCase{
+				{url: "http://di-server.di-system.svc.cluster.local:8081", expectURL: "http://di-server.di-system.svc.cluster.local:8081"},
+				{url: "http://di-server.di-system.svc.cluster.local:8080", expectURL: "http://di-server.di-system.svc.cluster.local:8080"},
+				{url: "", expectURL: "http://di-server.di-system.svc.cluster.local:8081"},
+			}
+			for i := range testCases {
+				c := testCases[i]
+				By(fmt.Sprintf("Create the %dth DIJob", i+1))
+				err := os.Setenv(ENVServerURL, c.url)
+				Expect(err).NotTo(HaveOccurred())
+				SetDIServerURL(c.expectURL)
+				url := GetDIServerURL()
+				Expect(url).To(Equal(c.expectURL))
 			}
 		})
 	})

@@ -16,7 +16,6 @@ limitations under the License.
 package operator
 
 import (
-	"context"
 	"flag"
 	"time"
 
@@ -32,6 +31,7 @@ import (
 	alloc "opendilab.org/di-orchestrator/pkg/allocator"
 	alloctypes "opendilab.org/di-orchestrator/pkg/allocator/types"
 	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	"opendilab.org/di-orchestrator/pkg/controllers"
 )
@@ -105,7 +105,13 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 	logger := zap.New(zap.UseFlagOptions(options.GenericFlags.ZapOpts))
 	ctrl.SetLogger(logger)
 
+	// set common config
+	dicommon.SetServiceDomainName(options.ServiceDomainName)
+	dicommon.SetDIServerURL(options.DIServerURL)
+
 	config := ctrl.GetConfigOrDie()
+	config.QPS = float32(options.QPS)
+	config.Burst = options.Burst
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
 		SyncPeriod:             options.SyncPeriod,
@@ -119,8 +125,7 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 		return err
 	}
 
-	ctx := dicontext.NewContext(context.Background(),
-		config,
+	ctx := dicontext.NewContext(config,
 		mgr.GetClient(),
 		mgr.GetEventRecorderFor("di-operator"),
 		ctrl.Log.WithName("di-operator"))
@@ -130,8 +135,7 @@ func runCommand(cmd *cobra.Command, options *CreateOptions) error {
 		return err
 	}
 
-	ctx = dicontext.NewContext(context.Background(),
-		config,
+	ctx = dicontext.NewContext(config,
 		mgr.GetClient(),
 		mgr.GetEventRecorderFor("di-allocator"),
 		ctrl.Log.WithName("di-allocator"))

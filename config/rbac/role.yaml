@@ -10,7 +10,6 @@ rules:
   - ""
   resources:
   - events
-  - nodes
   - pods
   - services
   verbs:
@@ -25,9 +24,11 @@ rules:
   - ""
   resources:
   - namespaces
+  - nodes
   verbs:
   - get
   - list
+  - watch
 - apiGroups:
   - diengine.opendilab.org
   resources:

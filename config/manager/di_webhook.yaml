@@ -21,8 +21,10 @@ spec:
         args:
         - "--probe-addr=:8080"
         - "--metric-addr=:8443"
-        - --port=9443
-        image: opendilab/di-orchestrator:v1.0.1
+        - "--port=9443"
+        - "--qps=100"
+        - "--burst=200"
+        image: opendilab/di-orchestrator:v1.1.0
         imagePullPolicy: Always
         name: webhook
         securityContext:

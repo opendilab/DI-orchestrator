@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
-	dihandler "opendilab.org/di-orchestrator/pkg/common/handler"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
@@ -52,8 +51,8 @@ func NewDIJobReconciler(scheme *runtime.Scheme, ctx dicontext.Context) *DIJobRec
 //+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=diengine.opendilab.org,resources=dijobs/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=pods;services;events;nodes,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list
+//+kubebuilder:rbac:groups="",resources=pods;services;events,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=namespaces;nodes,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -72,34 +71,59 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	err := r.ctx.Get(ctx, req.NamespacedName, job)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			log.Error(err, "failed to get job")
+			log.Error(err, "get job.")
 		}
 		return ctrl.Result{}, nil
 	}
 
-	pods, err := r.ctx.ListJobPods(job)
-	if err != nil {
-		log.Error(err, "failed to list pods")
+	// validate job
+	validators := make(diutil.Validators, 0)
+	validators = append(validators, diutil.TaskTypeNameValidator)
+	// check the task without name and set default name with task.Type
+
+	//find task without name
+	r.ctx.SetDefaultJobNameInCluster(ctx, job)
+
+	if err := validators.Apply(job); err != nil {
+		log.Error(err, "job validation.")
+		old := job.DeepCopy()
+		r.ctx.UpdateJobStatus(job, div2alpha1.JobFailed, dicontext.DIJobFailedReason, err.Error())
+		if err := r.ctx.UpdateJobPhaseAndConditionsInCluster(ctx, old, job); err != nil {
+			log.Error(err, "update job phase and conditions.")
+		}
 		return ctrl.Result{}, nil
 	}
 
-	services, err := r.ctx.ListJobServices(job)
+	pods, err := r.ctx.ListJobPods(ctx, job)
 	if err != nil {
-		log.Error(err, "failed to list services")
+		log.Error(err, "list pods.")
+		return ctrl.Result{}, nil
+	}
+
+	services, err := r.ctx.ListJobServices(ctx, job)
+	if err != nil {
+		log.Error(err, "list services.")
 		return ctrl.Result{}, nil
 	}
 
 	// check job phase
 	if diutil.IsSucceeded(job) || diutil.IsFailed(job) {
-		if err := r.ctx.DeletePodsAndServices(job, pods, services); err != nil {
-			log.Error(err, "failed to delete pods and services")
+		if err := r.ctx.DeletePodsAndServices(ctx, job, pods, services); err != nil {
+			log.Error(err, "delete pods and services.")
+			return ctrl.Result{}, nil
+		}
+
+		old := job.DeepCopy()
+		job.Status.ReadyReplicas = 0
+		if err := r.ctx.UpdateJobReadyReplicasInCluster(ctx, old, job); err != nil {
+			log.Error(err, "update job ready replicas.")
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, nil
 	}
 
 	if err := r.reconcileReplicas(ctx, job, pods, services); err != nil {
-		log.Error(err, "failed to reconcile pods")
+		log.Error(err, "reconcile pods.")
 		return ctrl.Result{}, nil
 	}
 
@@ -112,7 +136,7 @@ func (r *DIJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&div2alpha1.DIJob{}).
 		Watches(
 			&source.Kind{Type: &div2alpha1.DIJob{}},
-			&dihandler.EventHandler{
+			&dicommon.EventHandler{
 				OnCreateHandlers: []func(obj client.Object){
 					r.onJobAddHandler,
 				},
@@ -149,23 +173,21 @@ func (r *DIJobReconciler) onJobAddHandler(obj client.Object) {
 	log := r.ctx.Log.WithName("onJobAddHandler").WithValues("job", jobkey)
 	job, ok := obj.(*div2alpha1.DIJob)
 	if !ok {
-		log.Error(fmt.Errorf("failed to convert object to DIJob"), "")
-		r.ctx.MarkIncorrectJobFailed(obj)
+		log.Error(fmt.Errorf("convert object to dijob"), "")
+		r.ctx.MarkIncorrectJobFailed(context.Background(), obj)
 		return
 	}
-	oldStatus := job.Status.DeepCopy()
+	old := job.DeepCopy()
 
 	// update job status
 	msg := "job created."
-	if job.Status.Phase == "" {
+	if job.Status.Phase == "" || job.Status.Phase == div2alpha1.JobPending {
 		r.ctx.UpdateJobStatus(job, div2alpha1.JobPending, dicontext.DIJobPendingReason, msg)
 		r.ctx.Recorder.Eventf(job, corev1.EventTypeNormal, dicontext.DIJobPendingReason, msg)
 	}
 
-	if !apiequality.Semantic.DeepEqual(*oldStatus, job.Status) {
-		if err := r.ctx.UpdateDIJobStatusInCluster(job); err != nil {
-			log.Error(err, "failed to update job status")
-		}
+	if err := r.ctx.UpdateJobPhaseAndConditionsInCluster(context.Background(), old, job); err != nil {
+		log.Error(err, "update job phase and conditions.")
 	}
 }
 
@@ -174,21 +196,23 @@ func (r *DIJobReconciler) onJobUpdateHandler(old, new client.Object) {
 	log := r.ctx.Log.WithName("onJobUpdateHandler").WithValues("job", jobkey)
 	oldjob, ok := old.(*div2alpha1.DIJob)
 	if !ok {
-		log.Error(fmt.Errorf("failed to convert object to DIJob"), "")
+		log.Error(fmt.Errorf("convert object to dijob"), "")
+		log.Error(fmt.Errorf("onvert object to dijob"), "")
 		return
 	}
 	newjob, ok := new.(*div2alpha1.DIJob)
 	if !ok {
-		log.Error(fmt.Errorf("failed to convert object to DIJob"), "")
+		log.Error(fmt.Errorf("convert object to dijob"), "")
 		return
 	}
-	staleStatus := newjob.Status.DeepCopy()
+	stale := newjob.DeepCopy()
 
 	HandleJobStatus(r.ctx, oldjob, newjob)
-	if !apiequality.Semantic.DeepEqual(*staleStatus, newjob.Status) {
-		if err := r.ctx.UpdateDIJobStatusInCluster(newjob); err != nil {
-			log.Error(err, "failed to update job status")
-		}
+	if err := r.ctx.UpdateJobRestartsAndReschedulesInCluster(context.Background(), stale, newjob); err != nil {
+		log.Error(err, "update job restarts and reschedules.")
+	}
+	if err := r.ctx.UpdateJobReadyReplicasInCluster(context.Background(), stale, newjob); err != nil {
+		log.Error(err, "update job ready replicas.")
 	}
 }
 

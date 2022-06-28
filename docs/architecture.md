@@ -17,7 +17,7 @@ DI Operator is responsible for orchestrating DIJob in K8s system, using K8s [ope
 
 ### API Definitions
 
-According to the characteristics of DI-engine framework, we use K8s Custom Resource to define the DIJob resource, which is used to define the desired state of a DI-engine Reinforcement Learning(RL) job, including images, startup commands, mount volumes, and the number of workers, etc..
+According to the characteristics of DI-engine framework, we use K8s Custom Resource to define the DIJob resource, which is used to define the desired state of a DI-engine Reinforcement Learning(RL) job, including images, startup commands, mount volumes, and the task's type and number, etc..
 
 Definition and meaning of each field in DIJobSpec is as follows:
 
@@ -34,9 +34,6 @@ type DIJobSpec struct {
 	// +kubebuilder:validation:Enum=normal;high
 	Priority Priority `json:"priority,omitempty"`
 
-	// EngineFields defines features of the DI-engine framework.
-	EngineFields EngineFields `json:"engineFields,omitempty"`
-
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed.
 	// +kubebuilder:default=Running
 	// +kubebuilder:validation:Enum=Running;All;None
@@ -50,30 +47,45 @@ type DIJobSpec struct {
 	// +kubebuilder:default=3
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 
-	// MinReplicas defines the minimum number of replicas of DIJob.
-	// +kubebuilder:validation:Minimum=0
-	MinReplicas int32 `json:"minReplicas,omitempty"`
+	// Provides flexible support for different components(collector, learner, evaluator) in DI-Engine
+	// +kubebuilder:validation:Required
+	Tasks []Task `json:"tasks"`
+}
 
-	// MaxReplicas defines the maximum number of replicas of DIJob.
+type Task struct {
+	// Replicas defines the number of this task.
+	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	MaxReplicas int32 `json:"maxReplicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// TaskType defines the type of task
+	// +kubebuilder:validation:Enum=learner;collector;evaluator;none
+	// +kubebuilder:validation:Required
+	Type TaskType `json:"type,omitempty"`
+
+	// Name of the task specified.
+	Name string `json:"name,omitempty"`
 
 	// Template defines the pod template for DIJob.
 	// +kubebuilder:validation:Required
-	Template corev1.PodTemplateSpec `json:"template"`
+	Template corev1.PodTemplateSpec `json:"template,omitempty"`
 }
 
-type EngineFields struct {
-	// Topology defines the topology among the workers of the job.
-	// +kubebuilder:default=star
-	// +kubebuilder:validation:Enum=star;alone;mesh
-	Topology Topology `json:"topology,omitempty"`
+type TaskType string
 
-	// ParallelWorkers defines the number of parallel workers in each worker.
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	ParallelWorkers int32 `json:"parallelWorkers,omitempty"`
-}
+const (
+	// TaskTypeLearner represents learner task
+	TaskTypeLearner TaskType = "learner"
+
+	// TaskTypeCollector represents evaluator task
+	TaskTypeCollector TaskType = "collector"
+
+	// TaskTypeEvaluator represents collector task
+	TaskTypeEvaluator TaskType = "evaluator"
+
+	// TaskTypeNone represents none task
+	TaskTypeNone TaskType = "none"
+)
 ```
 
 ### Phase Definitions

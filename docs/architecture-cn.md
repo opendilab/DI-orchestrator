@@ -18,7 +18,7 @@ di-operator是负责在K8s系统中编排DIJob，采用K8s [operator pattern](ht
 
 ### API定义
 
-根据DI-engine框架的特性，我们利用K8s Custom Resource定义了DIJob资源，用来定义一个DI-engine强化学习（Reinforcement Learning，RL）任务运行所期望达成的状态，包括镜像、启动命令、挂载存储、workers数目等。
+根据DI-engine框架的特性，我们利用K8s Custom Resource定义了DIJob资源，用来定义一个DI-engine强化学习（Reinforcement Learning，RL）任务运行所期望达成的状态，包括镜像、启动命令、挂载存储、任务类型和数目等。
 
 DIJobSpec中各字段定义及含义：
 
@@ -35,9 +35,6 @@ type DIJobSpec struct {
 	// +kubebuilder:validation:Enum=normal;high
 	Priority Priority `json:"priority,omitempty"`
 
-	// EngineFields defines features of the DI-engine framework.
-	EngineFields EngineFields `json:"engineFields,omitempty"`
-
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed.
 	// +kubebuilder:default=Running
 	// +kubebuilder:validation:Enum=Running;All;None
@@ -51,30 +48,45 @@ type DIJobSpec struct {
 	// +kubebuilder:default=3
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 
-	// MinReplicas defines the minimum number of replicas of DIJob.
-	// +kubebuilder:validation:Minimum=0
-	MinReplicas int32 `json:"minReplicas,omitempty"`
+	// Provides flexible support for different components(collector, learner, evaluator) in DI-Engine
+	// +kubebuilder:validation:Required
+	Tasks []Task `json:"tasks"`
+}
 
-	// MaxReplicas defines the maximum number of replicas of DIJob.
+type Task struct {
+	// Replicas defines the number of this task.
+	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	MaxReplicas int32 `json:"maxReplicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// TaskType defines the type of task
+	// +kubebuilder:validation:Enum=learner;collector;evaluator;none
+	// +kubebuilder:validation:Required
+	Type TaskType `json:"type,omitempty"`
+
+	// Name of the task specified.
+	Name string `json:"name,omitempty"`
 
 	// Template defines the pod template for DIJob.
 	// +kubebuilder:validation:Required
-	Template corev1.PodTemplateSpec `json:"template"`
+	Template corev1.PodTemplateSpec `json:"template,omitempty"`
 }
 
-type EngineFields struct {
-	// Topology defines the topology among the workers of the job.
-	// +kubebuilder:default=star
-	// +kubebuilder:validation:Enum=star;alone;mesh
-	Topology Topology `json:"topology,omitempty"`
+type TaskType string
 
-	// ParallelWorkers defines the number of parallel workers in each worker.
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	ParallelWorkers int32 `json:"parallelWorkers,omitempty"`
-}
+const (
+	// TaskTypeLearner represents learner task
+	TaskTypeLearner TaskType = "learner"
+
+	// TaskTypeCollector represents evaluator task
+	TaskTypeCollector TaskType = "collector"
+
+	// TaskTypeEvaluator represents collector task
+	TaskTypeEvaluator TaskType = "evaluator"
+
+	// TaskTypeNone represents none task
+	TaskTypeNone TaskType = "none"
+)
 ```
 
 ### 状态定义

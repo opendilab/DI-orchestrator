@@ -28,14 +28,16 @@ di-server-7b86ff8df4-jfgmp         1/1     Running   0          59s
 
 ```bash
 # submit DIJob
-$ kubectl create -f config/samples/dijob-gobigger.yaml
+$ kubectl create -f config/samples/dijob-gobigger-tasks.yaml
 
 # get pod and you will see coordinator is created by di-operator
 # a few seconds later, you will see collectors and learners created by di-server
 $ kubectl get pod
-NAME                READY   STATUS    RESTARTS   AGE
-gobigger-test-0-0   1/1     Running   0          4m17s
-gobigger-test-0-1   1/1     Running   0          4m17s
+NAME                             READY   STATUS    RESTARTS      AGE
+job-with-tasks-collectorname-0   1/1     Running   0             2s
+job-with-tasks-collectorname-1   1/1     Running   0             2s
+job-with-tasks-evaluatorname-0   1/1     Running   0             2s
+job-with-tasks-learnername-0     1/1     Running   0             2s
 
 # get logs of coordinator
 $ kubectl logs gobigger-test-0-0

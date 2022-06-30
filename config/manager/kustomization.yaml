@@ -8,4 +8,4 @@ kind: Kustomization
 images:
 - name: opendilab/di-orchestrator
   newName: opendilab/di-orchestrator
-  newTag: v1.0.0
+  newTag: v1.1.0

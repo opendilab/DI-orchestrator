@@ -18,26 +18,20 @@ const (
 	LabelPod      = "diengine/pod"
 
 	// annotations for pods
-	AnnotationGeneration = "diengine/generation"
-	AnnotationReplicas   = "diengine/replicas"
-	AnnotationRank       = "diengine/rank"
-	AnnotationNode       = "diengine/node"
+	// AnnotationGeneration = "diengine/generation"
+	AnnotationReplicas = "diengine/replicas"
+	AnnotationRank     = "diengine/rank"
+	AnnotationNode     = "diengine/node"
+	AnnotationTaskType = "diengine/task-type"
+	AnnotationTaskRank = "diengine/task-rank"
 
+	// envs for orchestrator
+	ENVDomainName = "K8S_SVC_DOMAIN_NAME"
+	ENVServerURL  = "DI_SERVER_URL"
 	// envs for pods
-	ENVJobID              = "DI_JOB_ID"
-	ENVJobGeneration      = "DI_JOB_GENERATION"
-	ENVServerURL          = "DI_SERVER_URL"
-	ENVParallelWorkersArg = "DI_PARALLEL_WORKERS_ARG"
-	ENVPortsArg           = "DI_PORTS_ARG"
-	ENVNodeIDsArg         = "DI_NODE_IDS_ARG"
-	ENVAttachedNodesArg   = "DI_ATTACHED_NODES_ARG"
-
-	// args for di-engine command
-	DIArgParallelWorkers = "parallel-workers"
-	DIArgPorts           = "ports"
-	DIArgNodeIDs         = "node-ids"
-	DIArgAttachedNodes   = "attach-to"
-	DINodeURLPrefix      = "tcp://"
+	ENVJobID = "DI_JOB_ID"
+	ENVRank  = "DI_RANK"
+	ENVNodes = "DI_NODES"
 
 	// dijob oriented
 	OperatorName         = "di-operator"
@@ -49,12 +43,28 @@ const (
 	ResourceGPU = "nvidia.com/gpu"
 )
 
+var (
+	// k8s service domain name
+	svcDomainName = "svc.cluster.local"
+
+	// di server access url
+	diServerURL = fmt.Sprintf("http://di-server.di-system.%s:8081", svcDomainName)
+)
+
 func GetDIServerURL() string {
-	url := os.Getenv(ENVServerURL)
-	if url == "" {
-		return "http://di-server.di-system:8080"
-	}
-	return url
+	return diServerURL
+}
+
+func SetDIServerURL(serverURL string) {
+	diServerURL = serverURL
+}
+
+func GetServiceDomainName() string {
+	return svcDomainName
+}
+
+func SetServiceDomainName(domainName string) {
+	svcDomainName = domainName
 }
 
 func GetDIJobDefaultResources() (corev1.ResourceRequirements, error) {

@@ -1,18 +1,20 @@
 package allocator
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	ditypes "opendilab.org/di-orchestrator/pkg/allocator/types"
+	alloctypes "opendilab.org/di-orchestrator/pkg/allocator/types"
 )
 
-func (a *Allocator) getNodeInfos(nodes []*corev1.Node) (map[string]*ditypes.NodeInfo, error) {
-	nodeInfos := make(map[string]*ditypes.NodeInfo)
+func (a *Allocator) getNodeInfos(ctx context.Context, nodes []*corev1.Node) (map[string]*alloctypes.NodeInfo, error) {
+	nodeInfos := make(map[string]*alloctypes.NodeInfo)
 	// fieldSelector, err := fields.ParseSelector("spec.nodeName=" + name + ",status.phase!=" + string(corev1.PodSucceeded) + ",status.phase!=" + string(corev1.PodFailed))
 	// fieldSelector := fields.SelectorFromSet(fields.Set{"spec.nodeName": name})
 	// pods, err := c.ListPods(&client.ListOptions{FieldSelector: fieldSelector})
-	pods, err := a.ctx.ListPods(&client.ListOptions{})
+	pods, err := a.ctx.ListPods(ctx, &client.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +36,7 @@ func (a *Allocator) getNodeInfos(nodes []*corev1.Node) (map[string]*ditypes.Node
 	return nodeInfos, nil
 }
 
-func (a *Allocator) getNodeInfo(node *corev1.Node, pods []*corev1.Pod) (*ditypes.NodeInfo, error) {
+func (a *Allocator) getNodeInfo(node *corev1.Node, pods []*corev1.Pod) (*alloctypes.NodeInfo, error) {
 	reqs, _, err := a.ctx.GetNodeAllocatedResources(node, pods)
 	if err != nil {
 		return nil, err
@@ -47,7 +49,7 @@ func (a *Allocator) getNodeInfo(node *corev1.Node, pods []*corev1.Pod) (*ditypes
 		alloc.Sub(reqs[resourceName])
 		free[resourceName] = alloc
 	}
-	return &ditypes.NodeInfo{
+	return &alloctypes.NodeInfo{
 		Key:       node.Name,
 		Resources: free,
 	}, nil

@@ -22,6 +22,10 @@ spec:
         - --probe-addr=:8080
         - --metric-addr=:8443
         - --leader-elect
+        - --qps={{ .Values.qps }}
+        - --burst={{ .Values.burst }}
+        - --service-domain-name={{ .Values.serviceDomainName }}
+        - --di-server-url=http://{{ .Values.serverName }}.{{ .Release.Namespace }}.{{ .Values.serviceDomainName }}:{{ .Values.serverPort }}
         command:
         - /di-orchestrator
         - operator
@@ -75,7 +79,11 @@ spec:
       containers:
       - args:
         - --zap-devel=true
-        - --server-bind-address=:8081
+        - --server-bind-address=:{{ .Values.serverPort }}
+        - --qps={{ .Values.qps }}
+        - --burst={{ .Values.burst }}
+        - --service-domain-name={{ .Values.serviceDomainName }}
+        - --di-server-url=http://{{ .Values.serverName }}.{{ .Release.Namespace }}.{{ .Values.serviceDomainName }}:{{ .Values.serverPort }}
         command:
         - /di-orchestrator
         - server

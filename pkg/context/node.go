@@ -1,14 +1,16 @@
 package context
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	resourcehelper "k8s.io/kubectl/pkg/util/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (c *Context) ListNodes() ([]*corev1.Node, error) {
+func (c *Context) ListNodes(ctx context.Context) ([]*corev1.Node, error) {
 	nodeList := corev1.NodeList{}
-	if err := c.Client.List(c.ctx, &nodeList, &client.ListOptions{}); err != nil {
+	if err := c.Client.List(ctx, &nodeList, &client.ListOptions{}); err != nil {
 		return nil, err
 	}
 	nodes := []*corev1.Node{}

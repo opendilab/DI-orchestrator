@@ -28,34 +28,33 @@ di-server-7b86ff8df4-jfgmp         1/1     Running   0          59s
 
 ```bash
 # submit DIJob
-$ kubectl create -f config/samples/dijob-gobigger.yaml
+$ kubectl create -f config/samples/atari-dqn-tasks.yaml
 
 # get pod and you will see coordinator is created by di-operator
 # a few seconds later, you will see collectors and learners created by di-server
 $ kubectl get pod
-NAME                READY   STATUS    RESTARTS   AGE
-gobigger-test-0-0   1/1     Running   0          4m17s
-gobigger-test-0-1   1/1     Running   0          4m17s
+NAME                         READY   STATUS    RESTARTS      AGE
+job-with-tasks-collector-0   1/1     Running   0             2s
+job-with-tasks-collector-1   1/1     Running   0             2s
+job-with-tasks-evaluator-0   1/1     Running   0             2s
+job-with-tasks-learner-0     1/1     Running   0             2s
 
-# get logs of coordinator
-$ kubectl logs gobigger-test-0-0
-Bind subprocesses on these addresses: ['tcp://10.148.3.4:22270',
-'tcp://10.148.3.4:22271']
-[Warning] no enough data: 128/0
-...
-[Warning] no enough data: 128/120
-Current Training: Train Iter(0) Loss(102.256)
-Current Training: Train Iter(0) Loss(103.133)
-Current Training: Train Iter(20)        Loss(28.795)
-Current Training: Train Iter(20)        Loss(32.837)
-...
-Current Training: Train Iter(360)       Loss(12.850)
-Current Training: Train Iter(340)       Loss(11.812)
-Current Training: Train Iter(380)       Loss(12.892)
-Current Training: Train Iter(360)       Loss(13.621)
-Current Training: Train Iter(400)       Loss(15.183)
-Current Training: Train Iter(380)       Loss(14.187)
-Current Evaluation: Train Iter(404)     Eval Reward(-1788.326)
+# get logs of tasks
+$ kubectl logs job-with-tasks-evaluator-0 
+/opt/conda/lib/python3.8/site-packages/torch/cuda/__init__.py:52: UserWarning: CUDA initialization: Found no NVIDIA driver on your system. Please check that you have an NVIDIA GPU and installed a driver from http://www.nvidia.com/Download/index.aspx (Triggered internally at  /opt/conda/conda-bld/pytorch_1607370172916/work/c10/cuda/CUDAFunctions.cpp:100.)
+  return torch._C._cuda_getDeviceCount() > 0
+[06-28 08:25:29] INFO     Evaluator running on node 1                                                                                                           func.py:58
+A.L.E: Arcade Learning Environment (version +a54a328)
+[Powered by Stella]
+/opt/conda/lib/python3.8/site-packages/ale_py/roms/__init__.py:44: UserWarning: ale_py.roms contains unsupported ROMs: /opt/conda/lib/python3.8/site-packages/AutoROM/roms/{joust.bin, warlords.bin, maze_craze.bin, combat.bin}
+  warnings.warn(
+[06-28 08:25:46] INFO     Evaluation: Train Iter(0)       Env Step(0)     Eval Reward(-21.000)                                                                  func.py:58
+[06-28 08:25:46] WARNING  You have not installed memcache package! DI-engine has changed to some alternatives. 
+
+$ kubectl logs job-with-tasks-learner-0
+/opt/conda/lib/python3.8/site-packages/torch/cuda/__init__.py:52: UserWarning: CUDA initialization: Found no NVIDIA driver on your system. Please check that you have an NVIDIA GPU and installed a driver from http://www.nvidia.com/Download/index.aspx (Triggered internally at  /opt/conda/conda-bld/pytorch_1607370172916/work/c10/cuda/CUDAFunctions.cpp:100.)
+  return torch._C._cuda_getDeviceCount() > 0
+[06-28 08:25:27] INFO     Learner running on node 0
 ```
 
 ## User Guide

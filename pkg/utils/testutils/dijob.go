@@ -19,16 +19,53 @@ func NewDIJob() *div2alpha1.DIJob {
 			Namespace: DIJobNamespace,
 		},
 		Spec: div2alpha1.DIJobSpec{
-			MinReplicas: 1,
-			MaxReplicas: 4,
 			Preemptible: false,
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:    dicommon.DefaultContainerName,
-							Image:   DIJobImage,
-							Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
+			Tasks: []div2alpha1.Task{
+				{
+					Name:     "task1",
+					Type:     "learner",
+					Replicas: 1,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    dicommon.DefaultContainerName,
+									Image:   DIJobImage,
+									Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name:     "task2",
+					Type:     "evaluator",
+					Replicas: 1,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    dicommon.DefaultContainerName,
+									Image:   DIJobImage,
+									Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
+								},
+							},
+						},
+					},
+				},
+				{
+					Name:     "task3",
+					Type:     "collector",
+					Replicas: 2,
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    dicommon.DefaultContainerName,
+									Image:   DIJobImage,
+									Command: []string{"/bin/sh", "-c", "sleep", DefaultSleepDuration},
+								},
+							},
 						},
 					},
 				},

@@ -23,15 +23,27 @@ import (
 )
 
 type GenericFlags struct {
-	ZapOpts *zap.Options
+	QPS               float64
+	Burst             int
+	ServiceDomainName string
+	DIServerURL       string
+	ZapOpts           *zap.Options
 }
 
 func NewGenericFlags() *GenericFlags {
 	return &GenericFlags{
-		ZapOpts: &zap.Options{},
+		QPS:               5,
+		Burst:             10,
+		ServiceDomainName: "svc.cluster.local",
+		DIServerURL:       "http://di-server.di-system.svc.cluster.local:8081",
+		ZapOpts:           &zap.Options{},
 	}
 }
 
 func (f *GenericFlags) AddFlags(cmd *cobra.Command) {
+	goflag.Float64Var(&f.QPS, "qps", f.QPS, "qps for k8s client")
+	goflag.IntVar(&f.Burst, "burst", f.Burst, "burst for k8s client")
+	goflag.StringVar(&f.ServiceDomainName, "service-domain-name", f.ServiceDomainName, "k8s service domain name")
+	goflag.StringVar(&f.DIServerURL, "di-server-url", f.DIServerURL, "url for accessing di server")
 	f.ZapOpts.BindFlags(goflag.CommandLine)
 }

@@ -31,7 +31,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -56,13 +57,13 @@ const (
 	port             = 8150
 )
 
-var (
-	localServingPort = port
-)
-
 // var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
+var (
+	k8sClient        client.Client
+	testEnv          *envtest.Environment
+	localServingPort = port
+	scheme           = runtime.NewScheme()
+)
 
 func TestServer(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -85,12 +86,14 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = div2alpha1.AddToScheme(scheme.Scheme)
+	err = div2alpha1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = clientgoscheme.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
@@ -113,21 +116,21 @@ var _ = BeforeSuite(func() {
 	metricPort := config.GinkgoConfig.ParallelNode + 8200
 	metricAddress := fmt.Sprintf(":%d", metricPort)
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
+		Scheme:             scheme,
 		MetricsBindAddress: metricAddress,
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	ctx := dicontext.NewContext(context.Background(),
-		cfg,
+	ctx := dicontext.NewContext(cfg,
 		mgr.GetClient(),
 		mgr.GetEventRecorderFor("di-server"),
 		ctrl.Log.WithName("di-server"))
 
+	processor := NewProcessor(ctx)
 	localServingPort = port + config.GinkgoConfig.ParallelNode
 	addrPort := fmt.Sprintf("%s:%d", localServingHost, localServingPort)
 	go func() {
-		diServer := NewDIServer(ctx, addrPort)
+		diServer := NewDIServer(ctx, processor, addrPort)
 		mgr.Add(diServer)
 		err := mgr.Start(ctrl.SetupSignalHandler())
 		fmt.Println(err.Error())

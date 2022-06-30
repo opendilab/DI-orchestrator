@@ -37,9 +37,6 @@ type DIJobSpec struct {
 	// +kubebuilder:validation:Enum=normal;high
 	Priority Priority `json:"priority,omitempty"`
 
-	// EngineFields defines features of the DI-engine framework.
-	EngineFields EngineFields `json:"engineFields,omitempty"`
-
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed.
 	// +kubebuilder:default=Running
 	// +kubebuilder:validation:Enum=Running;All;None
@@ -49,30 +46,50 @@ type DIJobSpec struct {
 	// +kubebuilder:default=false
 	Preemptible bool `json:"preemptible,omitempty"`
 
-	// MinReplicas defines the minimum number of replicas of DIJob.
-	// +kubebuilder:validation:Minimum=0
-	MinReplicas int32 `json:"minReplicas,omitempty"`
+	// BackoffLimit defines the restart limit for DIJob.
+	// +kubebuilder:default=3
+	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 
-	// MaxReplicas defines the maximum number of replicas of DIJob.
+	// Provides flexible support for different components(collector, learner, evaluator) in DI-Engine
+	// +kubebuilder:validation:Required
+	Tasks []Task `json:"tasks"`
+}
+
+type Task struct {
+	// Replicas defines the number of this task.
+	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
-	MaxReplicas int32 `json:"maxReplicas,omitempty"`
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// TaskType defines the type of task
+	// +kubebuilder:validation:Enum=learner;collector;evaluator;none
+	// +kubebuilder:validation:Required
+	Type TaskType `json:"type,omitempty"`
+
+	// Name of the task specified.
+	Name string `json:"name,omitempty"`
 
 	// Template defines the pod template for DIJob.
 	// +kubebuilder:validation:Required
-	Template corev1.PodTemplateSpec `json:"template"`
+	Template corev1.PodTemplateSpec `json:"template,omitempty"`
 }
 
-type EngineFields struct {
-	// Topology defines the topology among the workers of the job.
-	// +kubebuilder:default=star
-	// +kubebuilder:validation:Enum=star;alone;mesh
-	Topology Topology `json:"topology,omitempty"`
+// TaskType defines the type of task
+type TaskType string
 
-	// ParallelWorkers defines the number of parallel workers in each worker.
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	ParallelWorkers int32 `json:"parallelWorkers,omitempty"`
-}
+const (
+	// TaskTypeLearner represents learner task
+	TaskTypeLearner TaskType = "learner"
+
+	// TaskTypeCollector represents evaluator task
+	TaskTypeCollector TaskType = "collector"
+
+	// TaskTypeEvaluator represents collector task
+	TaskTypeEvaluator TaskType = "evaluator"
+
+	// TaskTypeNone represents none task
+	TaskTypeNone TaskType = "none"
+)
 
 // Priority defines the priority of DIJob
 type Priority string
@@ -83,19 +100,6 @@ const (
 
 	// PriorityHigh is high priority
 	PriorityHigh Priority = "high"
-)
-
-type Topology string
-
-const (
-	// TopologyStar means all other workers are connected to a central node.
-	TopologyStar Topology = "star"
-
-	// TopologyAlone means no connections among workers.
-	TopologyAlone Topology = "alone"
-
-	// TopologyMesh means all workers are connected each other.
-	TopologyMesh Topology = "mesh"
 )
 
 type CleanPodPolicy string
@@ -119,16 +123,24 @@ type DIJobStatus struct {
 	// CompletionTimestamp defines the timestamp when the job was completed
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
-	// Generation defines restart times of the job
+	// Restarts defines restart times of the job
 	// +kubebuilder:default=0
-	Generation int32 `json:"generation,omitempty"`
+	Restarts int32 `json:"restarts,omitempty"`
+
+	// Reschedules defines reschedule times of the job
+	// +kubebuilder:default=0
+	Reschedules int32 `json:"reschedules,omitempty"`
 
 	// Phase defines the observed phase of the job
+	// +kubebuilder:default=Pending
 	Phase Phase `json:"phase,omitempty"`
 
 	// Replicas defines the observed number of replicas of the job
 	// +kubebuilder:default=0
 	Replicas int32 `json:"replicas,omitempty"`
+
+	// TaskStatus defines running status of each task. map's key is task.name, value is TaskStatus
+	TaskStatus map[string]TaskStatus `json:"taskStatus,omitempty"`
 
 	// ReadyReplicas defines the observed number of ready replicas of the job
 	// +kubebuilder:default=0
@@ -141,7 +153,7 @@ type DIJobStatus struct {
 	Profilings Profilings `json:"profilings,omitempty"`
 
 	// Conditions defines the conditions of the job
-	Conditions []DIJobCondition `json:"conditions,omitempty"`
+	Conditions []JobCondition `json:"conditions,omitempty"`
 }
 
 // Phase defines the phase of DIJob
@@ -158,6 +170,9 @@ const (
 	// JobRestarting means the job has been rescheduled and waits for restarting.
 	JobRestarting Phase = "Restarting"
 
+	// JobRescheduling means the job has been rescheduled and waits for restarting.
+	JobRescheduling Phase = "Rescheduling"
+
 	// JobRunning means all the pods are in running state
 	JobRunning Phase = "Running"
 
@@ -171,10 +186,13 @@ const (
 	JobUnknown Phase = "Unknown"
 )
 
+// Get the PodPhase from corev1
+type TaskStatus map[corev1.PodPhase]int32
+
 type Profilings struct{}
 
-// DIJobCondition records the conditions of DIJob
-type DIJobCondition struct {
+// JobCondition records the conditions of DIJob
+type JobCondition struct {
 	// Type of job condition.
 	Type Phase `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
@@ -193,9 +211,10 @@ type DIJobCondition struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=dijob
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="Restarts",type=integer,JSONPath=`.status.generation`
 // +kubebuilder:printcolumn:name="ReadyReplicas",type=integer,JSONPath=`.status.readyReplicas`
 // +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=`.status.replicas`
+// +kubebuilder:printcolumn:name="Restarts",type=integer,JSONPath=`.status.restarts`
+// +kubebuilder:printcolumn:name="Reschedules",type=integer,JSONPath=`.status.reschedules`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 // DIJob is the Schema for the dijobs API
 type DIJob struct {

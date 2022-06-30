@@ -5,16 +5,15 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	ditypes "opendilab.org/di-orchestrator/pkg/allocator/types"
+	alloctypes "opendilab.org/di-orchestrator/pkg/allocator/types"
 	div2alpha1 "opendilab.org/di-orchestrator/pkg/api/v2alpha1"
-	dihandler "opendilab.org/di-orchestrator/pkg/common/handler"
+	dicommon "opendilab.org/di-orchestrator/pkg/common"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
@@ -22,12 +21,12 @@ import (
 type Allocator struct {
 	Scheme           *runtime.Scheme
 	ctx              dicontext.Context
-	policy           ditypes.FitPolicy
+	policy           alloctypes.FitPolicy
 	scheduleDuration time.Duration
 	last             time.Time
 }
 
-func NewAllocator(scheme *runtime.Scheme, ctx dicontext.Context, policy ditypes.FitPolicy, scheduleDuration time.Duration) *Allocator {
+func NewAllocator(scheme *runtime.Scheme, ctx dicontext.Context, policy alloctypes.FitPolicy, scheduleDuration time.Duration) *Allocator {
 	return &Allocator{
 		Scheme:           scheme,
 		ctx:              ctx,
@@ -56,22 +55,22 @@ func (a *Allocator) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resul
 		log.Error(err, "get jobinfo failed")
 		return ctrl.Result{}, err
 	}
-	nodes, err := a.ctx.ListNodes()
+	nodes, err := a.ctx.ListNodes(ctx)
 	if err != nil {
 		log.Error(err, "list nodes failed")
 		return ctrl.Result{}, err
 	}
 
-	nodeinfos, err := a.getNodeInfos(nodes)
+	nodeinfos, err := a.getNodeInfos(ctx, nodes)
 	if err != nil {
 		log.Error(err, "list nodeinfos failed")
 		return ctrl.Result{}, err
 	}
 	log.V(2).Info("get", "nodeinfos", nodeinfos)
-	jobinfos := map[string]ditypes.JobInfo{
+	jobinfos := map[string]alloctypes.JobInfo{
 		jobinfo.Key.String(): jobinfo,
 	}
-	prevAllocations := map[string]ditypes.NodeList{}
+	prevAllocations := map[string]alloctypes.NodeList{}
 	if err := a.allocateAll(jobinfos, nodeinfos, prevAllocations); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -84,7 +83,7 @@ func (a *Allocator) SetupWithManager(mgr ctrl.Manager) error {
 		For(&div2alpha1.DIJob{}).
 		Watches(
 			&source.Kind{Type: &div2alpha1.DIJob{}},
-			&dihandler.EventHandler{
+			&dicommon.EventHandler{
 				OnCreateHandlers: []func(obj client.Object){
 					a.onJobAddHandler,
 				},
@@ -93,11 +92,11 @@ func (a *Allocator) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Watches(
 			&source.Kind{Type: &corev1.Node{}},
-			&dihandler.EventHandler{},
+			&dicommon.EventHandler{},
 		).
 		Watches(
 			&source.Kind{Type: &corev1.Pod{}},
-			&dihandler.EventHandler{},
+			&dicommon.EventHandler{},
 		).
 		Complete(a)
 }
@@ -107,7 +106,7 @@ func (a *Allocator) onJobAddHandler(obj client.Object) {
 	log := a.ctx.Log.WithName("onJobAddHandler").WithValues("job", diutil.NamespacedName(obj.GetNamespace(), obj.GetName()))
 	job := obj.(*div2alpha1.DIJob)
 
-	if err := a.allocate(job); err != nil {
+	if err := a.allocate(context.Background(), job); err != nil {
 		log.Error(err, "failed to allocate")
 	}
 }
@@ -121,9 +120,9 @@ func (a *Allocator) updateLastTime() {
 	a.last = time.Now()
 }
 
-func (a *Allocator) allocate(job *div2alpha1.DIJob) error {
+func (a *Allocator) allocate(ctx context.Context, job *div2alpha1.DIJob) error {
 	log := a.ctx.Log.WithName("allocate").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
-	status := job.Status.DeepCopy()
+	old := job.DeepCopy()
 	// allocate job if preemptible, otherwise just update status.replicas
 	if job.Spec.Preemptible {
 		jobinfo, err := getJobInfo(job)
@@ -131,11 +130,11 @@ func (a *Allocator) allocate(job *div2alpha1.DIJob) error {
 			log.Error(err, "get jobinfo failed")
 			return err
 		}
-		nodes, err := a.ctx.ListNodes()
+		nodes, err := a.ctx.ListNodes(ctx)
 		if err != nil {
 			return err
 		}
-		nodeinfos, err := a.getNodeInfos(nodes)
+		nodeinfos, err := a.getNodeInfos(ctx, nodes)
 		if err != nil {
 			return err
 		}
@@ -148,18 +147,17 @@ func (a *Allocator) allocate(job *div2alpha1.DIJob) error {
 			job.Status.Allocation = allocation
 		}
 	} else {
-		job.Status.Replicas = job.Spec.MinReplicas
+		// TODO(liqingping): 进行初始分配
+		// job.Status.Replicas = job.Spec.MinReplicas
 	}
 
-	if !apiequality.Semantic.DeepEqual(job.Status, *status) {
-		if err := a.ctx.UpdateDIJobStatusInCluster(job); err != nil {
-			return err
-		}
+	if err := a.ctx.UpdateJobAllocationInCluster(ctx, old, job); err != nil {
+		return err
 	}
 	return nil
 }
 
-func (a *Allocator) allocateAll(jobinfos map[string]ditypes.JobInfo, nodeinfos map[string]*ditypes.NodeInfo, prevAllocations map[string]ditypes.NodeList) error {
+func (a *Allocator) allocateAll(jobinfos map[string]alloctypes.JobInfo, nodeinfos map[string]*alloctypes.NodeInfo, prevAllocations map[string]alloctypes.NodeList) error {
 	log := a.ctx.Log.WithName("allocateAll")
 	allocations, err := a.policy.Optimize(jobinfos, nodeinfos, prevAllocations)
 	if err != nil {

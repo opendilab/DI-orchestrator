@@ -1,0 +1,53 @@
+apiVersion: diengine.opendilab.org/v2alpha1
+kind: DIJob
+metadata:
+  name: normal-job
+spec:
+  group: "diengine"  # 标记job所属的group，保留字段
+  priority: "normal"  # 表示job的优先级，保留字段，调度中或许可以用到
+  backoffLimit: 0  # 表示job允许的最大重启次数，可以为nil，表示无限重启；默认为3，可以通过status.restarts看到实际重启次数
+  cleanPodPolicy: "Running"  # 表示job运行完成之后，如何处理worker pods。Running表示job完成后删除所有还在Running的pods
+  preemptible: false  # 表示job是否允许被抢占，调度中对job资源改动之后涉及到抢占操作。目前只能设置为false
+  tasks:
+  - replicas: 1
+    name: "learner"
+    type: learner
+    template:
+      spec:
+        containers:
+        - name: di-container
+          image: alpine:3.9
+          command: ["/bin/sh", "-c",]
+          args:
+          - |
+            echo $DI_NODES
+            echo $DI_LEARNER_NODES
+        restartPolicy: Never
+  - replicas: 1
+    name: "evaluator"
+    type: evaluator
+    template:
+      spec:
+        containers:
+        - name: di-container
+          image: alpine:3.9
+          command: ["/bin/sh", "-c",]
+          args:
+          - |
+            echo $DI_NODES
+            echo $DI_EVALUATOR_NODES
+        restartPolicy: Never
+  - replicas: 2
+    name: "collector"
+    type: collector
+    template:
+      spec:
+        containers:
+        - name: di-container
+          image: alpine:3.9
+          command: ["/bin/sh", "-c",]
+          args:
+          - |
+            echo $DI_NODES
+            echo $DI_COLLECTOR_NODES
+        restartPolicy: Never

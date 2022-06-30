@@ -3,7 +3,7 @@ The v1 version of the DI-engine framework consists of three important modules, n
 
 The v2 version of the DI-engine framework integrates the three modules, so that the complete training process can be completed within the same worker, and a new worker can be added directly without restarting. This article will describe the DI Orchestrator v2 version for the DI-engine v2 version in detail.
 
-For more details about the DI-engine framework, please refer to [DI-engine Documentation](https://opendilab.github.io/DI-engine/index.html)
+For more details about the DI-engine framework, please refer to [DI-engine Documentation](https://di-engine-docs.readthedocs.io/en/latest/index.html) and [DI-engine Distributed](https://di-engine-docs.readthedocs.io/en/latest/distributed/gobigger.html)。
 
 In order to support for DI-engine running in Kubernetes (K8s), we designed DI Orchestrator. This article will explain how DI-engine components are created on K8s system using DI Orchestrator, how components to discover each other, how components to start training, etc. The architecture of DI Orchestrator is shown in the following figure:
 
@@ -17,44 +17,75 @@ DI Operator is responsible for orchestrating DIJob in K8s system, using K8s [ope
 
 ### API Definitions
 
-According to the characteristics of DI-engine framework, we use K8s Custom Resource to define the DIJob resource, which is used to define the desired state of a DI-engine Reinforcement Learning(RL) job, including images, startup commands, mount volumes, and the number of workers, etc..
+According to the characteristics of DI-engine framework, we use K8s Custom Resource to define the DIJob resource, which is used to define the desired state of a DI-engine Reinforcement Learning(RL) job, including images, startup commands, mount volumes, and the task's type and number, etc..
 
 Definition and meaning of each field in DIJobSpec is as follows:
 
 ```go
 type DIJobSpec struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
 	// Group is a collection of DIJobs.
 	Group string `json:"group,omitempty"`
 
 	// Priority labels the priority of DIJob.
+	// +kubebuilder:default=normal
+	// +kubebuilder:validation:Enum=normal;high
 	Priority Priority `json:"priority,omitempty"`
 
-	// EngineFields defines features of the DI-engine framework.
-	EngineFields EngineFields `json:"engineFields,omitempty"`
-
 	// CleanPodPolicy defines the policy to clean pods after DIJob completed.
+	// +kubebuilder:default=Running
+	// +kubebuilder:validation:Enum=Running;All;None
 	CleanPodPolicy CleanPodPolicy `json:"cleanPodPolicy,omitempty"`
 
 	// Preemptible defines whether the dijob can be preempted.
+	// +kubebuilder:default=false
 	Preemptible bool `json:"preemptible,omitempty"`
 
-	// MinReplicas defines the minimum number of replicas of DIJob.
-	MinReplicas int32 `json:"minReplicas,omitempty"`
+	// BackoffLimit defines the restart limit for DIJob.
+	// +kubebuilder:default=3
+	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 
-	// MaxReplicas defines the maximum number of replicas of DIJob.
-	MaxReplicas int32 `json:"maxReplicas,omitempty"`
+	// Provides flexible support for different components(collector, learner, evaluator) in DI-Engine
+	// +kubebuilder:validation:Required
+	Tasks []Task `json:"tasks"`
+}
+
+type Task struct {
+	// Replicas defines the number of this task.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// TaskType defines the type of task
+	// +kubebuilder:validation:Enum=learner;collector;evaluator;none
+	// +kubebuilder:validation:Required
+	Type TaskType `json:"type,omitempty"`
+
+	// Name of the task specified.
+	Name string `json:"name,omitempty"`
 
 	// Template defines the pod template for DIJob.
-	Template corev1.PodTemplateSpec `json:"template"`
+	// +kubebuilder:validation:Required
+	Template corev1.PodTemplateSpec `json:"template,omitempty"`
 }
 
-type EngineFields struct {
-	// Topology defines the topology among the workers of the job.
-	Topology Topology `json:"topology,omitempty"`
+type TaskType string
 
-	// ParallelWorkers defines the number of parallel workers in each worker.
-	ParallelWorkers int32 `json:"parallelWorkers,omitempty"`
-}
+const (
+	// TaskTypeLearner represents learner task
+	TaskTypeLearner TaskType = "learner"
+
+	// TaskTypeCollector represents evaluator task
+	TaskTypeCollector TaskType = "collector"
+
+	// TaskTypeEvaluator represents collector task
+	TaskTypeEvaluator TaskType = "evaluator"
+
+	// TaskTypeNone represents none task
+	TaskTypeNone TaskType = "none"
+)
 ```
 
 ### Phase Definitions
@@ -72,6 +103,9 @@ const (
 
 	// JobRestarting means the job has been rescheduled and waits for restarting.
 	JobRestarting Phase = "Restarting"
+
+	// JobRescheduling means the job has been rescheduled and waits for restarting.
+	JobRescheduling Phase = "Rescheduling"
 
 	// JobRunning means all the pods are in running state
 	JobRunning Phase = "Running"

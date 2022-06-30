@@ -17,7 +17,6 @@ limitations under the License.
 package controllers
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -26,7 +25,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
@@ -48,8 +48,11 @@ const (
 )
 
 // var cfg *rest.Config
-var ctx dicontext.Context
-var testEnv *envtest.Environment
+var (
+	ctx     dicontext.Context
+	testEnv *envtest.Environment
+	scheme  = runtime.NewScheme()
+)
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -72,7 +75,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = v2alpha1.AddToScheme(scheme.Scheme)
+	err = v2alpha1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = clientgoscheme.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
@@ -81,13 +86,12 @@ var _ = BeforeSuite(func() {
 	metricPort := config.GinkgoConfig.ParallelNode + 8200
 	metricAddress := fmt.Sprintf(":%d", metricPort)
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
+		Scheme:             scheme,
 		MetricsBindAddress: metricAddress,
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	ctx = dicontext.NewContext(context.Background(),
-		cfg,
+	ctx = dicontext.NewContext(cfg,
 		k8sManager.GetClient(),
 		k8sManager.GetEventRecorderFor("controller"),
 		ctrl.Log.WithName("controller"))

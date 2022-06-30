@@ -20,9 +20,11 @@ spec:
         - /di-orchestrator
         - server
         args:
-        - --zap-devel=true
-        - --server-bind-address=:8081
-        image: opendilab/di-orchestrator:v1.0.1
+        - "--zap-devel=true"
+        - "--server-bind-address=:8081"
+        - "--qps=100"
+        - "--burst=200"
+        image: opendilab/di-orchestrator:v1.1.0
         imagePullPolicy: Always
         name: server
         envFrom:

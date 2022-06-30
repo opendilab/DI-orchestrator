@@ -14,14 +14,17 @@ var (
 
 type DIServer struct {
 	ctx               dicontext.Context
+	p                 ProcessorInterface
 	serverBindAddress string
 }
 
 func NewDIServer(
 	ctx dicontext.Context,
+	processor ProcessorInterface,
 	serverBindAddress string) *DIServer {
 	return &DIServer{
 		ctx:               ctx,
+		p:                 processor,
 		serverBindAddress: serverBindAddress,
 	}
 }

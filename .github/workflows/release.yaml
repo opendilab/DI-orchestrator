@@ -6,7 +6,7 @@ name: Release
 on: [push]
 
 env:
-  version: v1.0.0
+  version: v1.1.0
 
 jobs:
   docker:

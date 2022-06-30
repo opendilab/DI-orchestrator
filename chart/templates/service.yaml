@@ -16,6 +16,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  labels:
+    control-plane: {{ .Values.serverName }}
   name: {{ .Values.serverName }}
   namespace: {{ .Release.Namespace }}
 spec:

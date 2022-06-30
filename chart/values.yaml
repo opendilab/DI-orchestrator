@@ -3,8 +3,9 @@
 # Declare variables to be passed into your templates.
 
 # tag for pytorch-operator image
-tag: ${ImageTag}
+tag: v1.1.0
 
+# tag for di-orchestrator image
 registry: opendilab
 serviceDomainName: svc.cluster.local
 

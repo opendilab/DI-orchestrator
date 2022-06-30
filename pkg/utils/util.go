@@ -2,12 +2,9 @@ package util
 
 import (
 	"fmt"
-	"math/rand"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -21,8 +18,12 @@ const (
 	randomLength = 5
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
+func Int32(i int32) *int32 {
+	return &i
+}
+
+func Bool(i bool) *bool {
+	return &i
 }
 
 func GenerateName(name string) string {
@@ -41,8 +42,12 @@ func SplitNamespaceName(namespaceName string) (types.NamespacedName, error) {
 	return types.NamespacedName{Namespace: strs[0], Name: strs[1]}, nil
 }
 
-func ReplicaName(jobName string, generation, rank int) string {
-	return fmt.Sprintf("%s-%d-%d", jobName, generation, rank)
+func ReplicaName(jobName string, taskName string, rank int) string {
+	return fmt.Sprintf("%s-%s-%d", jobName, taskName, rank)
+}
+
+func PodFQDN(name, subdomain, namespace, domainName string) string {
+	return fmt.Sprintf("%s.%s.%s.%s", name, subdomain, namespace, domainName)
 }
 
 func IsSucceeded(job *div2alpha1.DIJob) bool {
@@ -51,10 +56,6 @@ func IsSucceeded(job *div2alpha1.DIJob) bool {
 
 func IsFailed(job *div2alpha1.DIJob) bool {
 	return job.Status.Phase == div2alpha1.JobFailed
-}
-
-func IsTerminating(pod *corev1.Pod) bool {
-	return pod.DeletionTimestamp != nil
 }
 
 func GetObjectFromUnstructured(obj interface{}, dest interface{}) error {
@@ -148,7 +149,7 @@ func GetEnvFromPod(pod *corev1.Pod, envName string) (string, bool) {
 	return "", false
 }
 
-func CountPodsScheduled(pods []*corev1.Pod) int {
+func CountScheduledPods(pods []*corev1.Pod) int {
 	count := 0
 	for _, pod := range pods {
 		for _, c := range pod.Status.Conditions {
@@ -163,6 +164,9 @@ func CountPodsScheduled(pods []*corev1.Pod) int {
 func CountReadyPods(pods []*corev1.Pod) int {
 	count := 0
 	for _, pod := range pods {
+		if IsPodTerminating(pod) {
+			continue
+		}
 		for _, c := range pod.Status.ContainerStatuses {
 			if c.Ready {
 				count++
@@ -170,6 +174,23 @@ func CountReadyPods(pods []*corev1.Pod) int {
 		}
 	}
 	return count
+}
+
+func CountCompletedPods(pods []*corev1.Pod, preemptible bool) (succeeded, failed int) {
+	succeeded = 0
+	failed = 0
+	for _, pod := range pods {
+		// replicas, _ := strconv.Atoi(pod.Annotations[dicommon.AnnotationReplicas])
+		// if replicas == len(pods) && diutil.IsPodSucceeded(pod) {
+		if IsPodSucceeded(pod) {
+			succeeded++
+			continue
+		}
+		if IsPodFailed(pod, preemptible) {
+			failed++
+		}
+	}
+	return succeeded, failed
 }
 
 func SetPodResources(pod *corev1.Pod, resources corev1.ResourceRequirements) {
@@ -191,71 +212,53 @@ func GetPodResources(spec *corev1.PodSpec) corev1.ResourceRequirements {
 	return corev1.ResourceRequirements{}
 }
 
-func ConcatURL(name, ns string, port int32) string {
-	return fmt.Sprintf("%s.%s:%d", name, ns, port)
-}
-
-func GetPodAccessURL(pod *corev1.Pod, defaultPort int32) string {
-	port, found := GetDefaultPortFromPod(pod)
-	if !found {
-		port = defaultPort
-	}
-	return ConcatURL(pod.Name, pod.Namespace, port)
-}
-
-func GetServiceAccessURL(service *corev1.Service) string {
-	url := ""
-	for _, port := range service.Spec.Ports {
-		if port.Name == dicommon.DefaultPortName {
-			url = ConcatURL(service.Name, service.Namespace, port.Port)
-			break
-		}
-	}
-	return url
-}
-
-func FilterOutTerminatingPods(pods []*corev1.Pod) []*corev1.Pod {
+func FilterPods(pods []*corev1.Pod, filters Filters) []*corev1.Pod {
 	results := []*corev1.Pod{}
 	for _, pod := range pods {
-		if IsTerminating(pod) {
-			continue
+		if filters.Apply(pod) {
+			results = append(results, pod)
 		}
-		results = append(results, pod)
 	}
 
 	return results
 }
 
-func BuildService(name, namespace string, ownRefer metav1.OwnerReference, labels map[string]string, port int32) *corev1.Service {
-	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
-			Namespace:       namespace,
-			Labels:          labels,
-			OwnerReferences: []metav1.OwnerReference{ownRefer},
-		},
-		Spec: corev1.ServiceSpec{
-			Type:      corev1.ServiceTypeClusterIP,
-			ClusterIP: "None",
-			Selector:  labels,
-			Ports: []corev1.ServicePort{
-				{
-					Port: port,
-					Name: dicommon.DefaultPortName,
-				},
-			},
-		},
-	}
-
-	return svc
+func IsPodTerminating(pod *corev1.Pod) bool {
+	return pod.DeletionTimestamp != nil
 }
 
-func NewOwnerReference(apiVersion, kind, name string, uid types.UID, controller bool) metav1.OwnerReference {
-	return metav1.OwnerReference{
-		APIVersion: apiVersion,
-		Kind:       kind,
-		Name:       name,
-		UID:        uid,
-		Controller: &controller,
+func IsPodSucceeded(pod *corev1.Pod) bool {
+	return pod.Status.Phase == corev1.PodSucceeded
+}
+
+func IsPodFailed(pod *corev1.Pod, preemptible bool) bool {
+	exit143 := func(pod *corev1.Pod) bool {
+		if pod.Status.ContainerStatuses == nil {
+			return false
+		}
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.State.Terminated != nil && status.State.Terminated.ExitCode == 143 {
+				return true
+			}
+		}
+		return false
 	}
+
+	if pod.Status.Phase != corev1.PodUnknown && pod.Status.Phase != corev1.PodFailed {
+		return false
+	}
+	if pod.Status.Reason == "UnexpectedAdmissionError" {
+		// log.Info(fmt.Sprintf("pod %s UnexpectedAdmissionError occurred, message: %s", pod.Name, pod.Status.Message))
+		return false
+	} else if strings.HasPrefix(pod.Status.Reason, "Outof") {
+		// log.Info(fmt.Sprintf("pod %s is %s on node %s", pod.Name, pod.Status.Reason, pod.Spec.NodeName))
+		return false
+	} else if preemptible && exit143(pod) {
+		// log.Info(fmt.Sprintf("pod %s is terminated intentionally", pod.Name))
+		return false
+	} else if IsPodTerminating(pod) {
+		// log.Info(fmt.Sprintf("pod %s has been deleted", pod.Name))
+		return false
+	}
+	return true
 }

@@ -1,16 +1,13 @@
 package testutils
 
 import (
+	"bytes"
 	"context"
-	"fmt"
 	"io"
-	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -67,12 +64,10 @@ func UpdatePodPhase(ctx dicontext.Context, podKey types.NamespacedName, phase co
 }
 
 func GetPodLogs(clientSet *kubernetes.Clientset,
-	namespace string, podName string, containerName string, follow bool, message string, timeout time.Duration) error {
-	count := int64(100)
+	namespace string, podName string, containerName string, follow bool) (string, error) {
 	podLogOptions := corev1.PodLogOptions{
 		Container: containerName,
 		Follow:    follow,
-		TailLines: &count,
 	}
 
 	podLogRequest := clientSet.CoreV1().
@@ -80,30 +75,15 @@ func GetPodLogs(clientSet *kubernetes.Clientset,
 		GetLogs(podName, &podLogOptions)
 	stream, err := podLogRequest.Stream(context.TODO())
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer stream.Close()
 
-	err = wait.Poll(50*time.Millisecond, timeout, func() (bool, error) {
-		buf := make([]byte, 2000)
-		numBytes, err := stream.Read(buf)
-		if numBytes == 0 {
-			return false, nil
-		}
-		if err == io.EOF {
-			return false, fmt.Errorf("can't find related logs '%s' from pod %s", message, podName)
-		}
-		if err != nil {
-			return false, err
-		}
-		logs := string(buf[:numBytes])
-		if strings.Contains(logs, message) {
-			return true, nil
-		}
-		return false, nil
-	})
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, stream)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	str := buf.String()
+	return str, nil
 }

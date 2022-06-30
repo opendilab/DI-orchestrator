@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -27,37 +28,37 @@ var _ = Describe("DIJob Specification", func() {
 			for _, policy := range cleanPodPolicies {
 				type testCase struct {
 					runnings       int // pending pods are also considered as running pods
-					replicaStatues []corev1.PodPhase
+					replicaStatues [][]corev1.PodPhase
 				}
 				testCases := []testCase{
 					{
 						runnings: 2,
-						replicaStatues: []corev1.PodPhase{
-							corev1.PodRunning, corev1.PodRunning, corev1.PodFailed, corev1.PodSucceeded,
+						replicaStatues: [][]corev1.PodPhase{
+							{corev1.PodRunning}, {corev1.PodRunning}, {corev1.PodFailed, corev1.PodSucceeded},
 						},
 					},
 					{
 						runnings: 0,
-						replicaStatues: []corev1.PodPhase{
-							corev1.PodFailed, corev1.PodSucceeded, corev1.PodFailed,
+						replicaStatues: [][]corev1.PodPhase{
+							{corev1.PodFailed}, {corev1.PodFailed}, {corev1.PodFailed, corev1.PodSucceeded},
 						},
 					},
 					{
 						runnings: 3,
-						replicaStatues: []corev1.PodPhase{
-							corev1.PodPending, corev1.PodRunning, corev1.PodFailed, corev1.PodRunning,
+						replicaStatues: [][]corev1.PodPhase{
+							{corev1.PodRunning}, {corev1.PodRunning}, {corev1.PodRunning, corev1.PodFailed},
 						},
 					},
 					{
 						runnings: 0,
-						replicaStatues: []corev1.PodPhase{
-							corev1.PodFailed, corev1.PodFailed, corev1.PodFailed,
+						replicaStatues: [][]corev1.PodPhase{
+							{corev1.PodFailed}, {corev1.PodFailed}, {corev1.PodFailed, corev1.PodFailed},
 						},
 					},
 					{
 						runnings: 0,
-						replicaStatues: []corev1.PodPhase{
-							corev1.PodSucceeded, corev1.PodSucceeded, corev1.PodSucceeded,
+						replicaStatues: [][]corev1.PodPhase{
+							{corev1.PodSucceeded}, {corev1.PodSucceeded}, {corev1.PodSucceeded, corev1.PodSucceeded},
 						},
 					},
 				}
@@ -66,23 +67,29 @@ var _ = Describe("DIJob Specification", func() {
 					By(fmt.Sprintf("Create %dth DIJob", i+1))
 					var err error
 					jobTmpl := testutil.NewDIJob()
-					jobTmpl.Spec.MinReplicas = int32(len(c.replicaStatues))
+					for i := range jobTmpl.Spec.Tasks {
+						jobTmpl.Spec.Tasks[i].Replicas = int32(len(c.replicaStatues[i]))
+					}
+					totalReplicas := 0
+					for _, task := range jobTmpl.Spec.Tasks {
+						totalReplicas += int(task.Replicas)
+					}
+					jobTmpl.Spec.BackoffLimit = diutil.Int32(0)
 					jobTmpl.Spec.CleanPodPolicy = policy
-					job, jobKey := createAndUpdateReplicas(ctx, jobTmpl)
-
-					By("Check the created DIJob is in Starting state")
-					checkDIJobPhase(ctx, jobKey, div2alpha1.JobStarting)
+					job, _ := createAndUpdateReplicas(ctx, jobTmpl)
 
 					By("Update workers status")
-					for rank := 0; rank < len(c.replicaStatues); rank++ {
-						replicaName := diutil.ReplicaName(job.Name, int(job.Status.Generation), rank)
-						podKey := types.NamespacedName{Namespace: job.Namespace, Name: replicaName}
-						err = testutil.UpdatePodPhase(ctx, podKey, c.replicaStatues[rank])
-						Expect(err).NotTo(HaveOccurred())
+					for taskIndex, taskStatus := range c.replicaStatues {
+						for podIndex, phase := range taskStatus {
+							replicaName := diutil.ReplicaName(job.Name, job.Spec.Tasks[taskIndex].Name, podIndex)
+							podKey := types.NamespacedName{Namespace: job.Namespace, Name: replicaName}
+							err = testutil.UpdatePodPhase(ctx, podKey, phase)
+							Expect(err).NotTo(HaveOccurred())
+						}
 					}
 
 					By("Get the number of pods")
-					pods, err := ctx.ListJobPods(&job)
+					pods, err := ctx.ListJobPods(context.Background(), &job)
 					Expect(err).NotTo(HaveOccurred())
 					npods := len(pods)
 
@@ -91,14 +98,14 @@ var _ = Describe("DIJob Specification", func() {
 					switch policy {
 					case div2alpha1.CleanPodPolicyAll:
 						Eventually(func() int {
-							pods, err := ctx.ListJobPods(&job)
+							pods, err := ctx.ListJobPods(context.Background(), &job)
 							if err != nil {
 								return -1
 							}
 							return len(pods)
 						}, timeout, interval).Should(Equal(0))
 						Eventually(func() int {
-							svcs, err := ctx.ListJobServices(&job)
+							svcs, err := ctx.ListJobServices(context.Background(), &job)
 							if err != nil {
 								return -1
 							}
@@ -106,14 +113,14 @@ var _ = Describe("DIJob Specification", func() {
 						}, timeout, interval).Should(Equal(0))
 					case div2alpha1.CleanPodPolicyNone:
 						Consistently(func() int {
-							pods, err := ctx.ListJobPods(&job)
+							pods, err := ctx.ListJobPods(context.Background(), &job)
 							if err != nil {
 								return -1
 							}
 							return len(pods)
 						}, duration, interval).Should(Equal(npods))
 						Eventually(func() int {
-							svcs, err := ctx.ListJobServices(&job)
+							svcs, err := ctx.ListJobServices(context.Background(), &job)
 							if err != nil {
 								return -1
 							}
@@ -121,14 +128,14 @@ var _ = Describe("DIJob Specification", func() {
 						}, timeout, interval).Should(Equal(0))
 					case div2alpha1.CleanPodPolicyRunning:
 						Eventually(func() int {
-							pods, err := ctx.ListJobPods(&job)
+							pods, err := ctx.ListJobPods(context.Background(), &job)
 							if err != nil {
 								return -1
 							}
 							return len(pods)
 						}, timeout, interval).Should(Equal(npods - c.runnings))
 						Eventually(func() int {
-							svcs, err := ctx.ListJobServices(&job)
+							svcs, err := ctx.ListJobServices(context.Background(), &job)
 							if err != nil {
 								return -1
 							}
@@ -137,58 +144,34 @@ var _ = Describe("DIJob Specification", func() {
 					}
 
 					By("Clean up pods")
-					err = ctx.CleanUpJob(&job)
+					err = ctx.CleanUpJob(context.Background(), &job)
 					Expect(err).NotTo(HaveOccurred())
 				}
 			}
 		})
-		It("Should create replicas with different connections relying on topology and parallel workers", func() {
+		It("Should create replicas with correct envs setted", func() {
 			type testCase struct {
-				topology            div2alpha1.Topology
-				replicas            int
-				paralleWorkers      int
-				expectAttachedNodes int
+				replicas         []int
+				expectedEnvNodes int
 			}
 			testCases := []testCase{
-				{
-					topology: div2alpha1.TopologyAlone, replicas: 1, paralleWorkers: 1, expectAttachedNodes: 0,
-				},
-				{
-					topology: div2alpha1.TopologyAlone, replicas: 2, paralleWorkers: 3, expectAttachedNodes: 0,
-				},
-				{
-					topology: div2alpha1.TopologyStar, replicas: 1, paralleWorkers: 1, expectAttachedNodes: 0,
-				},
-				{
-					topology: div2alpha1.TopologyStar, replicas: 2, paralleWorkers: 3, expectAttachedNodes: 1,
-				},
-				{
-					topology: div2alpha1.TopologyStar, replicas: 3, paralleWorkers: 3, expectAttachedNodes: 2,
-				},
-				{
-					topology: div2alpha1.TopologyStar, replicas: 3, paralleWorkers: 4, expectAttachedNodes: 2,
-				},
-				{
-					topology: div2alpha1.TopologyMesh, replicas: 1, paralleWorkers: 1, expectAttachedNodes: 0,
-				},
-				{
-					topology: div2alpha1.TopologyMesh, replicas: 2, paralleWorkers: 3, expectAttachedNodes: 3,
-				},
-				{
-					topology: div2alpha1.TopologyMesh, replicas: 3, paralleWorkers: 3, expectAttachedNodes: 9,
-				},
-				{
-					topology: div2alpha1.TopologyMesh, replicas: 3, paralleWorkers: 4, expectAttachedNodes: 12,
-				},
+				{replicas: []int{1, 1, 1}, expectedEnvNodes: 9},
+				{replicas: []int{1, 1, 2}, expectedEnvNodes: 16},
+				{replicas: []int{1, 3, 2}, expectedEnvNodes: 36},
 			}
 			for i := range testCases {
 				c := testCases[i]
 				By(fmt.Sprintf("Create %dth DIJob", i+1))
 				var err error
 				jobTmpl := testutil.NewDIJob()
-				jobTmpl.Spec.MinReplicas = int32(c.replicas)
-				jobTmpl.Spec.EngineFields.ParallelWorkers = int32(c.paralleWorkers)
-				jobTmpl.Spec.EngineFields.Topology = c.topology
+				for i := range jobTmpl.Spec.Tasks {
+					jobTmpl.Spec.Tasks[i].Replicas = int32(c.replicas[i])
+				}
+				totalReplicas := 0
+				for _, task := range jobTmpl.Spec.Tasks {
+					totalReplicas += int(task.Replicas)
+				}
+
 				job, jobKey := createAndUpdateReplicas(ctx, jobTmpl)
 
 				By("Check the created DIJob is in Starting state")
@@ -196,26 +179,26 @@ var _ = Describe("DIJob Specification", func() {
 
 				By("Check workers' attached nodes are as expected")
 				Eventually(func() int {
-					pods, err := ctx.ListJobPods(&job)
+					pods, err := ctx.ListJobPods(context.Background(), &job)
 					if err != nil {
 						return -1
 					}
-					attachedNodes := 0
+					nodes := 0
 					for _, pod := range pods {
 						for _, env := range pod.Spec.Containers[0].Env {
-							if env.Name == dicommon.ENVAttachedNodesArg {
+							if env.Name == dicommon.ENVNodes {
 								if env.Value == "" {
 									continue
 								}
-								attachedNodes += len(strings.Split(env.Value, ","))
+								nodes += len(strings.Split(env.Value, ","))
 							}
 						}
 					}
-					return attachedNodes
-				}, timeout, interval).Should(Equal(c.expectAttachedNodes))
+					return nodes
+				}, timeout, interval).Should(Equal(c.expectedEnvNodes))
 
 				By("Clean up pods")
-				err = ctx.CleanUpJob(&job)
+				err = ctx.CleanUpJob(context.Background(), &job)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})

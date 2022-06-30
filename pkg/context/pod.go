@@ -1,8 +1,10 @@
 package context
 
 import (
+	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -14,27 +16,32 @@ import (
 	diutil "opendilab.org/di-orchestrator/pkg/utils"
 )
 
-func (c *Context) BuildPod(job *div2alpha1.DIJob, rank int, allocation []string) *corev1.Pod {
-	generation := int(job.Status.Generation)
-	replicas := int(job.Status.Replicas)
-	nodeName := ""
-	if allocation != nil {
-		nodeName = allocation[rank]
+func (c *Context) BuildPod(job *div2alpha1.DIJob, rank int, allocation []string, taskNum int, taskLocalRank int) *corev1.Pod {
+	replicas := 0
+	for _, task := range job.Spec.Tasks {
+		replicas += int(task.Replicas)
 	}
 
-	podTemplate := job.Spec.Template.DeepCopy()
+	podTemplate := job.Spec.Tasks[taskNum].Template.DeepCopy()
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: job.Namespace,
-			Name:      diutil.ReplicaName(job.Name, generation, rank),
+			Name:      diutil.ReplicaName(job.Name, job.Spec.Tasks[taskNum].Name, taskLocalRank),
 		},
 		Spec: podTemplate.Spec,
 	}
-	pod.OwnerReferences = append(pod.OwnerReferences, diutil.NewOwnerReference(job.APIVersion, job.Kind, job.Name, job.UID, true))
-	if nodeName != "" {
-		// TODO(liqingping): add node selector to pod
+	pod.OwnerReferences = append(pod.OwnerReferences, *metav1.NewControllerRef(job, div2alpha1.GroupVersion.WithKind(div2alpha1.KindDIJob)))
+
+	nodeName := ""
+	if job.Spec.Preemptible {
+		if len(allocation) >= rank {
+			nodeName = allocation[rank]
+			pod.Spec.NodeName = nodeName
+		}
 	}
+
 	pod.Spec.RestartPolicy = corev1.RestartPolicyNever
+	// set hostname and subdomain to enable service subdomain
 	pod.Spec.Hostname = pod.Name
 	pod.Spec.Subdomain = job.Name
 
@@ -44,21 +51,39 @@ func (c *Context) BuildPod(job *div2alpha1.DIJob, rank int, allocation []string)
 	diutil.AddLabelsToPod(pod, labels)
 
 	annotations := map[string]string{
-		dicommon.AnnotationGeneration: strconv.Itoa(generation),
-		dicommon.AnnotationReplicas:   strconv.Itoa(replicas),
-		dicommon.AnnotationRank:       strconv.Itoa(rank),
-		dicommon.AnnotationNode:       nodeName,
+		dicommon.AnnotationReplicas: strconv.Itoa(replicas),
+		dicommon.AnnotationRank:     strconv.Itoa(rank),
+		dicommon.AnnotationNode:     nodeName,
+		dicommon.AnnotationTaskType: string(job.Spec.Tasks[taskNum].Type),
+		dicommon.AnnotationTaskRank: strconv.Itoa(taskLocalRank),
 	}
 	diutil.AddAnnotationsToPod(pod, annotations)
 
+	// build fqdns for all pods
+	var fqdns []string
+	var internalFqdns []string
+
+	for num, task := range job.Spec.Tasks {
+		for i := 0; i < int(task.Replicas); i++ {
+			replicaName := diutil.ReplicaName(job.Name, job.Spec.Tasks[num].Name, i)
+			fqdn := diutil.PodFQDN(replicaName, job.Name, job.Namespace, dicommon.GetServiceDomainName())
+			fqdns = append(fqdns, fqdn)
+			if task.Type == job.Spec.Tasks[taskNum].Type {
+				internalFqdns = append(internalFqdns, fqdn)
+			}
+		}
+	}
+	var DITasknameNodes string = "DI_" + strings.ReplaceAll(strings.ToUpper(job.Spec.Tasks[taskNum].Name), "-", "_") + "_NODES"
 	envs := map[string]string{
-		dicommon.ENVJobID:         diutil.NamespacedName(job.Namespace, job.Name),
-		dicommon.ENVJobGeneration: strconv.Itoa(generation),
-		dicommon.ENVServerURL:     dicommon.GetDIServerURL(),
+		dicommon.ENVJobID:     diutil.NamespacedName(job.Namespace, job.Name),
+		dicommon.ENVServerURL: dicommon.GetDIServerURL(),
+		dicommon.ENVRank:      strconv.Itoa(rank),
+		dicommon.ENVNodes:     strings.Join(fqdns, ","),
+		DITasknameNodes:       strings.Join(internalFqdns, ","),
 	}
 	diutil.AddEnvsToPod(pod, envs)
 
-	OnTopologyHandler(job, rank, pod)
+	// OnTopologyHandler(job, rank, pod)
 	return pod
 }
 
@@ -66,10 +91,10 @@ func (c *Context) BuildService(job *div2alpha1.DIJob) *corev1.Service {
 	labels := diutil.GenLabels(*job)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      job.Name,
+			Name:      svcName(job.Name),
 			Namespace: job.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				diutil.NewOwnerReference(job.APIVersion, job.Kind, job.Name, job.UID, true),
+				*metav1.NewControllerRef(job, div2alpha1.GroupVersion.WithKind(div2alpha1.KindDIJob)),
 			},
 			Labels: labels,
 		},
@@ -86,39 +111,37 @@ func (c *Context) BuildService(job *div2alpha1.DIJob) *corev1.Service {
 	}
 }
 
-func (c *Context) CreatePod(job *div2alpha1.DIJob, pod *corev1.Pod) error {
+func (c *Context) CreatePod(ctx context.Context, job *div2alpha1.DIJob, pod *corev1.Pod) error {
 	log := c.Log.WithName("CreatePod").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
-	if err := c.Create(c.ctx, pod, &client.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
+	if err := c.Create(ctx, pod, &client.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
 		msg := fmt.Sprintf("failed to create pod: %s error: %v", pod.Name, err)
 		c.Recorder.Eventf(job, corev1.EventTypeWarning, FailedCreateReason, msg)
 		return fmt.Errorf("failed to create pod: %v", err)
 	}
-	msg := fmt.Sprintf("create pod %s", pod.Name)
-	log.Info(msg)
-	// c.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulCreateReason, msg)
+	log.Info("create pod", "pod", pod)
+	c.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulCreateReason, fmt.Sprintf("pod %v was successfully created", pod.Name))
 	return nil
 }
 
-func (c *Context) CreateService(job *div2alpha1.DIJob, service *corev1.Service) error {
+func (c *Context) CreateService(ctx context.Context, job *div2alpha1.DIJob, service *corev1.Service) error {
 	log := c.Log.WithName("CreateService").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
-	if err := c.Create(c.ctx, service, &client.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
+	if err := c.Create(ctx, service, &client.CreateOptions{}); err != nil && !errors.IsAlreadyExists(err) {
 		msg := fmt.Sprintf("failed to create service: %s error: %v", service.Name, err)
 		c.Recorder.Eventf(job, corev1.EventTypeWarning, FailedCreateReason, msg)
 		return fmt.Errorf("failed to create service: %v", err)
 	}
-	msg := fmt.Sprintf("create service %s", service.Name)
-	log.Info(msg)
-	// c.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulCreateReason, msg)
+	log.Info("create service", "service", service)
+	c.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulCreateReason, fmt.Sprintf("service %v was successfully created", service.Name))
 	return nil
 }
 
-func (c *Context) DeletePodsAndServices(job *div2alpha1.DIJob, pods []*corev1.Pod, services []*corev1.Service) error {
+func (c *Context) DeletePodsAndServices(ctx context.Context, job *div2alpha1.DIJob, pods []*corev1.Pod, services []*corev1.Service) error {
 	log := c.Log.WithName("DeletePodsAndServices").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
 	if len(pods) == 0 {
 		return nil
 	}
 	for _, svc := range services {
-		if err := c.DeleteService(job, svc); err != nil {
+		if err := c.DeleteService(ctx, job, svc); err != nil {
 			return err
 		}
 	}
@@ -145,7 +168,7 @@ func (c *Context) DeletePodsAndServices(job *div2alpha1.DIJob, pods []*corev1.Po
 		}
 
 		// if pod is already in terminating state, do not delete it
-		if diutil.IsTerminating(pod) {
+		if diutil.IsPodTerminating(pod) {
 			needsDelete = false
 		}
 		if !needsDelete {
@@ -154,52 +177,50 @@ func (c *Context) DeletePodsAndServices(job *div2alpha1.DIJob, pods []*corev1.Po
 
 		msg := fmt.Sprintf("delete pod %s", pod.Name)
 		log.Info(msg)
-		if err := c.DeletePod(job, pod); err != nil {
+		if err := c.DeletePod(ctx, job, pod); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Context) DeletePods(job *div2alpha1.DIJob, pods []*corev1.Pod) error {
+func (c *Context) DeletePods(ctx context.Context, job *div2alpha1.DIJob, pods []*corev1.Pod) error {
 	var err error
 	for _, pod := range pods {
-		if err1 := c.DeletePod(job, pod); err != nil {
+		if err1 := c.DeletePod(ctx, job, pod); err != nil {
 			err = err1
 		}
 	}
 	return err
 }
 
-func (c *Context) DeletePod(job *div2alpha1.DIJob, pod *corev1.Pod) error {
+func (c *Context) DeletePod(ctx context.Context, job *div2alpha1.DIJob, pod *corev1.Pod) error {
 	log := c.Log.WithName("DeletePod").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
-	if err := c.Delete(c.ctx, pod,
+	if err := c.Delete(ctx, pod,
 		&client.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !errors.IsNotFound(err) {
 		msg := fmt.Sprintf("failed to delete pod: %s error: %v", pod.Name, err)
 		c.Recorder.Eventf(job, corev1.EventTypeWarning, FailedDeleteReason, msg)
 		return fmt.Errorf("failed to delete pod: %v", err)
 	}
-	msg := fmt.Sprintf("delete pod %s", pod.Name)
-	log.Info(msg)
-	// c.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulDeleteReason, msg)
+	log.Info("delete pod", "pod", pod)
+	c.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulDeleteReason, fmt.Sprintf("pod %v was successfully deleted", pod.Name))
 	return nil
 }
 
-func (c *Context) DeleteService(job *div2alpha1.DIJob, service *corev1.Service) error {
+func (c *Context) DeleteService(ctx context.Context, job *div2alpha1.DIJob, service *corev1.Service) error {
 	log := c.Log.WithName("DeleteService").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
-	if err := c.Delete(c.ctx, service,
+	if err := c.Delete(ctx, service,
 		&client.DeleteOptions{GracePeriodSeconds: func(a int64) *int64 { return &a }(0)}); err != nil && !errors.IsNotFound(err) {
 		msg := fmt.Sprintf("failed to delete service: %s error: %v", service.Name, err)
 		c.Recorder.Eventf(job, corev1.EventTypeWarning, FailedDeleteReason, msg)
 		return fmt.Errorf("failed to delete service: %v", err)
 	}
-	msg := fmt.Sprintf("delete service %s", service.Name)
-	log.Info(msg)
-	// c.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulDeleteReason, msg)
+	log.Info("delete service", "service", service)
+	c.Recorder.Eventf(job, corev1.EventTypeNormal, SuccessfulDeleteReason, fmt.Sprintf("service %v was successfully deleted", service.Name))
 	return nil
 }
 
-func (c *Context) ListJobPods(job *div2alpha1.DIJob) ([]*corev1.Pod, error) {
+func (c *Context) ListJobPods(ctx context.Context, job *div2alpha1.DIJob) ([]*corev1.Pod, error) {
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: diutil.GenLabels(*job),
 	})
@@ -208,14 +229,14 @@ func (c *Context) ListJobPods(job *div2alpha1.DIJob) ([]*corev1.Pod, error) {
 	}
 
 	// list pods of job
-	pods, err := c.ListPods(&client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
+	pods, err := c.ListPods(ctx, &client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
 	if err != nil {
 		return nil, err
 	}
 	return pods, nil
 }
 
-func (c *Context) ListJobServices(job *div2alpha1.DIJob) ([]*corev1.Service, error) {
+func (c *Context) ListJobServices(ctx context.Context, job *div2alpha1.DIJob) ([]*corev1.Service, error) {
 	labelSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: diutil.GenLabels(*job),
 	})
@@ -224,16 +245,16 @@ func (c *Context) ListJobServices(job *div2alpha1.DIJob) ([]*corev1.Service, err
 	}
 
 	// list svcs of job
-	svcs, err := c.ListServices(&client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
+	svcs, err := c.ListServices(ctx, &client.ListOptions{Namespace: job.Namespace, LabelSelector: labelSelector})
 	if err != nil {
 		return nil, err
 	}
 	return svcs, nil
 }
 
-func (c *Context) ListPods(opts *client.ListOptions) ([]*corev1.Pod, error) {
+func (c *Context) ListPods(ctx context.Context, opts *client.ListOptions) ([]*corev1.Pod, error) {
 	podList := &corev1.PodList{}
-	err := c.List(c.ctx, podList, opts)
+	err := c.List(ctx, podList, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -245,9 +266,9 @@ func (c *Context) ListPods(opts *client.ListOptions) ([]*corev1.Pod, error) {
 	return pods, nil
 }
 
-func (c *Context) ListServices(opts *client.ListOptions) ([]*corev1.Service, error) {
+func (c *Context) ListServices(ctx context.Context, opts *client.ListOptions) ([]*corev1.Service, error) {
 	svcList := &corev1.ServiceList{}
-	err := c.List(c.ctx, svcList, opts)
+	err := c.List(ctx, svcList, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -257,4 +278,8 @@ func (c *Context) ListServices(opts *client.ListOptions) ([]*corev1.Service, err
 		svcs = append(svcs, pod.DeepCopy())
 	}
 	return svcs, nil
+}
+
+func svcName(name string) string {
+	return fmt.Sprintf("dijob-%s", name)
 }

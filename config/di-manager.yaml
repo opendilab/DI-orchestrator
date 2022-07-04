@@ -5214,7 +5214,7 @@ spec:
         envFrom:
         - configMapRef:
             name: di-config
-        image: opendilab/di-orchestrator:v1.1.0
+        image: opendilab/di-orchestrator:v1.1.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:
@@ -5270,7 +5270,7 @@ spec:
         envFrom:
         - configMapRef:
             name: di-config
-        image: opendilab/di-orchestrator:v1.1.0
+        image: opendilab/di-orchestrator:v1.1.1
         imagePullPolicy: Always
         livenessProbe:
           httpGet:

@@ -87,7 +87,7 @@ lint:
 .PHONY: test
 test: ginkgo ## Run tests.
 	# $(GINKGO) -nodes 4 -v -cover -coverprofile=coverage.out ./pkg/... 
-	$(GINKGO) -cover -coverprofile=coverage.out ./pkg/... 
+	$(GINKGO) -r -cover -coverprofile=coverage.out ./pkg
 	go tool cover -func=./pkg/server/coverage.out 
 	go tool cover -func=./pkg/common/coverage.out
 	go tool cover -func=./pkg/controllers/coverage.out 

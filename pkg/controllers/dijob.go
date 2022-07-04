@@ -24,27 +24,13 @@ func (r *DIJobReconciler) reconcileReplicas(ctx context.Context, job *div2alpha1
 		if err := r.ctx.UpdateJobPhaseAndConditionsInCluster(ctx, old, job); err != nil {
 			log.Error(err, "update job phase and conditions.")
 		}
-		if err := r.ctx.UpdateJobReadyReplicasInCluster(ctx, old, job); err != nil {
-			log.Error(err, "update job ready replicas.")
+		if err := r.ctx.UpdateJobReplicaStatusInCluster(ctx, old, job); err != nil {
+			log.Error(err, "update job replica status.")
 		}
 		if err := r.ctx.UpdateJobAllocationInCluster(ctx, old, job); err != nil {
 			log.Error(err, "update allocation.")
 		}
 	}()
-
-	allocation := job.Status.Allocation
-	if job.Spec.Preemptible {
-		if len(allocation) != 0 {
-			job.Status.Replicas = int32(len(allocation))
-			job.Status.ReadyReplicas = int32(diutil.CountReadyPods(pods))
-		} else {
-			job.Status.Allocation = nil
-			job.Status.Replicas = 0
-			job.Status.ReadyReplicas = 0
-		}
-	} else {
-		job.Status.ReadyReplicas = int32(diutil.CountReadyPods(pods))
-	}
 
 	if err := r.reconcileWithJobStatus(ctx, job, pods); err != nil {
 		return err
@@ -64,6 +50,13 @@ func (r *DIJobReconciler) reconcileWithJobStatus(ctx context.Context, job *div2a
 	for _, task := range job.Spec.Tasks {
 		replicas += int(task.Replicas)
 	}
+
+	// update status replicas
+	err := r.updateStatusReplicas(job, totalPods, replicas)
+	if err != nil {
+		return err
+	}
+
 	// filter out terminating pods
 	filters := make(diutil.Filters, 0)
 	filters = append(filters, diutil.NonTerminatingPodFilter)
@@ -268,7 +261,7 @@ func (r *DIJobReconciler) deleteRedundantReplicas(ctx context.Context, job *div2
 		typeNumMap[string(task.Type)] = int(task.Replicas)
 	}
 	for _, pod := range pods {
-		taskType := pod.Annotations[dicommon.AnnotationTaskType]
+		taskType := pod.Labels[dicommon.LabelTaskType]
 		if typeNumMap[taskType] > 0 {
 			typeNumMap[taskType]-- // upper limit was not reached.
 			continue
@@ -287,7 +280,7 @@ func (r *DIJobReconciler) createMissedReplicas(ctx context.Context, job *div2alp
 	for index, task := range job.Spec.Tasks {
 		localTrace := make([]bool, task.Replicas)
 		for _, pod := range pods {
-			if pod.Annotations[dicommon.AnnotationTaskType] != string(task.Type) {
+			if pod.Labels[dicommon.LabelTaskType] != string(task.Type) {
 				continue
 			}
 			localRank, err := strconv.Atoi(pod.Annotations[dicommon.AnnotationTaskRank])
@@ -352,4 +345,34 @@ func (r *DIJobReconciler) deleteFailedReplicas(ctx context.Context, job *div2alp
 		}
 	}
 	return allReady, nil
+}
+
+func (r *DIJobReconciler) updateStatusReplicas(job *div2alpha1.DIJob, pods []*corev1.Pod, replicas int) error {
+	allocation := job.Status.Allocation
+	if job.Spec.Preemptible {
+		if len(allocation) != 0 {
+			job.Status.Replicas = int32(len(allocation))
+			job.Status.ReadyReplicas = int32(diutil.CountReadyPods(pods))
+		} else {
+			job.Status.Allocation = nil
+			job.Status.Replicas = 0
+			job.Status.ReadyReplicas = 0
+		}
+	} else {
+		job.Status.Replicas = int32(replicas)
+		job.Status.ReadyReplicas = int32(diutil.CountReadyPods(pods))
+
+		// update task status
+		tasksStatus := make(map[string]div2alpha1.TaskStatus)
+		taskPods := diutil.SplitTypedPods(pods)
+		for taskName, tmppods := range taskPods {
+			taskStatus := make(div2alpha1.TaskStatus)
+			for _, pod := range tmppods {
+				taskStatus[pod.Status.Phase]++
+			}
+			tasksStatus[taskName] = taskStatus
+		}
+		job.Status.TaskStatus = tasksStatus
+	}
+	return nil
 }

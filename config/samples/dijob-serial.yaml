@@ -8,10 +8,15 @@ spec:
   backoffLimit: 0  # 重启次数，可以为nil，表示无限重启；默认为3
   cleanPodPolicy: "Running"  # 表示job运行完成之后，如何处理worker pods
   preemptible: false  # 表示job是否允许被抢占，调度中对job资源改动之后涉及到抢占操作
+  volumes:
+  - name: cache-volume
+    emptyDir:
+      medium: Memory
+      sizeLimit: 128Mi
   tasks:
   - replicas: 1
-    type: none
     name: serial
+    type: none
     template:
       spec:
         containers:
@@ -28,8 +33,4 @@ spec:
           volumeMounts:
           - name: cache-volume
             mountPath: /dev/shm
-        volumes:
-        - name: cache-volume
-          emptyDir:
-            medium: Memory
-            sizeLimit: 128Mi
+      

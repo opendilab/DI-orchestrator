@@ -92,6 +92,13 @@ func (in *DIJobSpec) DeepCopyInto(out *DIJobSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Volumes != nil {
+		in, out := &in.Volumes, &out.Volumes
+		*out = make([]v1.Volume, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Tasks != nil {
 		in, out := &in.Tasks, &out.Tasks
 		*out = make([]Task, len(*in))

@@ -115,8 +115,9 @@ func (r *DIJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 		old := job.DeepCopy()
 		job.Status.ReadyReplicas = 0
-		if err := r.ctx.UpdateJobReadyReplicasInCluster(ctx, old, job); err != nil {
-			log.Error(err, "update job ready replicas.")
+		job.Status.TaskStatus = nil
+		if err := r.ctx.UpdateJobReplicaStatusInCluster(ctx, old, job); err != nil {
+			log.Error(err, "update job replica status.")
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, nil
@@ -211,8 +212,8 @@ func (r *DIJobReconciler) onJobUpdateHandler(old, new client.Object) {
 	if err := r.ctx.UpdateJobRestartsAndReschedulesInCluster(context.Background(), stale, newjob); err != nil {
 		log.Error(err, "update job restarts and reschedules.")
 	}
-	if err := r.ctx.UpdateJobReadyReplicasInCluster(context.Background(), stale, newjob); err != nil {
-		log.Error(err, "update job ready replicas.")
+	if err := r.ctx.UpdateJobReplicaStatusInCluster(context.Background(), stale, newjob); err != nil {
+		log.Error(err, "update job replica status.")
 	}
 }
 

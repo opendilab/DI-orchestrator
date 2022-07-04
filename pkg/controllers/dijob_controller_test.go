@@ -51,6 +51,10 @@ var _ = Describe("DIJob Controller", func() {
 			readyReplicas = 0
 			checkReadyReplicas(ctx, jobKey, readyReplicas)
 
+			By("Checking the delete timestamp is not nil")
+			ctx.Get(context.Background(), jobKey, &job)
+			Expect(job.Status.CompletionTimestamp).ShouldNot(Equal(nil))
+
 			By("Cleaning up")
 			err = ctx.CleanUpJob(context.Background(), &job)
 			Expect(err).NotTo(HaveOccurred())

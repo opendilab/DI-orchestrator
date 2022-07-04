@@ -46,15 +46,15 @@ func (c *Context) BuildPod(job *div2alpha1.DIJob, rank int, allocation []string,
 	pod.Spec.Subdomain = job.Name
 
 	labels := diutil.GenLabels(*job)
-	labels[dicommon.LabelRank] = strconv.Itoa(rank)
 	labels[dicommon.LabelPod] = pod.Name
+	labels[dicommon.LabelTaskType] = string(job.Spec.Tasks[taskNum].Type)
+	labels[dicommon.LabelTaskName] = job.Spec.Tasks[taskNum].Name
 	diutil.AddLabelsToPod(pod, labels)
 
 	annotations := map[string]string{
 		dicommon.AnnotationReplicas: strconv.Itoa(replicas),
 		dicommon.AnnotationRank:     strconv.Itoa(rank),
 		dicommon.AnnotationNode:     nodeName,
-		dicommon.AnnotationTaskType: string(job.Spec.Tasks[taskNum].Type),
 		dicommon.AnnotationTaskRank: strconv.Itoa(taskLocalRank),
 	}
 	diutil.AddAnnotationsToPod(pod, annotations)
@@ -73,17 +73,22 @@ func (c *Context) BuildPod(job *div2alpha1.DIJob, rank int, allocation []string,
 			}
 		}
 	}
-	var DITasknameNodes string = "DI_" + strings.ReplaceAll(strings.ToUpper(job.Spec.Tasks[taskNum].Name), "-", "_") + "_NODES"
+	DITaskNodes := fmt.Sprintf(dicommon.ENVTaskNodesFormat, strings.ReplaceAll(strings.ToUpper(job.Spec.Tasks[taskNum].Name), "-", "_"))
 	envs := map[string]string{
 		dicommon.ENVJobID:     diutil.NamespacedName(job.Namespace, job.Name),
 		dicommon.ENVServerURL: dicommon.GetDIServerURL(),
 		dicommon.ENVRank:      strconv.Itoa(rank),
 		dicommon.ENVNodes:     strings.Join(fqdns, ","),
-		DITasknameNodes:       strings.Join(internalFqdns, ","),
+		DITaskNodes:           strings.Join(internalFqdns, ","),
 	}
 	diutil.AddEnvsToPod(pod, envs)
 
-	// OnTopologyHandler(job, rank, pod)
+	// add job volumes to pod
+	if pod.Spec.Volumes == nil {
+		pod.Spec.Volumes = make([]corev1.Volume, 0)
+	}
+	pod.Spec.Volumes = append(pod.Spec.Volumes, job.Spec.Volumes...)
+
 	return pod
 }
 

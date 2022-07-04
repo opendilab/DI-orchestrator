@@ -141,12 +141,10 @@ func (c *Context) UpdateJobPhaseAndConditionsInCluster(ctx context.Context, old,
 
 func (c *Context) UpdateJobAllocationInCluster(ctx context.Context, old, new *div2alpha1.DIJob) error {
 	log := c.Log.WithName("UpdateJobAllocation").WithValues("job", diutil.NamespacedName(new.Namespace, new.Name))
-	if old.Status.Replicas == new.Status.Replicas &&
-		apiequality.Semantic.DeepEqual(old.Status.Allocation, new.Status.Allocation) {
+	if apiequality.Semantic.DeepEqual(old.Status.Allocation, new.Status.Allocation) {
 		return nil
 	}
 	log.Info("update job allocation",
-		"replicas", fmt.Sprintf("%d->%d", old.Status.Replicas, new.Status.Replicas),
 		"allocation", fmt.Sprintf("%v->%v", old.Status.Allocation, new.Status.Allocation))
 
 	err := wait.Poll(updatedPauseDuration, updateTimeout, func() (bool, error) {
@@ -156,7 +154,6 @@ func (c *Context) UpdateJobAllocationInCluster(ctx context.Context, old, new *di
 			return false, nil
 		}
 		newJob.Status.Allocation = new.Status.DeepCopy().Allocation
-		newJob.Status.Replicas = new.Status.DeepCopy().Replicas
 		err = c.Status().Update(ctx, newJob, &client.UpdateOptions{})
 		if err == nil {
 			return true, nil
@@ -190,13 +187,16 @@ func (c *Context) UpdateJobProfilingsInCluster(ctx context.Context, old, new *di
 	return err
 }
 
-func (c *Context) UpdateJobReadyReplicasInCluster(ctx context.Context, old, new *div2alpha1.DIJob) error {
-	log := c.Log.WithName("UpdateJobReadyReplicas").WithValues("job", diutil.NamespacedName(new.Namespace, new.Name))
-	if old.Status.ReadyReplicas == new.Status.ReadyReplicas {
+func (c *Context) UpdateJobReplicaStatusInCluster(ctx context.Context, old, new *div2alpha1.DIJob) error {
+	log := c.Log.WithName("UpdateJobReplicaStatus").WithValues("job", diutil.NamespacedName(new.Namespace, new.Name))
+	if old.Status.Replicas == new.Status.Replicas && old.Status.ReadyReplicas == new.Status.ReadyReplicas &&
+		apiequality.Semantic.DeepEqual(old.Status.TaskStatus, new.Status.TaskStatus) {
 		return nil
 	}
-	log.Info("update job ready replicas",
-		"replicas", fmt.Sprintf("%d->%d", old.Status.ReadyReplicas, new.Status.ReadyReplicas))
+	log.Info("update job replica status",
+		"ready replicas", fmt.Sprintf("%d->%d", old.Status.ReadyReplicas, new.Status.ReadyReplicas),
+		"replicas", fmt.Sprintf("%d->%d", old.Status.Replicas, new.Status.Replicas),
+		"task status", fmt.Sprintf("%v->%v", old.Status.TaskStatus, new.Status.TaskStatus))
 
 	err := wait.Poll(updatedPauseDuration, updateTimeout, func() (bool, error) {
 		newJob := &div2alpha1.DIJob{}
@@ -205,6 +205,9 @@ func (c *Context) UpdateJobReadyReplicasInCluster(ctx context.Context, old, new 
 			return false, nil
 		}
 		newJob.Status.ReadyReplicas = new.Status.DeepCopy().ReadyReplicas
+		newJob.Status.Replicas = new.Status.DeepCopy().Replicas
+		newJob.Status.TaskStatus = new.Status.DeepCopy().TaskStatus
+		newJob.Status.CompletionTimestamp = new.Status.DeepCopy().CompletionTimestamp
 		err = c.Status().Update(ctx, newJob, &client.UpdateOptions{})
 		if err == nil {
 			return true, nil

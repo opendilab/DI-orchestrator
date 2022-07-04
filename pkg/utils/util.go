@@ -99,7 +99,6 @@ func AddPortToPod(pod *corev1.Pod, port corev1.ContainerPort) {
 
 func GenLabels(job div2alpha1.DIJob) map[string]string {
 	return map[string]string{
-		dicommon.LabelGroup:    job.Spec.Group,
 		dicommon.LabelJob:      strings.Replace(job.Name, "/", "-", -1),
 		dicommon.LabelOperator: dicommon.OperatorName,
 	}
@@ -221,6 +220,17 @@ func FilterPods(pods []*corev1.Pod, filters Filters) []*corev1.Pod {
 	}
 
 	return results
+}
+
+func SplitTypedPods(pods []*corev1.Pod) map[string][]*corev1.Pod {
+	out := make(map[string][]*corev1.Pod)
+	for _, pod := range pods {
+		if _, ok := out[pod.Labels[dicommon.LabelTaskName]]; !ok {
+			out[pod.Labels[dicommon.LabelTaskName]] = make([]*corev1.Pod, 0)
+		}
+		out[pod.Labels[dicommon.LabelTaskName]] = append(out[pod.Labels[dicommon.LabelTaskName]], pod)
+	}
+	return out
 }
 
 func IsPodTerminating(pod *corev1.Pod) bool {

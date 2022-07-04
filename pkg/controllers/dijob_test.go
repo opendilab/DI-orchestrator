@@ -202,5 +202,111 @@ var _ = Describe("DIJob Specification", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
+
+		It("Should have correct status", func() {
+			type testCase struct {
+				replicas         []int
+				expectedReplicas int
+			}
+			testCases := []testCase{
+				{replicas: []int{1, 1, 1}, expectedReplicas: 3},
+				{replicas: []int{1, 1, 2}, expectedReplicas: 4},
+				{replicas: []int{1, 3, 2}, expectedReplicas: 6},
+			}
+			for i := range testCases {
+				c := testCases[i]
+				By(fmt.Sprintf("Create %dth DIJob", i+1))
+				var err error
+				jobTmpl := testutil.NewDIJob()
+				for i := range jobTmpl.Spec.Tasks {
+					jobTmpl.Spec.Tasks[i].Replicas = int32(c.replicas[i])
+				}
+				totalReplicas := 0
+				for _, task := range jobTmpl.Spec.Tasks {
+					totalReplicas += int(task.Replicas)
+				}
+
+				job, jobKey := createAndUpdateReplicas(ctx, jobTmpl)
+
+				By("Check the created DIJob is in Starting state")
+				checkDIJobPhase(ctx, jobKey, div2alpha1.JobStarting)
+
+				By("Update workers to Running")
+				err = updateWorkerPodsPhase(&job, corev1.PodRunning)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Check status replicas are as expected")
+				Eventually(func() int {
+					err := ctx.Get(context.Background(), jobKey, &job)
+					if err != nil {
+						return -1
+					}
+					return int(job.Status.Replicas)
+				}, timeout, interval).Should(Equal(c.expectedReplicas))
+
+				By("Check status taskStatus are as expected")
+				Eventually(func() int {
+					err := ctx.Get(context.Background(), jobKey, &job)
+					if err != nil {
+						return -1
+					}
+					count := 0
+					for _, taskStatus := range job.Status.TaskStatus {
+						count += int(taskStatus[corev1.PodRunning])
+					}
+					return count
+				}, timeout, interval).Should(Equal(c.expectedReplicas))
+
+				By("Clean up pods")
+				err = ctx.CleanUpJob(context.Background(), &job)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
+
+		It("Should have correct volumes when job volumes specified", func() {
+			type testCase struct {
+				volumes         int
+				expectedVolumes int
+			}
+			testCases := []testCase{
+				{volumes: 1, expectedVolumes: 1},
+				{volumes: 3, expectedVolumes: 3},
+				{volumes: 4, expectedVolumes: 4},
+			}
+			for i := range testCases {
+				c := testCases[i]
+				By(fmt.Sprintf("Create %dth DIJob", i+1))
+				var err error
+				jobTmpl := testutil.NewDIJob()
+				jobTmpl.Spec.Volumes = make([]corev1.Volume, 0)
+				for i := 0; i < c.volumes; i++ {
+					volume := corev1.Volume{
+						Name: fmt.Sprintf("volume-%d", i),
+						VolumeSource: corev1.VolumeSource{
+							HostPath: &corev1.HostPathVolumeSource{
+								Path: "/example",
+							},
+						},
+					}
+					jobTmpl.Spec.Volumes = append(jobTmpl.Spec.Volumes, volume)
+				}
+
+				job, jobKey := createAndUpdateReplicas(ctx, jobTmpl)
+
+				By("Check the created DIJob is in Starting state")
+				checkDIJobPhase(ctx, jobKey, div2alpha1.JobStarting)
+
+				By("Check pod volumes are as expected")
+				pods, err := ctx.ListJobPods(context.Background(), &job)
+				Expect(err).NotTo(HaveOccurred())
+				for _, pod := range pods {
+					Expect(len(pod.Spec.Volumes)).Should(Equal(c.expectedVolumes))
+				}
+
+				By("Clean up pods")
+				err = ctx.CleanUpJob(context.Background(), &job)
+				Expect(err).NotTo(HaveOccurred())
+			}
+		})
 	})
 })

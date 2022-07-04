@@ -2,6 +2,8 @@ package controllers
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"opendilab.org/di-orchestrator/pkg/api/v2alpha1"
 	dicontext "opendilab.org/di-orchestrator/pkg/context"
 )
@@ -123,9 +125,13 @@ func onJobRescheduling(ctx dicontext.Context, job *v2alpha1.DIJob) {
 func onJobFailed(ctx dicontext.Context, job *v2alpha1.DIJob) {
 	msg := "job is failed since some replicas are failed."
 	ctx.Recorder.Eventf(job, corev1.EventTypeWarning, dicontext.DIJobFailedReason, msg)
+	deleteTime := metav1.Now()
+	job.Status.CompletionTimestamp = &deleteTime
 }
 
 func onJobSucceeded(ctx dicontext.Context, job *v2alpha1.DIJob) {
 	msg := "job is succeeded since all the replicas are succeeded."
 	ctx.Recorder.Eventf(job, corev1.EventTypeNormal, dicontext.DIJobSucceededReason, msg)
+	deleteTime := metav1.Now()
+	job.Status.CompletionTimestamp = &deleteTime
 }

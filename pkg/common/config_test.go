@@ -52,14 +52,11 @@ var _ = Describe("Test common config", func() {
 			testCases := []testCase{
 				{domainName: "svc.k8s.cluster", expectDomain: "svc.k8s.cluster"},
 				{domainName: "svc.cluster.local", expectDomain: "svc.cluster.local"},
-				{domainName: "", expectDomain: "svc.cluster.local"},
 			}
 			for i := range testCases {
 				c := testCases[i]
 				By(fmt.Sprintf("Create the %dth DIJob", i+1))
-				err := os.Setenv(ENVDomainName, c.domainName)
-				Expect(err).NotTo(HaveOccurred())
-				SetServiceDomainName(c.expectDomain)
+				SetServiceDomainName(c.domainName)
 				domainName := GetServiceDomainName()
 				Expect(domainName).To(Equal(c.expectDomain))
 			}

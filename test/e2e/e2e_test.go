@@ -170,6 +170,50 @@ var _ = Describe("E2E test for DI-engine", func() {
 			dictx.CleanUpJob(context.Background(), job)
 		})
 
+		It("should have correct task status", func() {
+			var err error
+			ctx := context.Background()
+			jobPath := filepath.Join(exampleJobsDir, "normal-job-sleep.yaml")
+
+			By(fmt.Sprintf("create job from %s", jobPath))
+			job, err := buildDIJob(jobPath)
+			Expect(err).NotTo(HaveOccurred())
+			job.Name = "normal-job-task-status"
+
+			err = dictx.Create(ctx, job, &client.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for job to running")
+			jobKey := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
+			Eventually(func() div2alpha1.Phase {
+				err := dictx.Get(ctx, jobKey, job)
+				if err != nil {
+					return div2alpha1.JobUnknown
+				}
+				return job.Status.Phase
+			}, timeout, interval).Should(Equal(div2alpha1.JobRunning))
+
+			By("checking task status")
+			replicas := 0
+			for _, task := range job.Spec.Tasks {
+				replicas += int(task.Replicas)
+			}
+			Eventually(func() int {
+				err := dictx.Get(ctx, jobKey, job)
+				if err != nil {
+					return -1
+				}
+				count := 0
+				for _, taskStatus := range job.Status.TaskStatus {
+					count += int(taskStatus[corev1.PodRunning])
+				}
+				return count
+			}, timeout, interval).Should(Equal(replicas))
+
+			// clean jobs
+			dictx.CleanUpJob(context.Background(), job)
+		})
+
 		It("should delete pods when task replicas decreased", func() {
 			var err error
 			ctx := context.Background()

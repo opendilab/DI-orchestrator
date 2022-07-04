@@ -12,26 +12,24 @@ import (
 const (
 	// labels for pods
 	LabelOperator = "diengine/operator"
-	LabelGroup    = "diengine/group"
 	LabelJob      = "diengine/job"
-	LabelRank     = "diengine/rank"
+	LabelTaskType = "diengine/task-type"
+	LabelTaskName = "diengine/task-name"
 	LabelPod      = "diengine/pod"
 
 	// annotations for pods
-	// AnnotationGeneration = "diengine/generation"
 	AnnotationReplicas = "diengine/replicas"
 	AnnotationRank     = "diengine/rank"
-	AnnotationNode     = "diengine/node"
-	AnnotationTaskType = "diengine/task-type"
 	AnnotationTaskRank = "diengine/task-rank"
+	AnnotationNode     = "diengine/node"
 
 	// envs for orchestrator
-	ENVDomainName = "K8S_SVC_DOMAIN_NAME"
-	ENVServerURL  = "DI_SERVER_URL"
+	ENVServerURL = "DI_SERVER_URL"
 	// envs for pods
-	ENVJobID = "DI_JOB_ID"
-	ENVRank  = "DI_RANK"
-	ENVNodes = "DI_NODES"
+	ENVJobID           = "DI_JOB_ID"
+	ENVRank            = "DI_RANK"
+	ENVNodes           = "DI_NODES"
+	ENVTaskNodesFormat = "DI_%s_NODES"
 
 	// dijob oriented
 	OperatorName         = "di-operator"

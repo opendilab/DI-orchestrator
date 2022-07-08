@@ -37,7 +37,7 @@ import (
 )
 
 type CreateOptions struct {
-	cmdcommon.GenericFlags
+	*cmdcommon.GenericFlags
 
 	SyncPeriod           *time.Duration
 	MetricAddress        string
@@ -45,7 +45,7 @@ type CreateOptions struct {
 	EnableLeaderElection bool
 }
 
-func NewCreateOptions(genFlags cmdcommon.GenericFlags) *CreateOptions {
+func NewCreateOptions(genFlags *cmdcommon.GenericFlags) *CreateOptions {
 	DefaultSyncPeriod := 1 * time.Minute
 	DefaultMetricAddress := ":8443"
 	DefaultProbeAddress := ":8080"
@@ -68,7 +68,7 @@ func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
 			"Enabling this will ensure there is only one active controller manager.")
 }
 
-func NewCmdOperator(genFlags cmdcommon.GenericFlags) *cobra.Command {
+func NewCmdOperator(genFlags *cmdcommon.GenericFlags) *cobra.Command {
 	o := NewCreateOptions(genFlags)
 	var operatorCmd = &cobra.Command{
 		Use:   "operator",

@@ -16,7 +16,7 @@ limitations under the License.
 package cmd
 
 import (
-	goflag "flag"
+	"flag"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -50,9 +50,8 @@ func Execute() {
 func init() {
 	genFlags := common.NewGenericFlags()
 	genFlags.AddFlags(rootCmd)
-	rootCmd.AddCommand(server.NewCmdServer(*genFlags))
-	rootCmd.AddCommand(operator.NewCmdOperator(*genFlags))
-
+	rootCmd.AddCommand(server.NewCmdServer(genFlags))
+	rootCmd.AddCommand(operator.NewCmdOperator(genFlags))
 	// add all the flags in go flagset into pflagset
-	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 }

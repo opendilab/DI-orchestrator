@@ -34,14 +34,14 @@ import (
 )
 
 type CreateOptions struct {
-	cmdcommon.GenericFlags
+	*cmdcommon.GenericFlags
 
 	ServerBindAddress string
 	ProbeAddress      string
 	MetricAddress     string
 }
 
-func NewCreateOptions(genFlags cmdcommon.GenericFlags) *CreateOptions {
+func NewCreateOptions(genFlags *cmdcommon.GenericFlags) *CreateOptions {
 	return &CreateOptions{
 		GenericFlags:      genFlags,
 		ServerBindAddress: ":8081",
@@ -59,7 +59,7 @@ func (o *CreateOptions) AddFlags(cmd *cobra.Command) {
 }
 
 // serverCmd represents the server command
-func NewCmdServer(genFlags cmdcommon.GenericFlags) *cobra.Command {
+func NewCmdServer(genFlags *cmdcommon.GenericFlags) *cobra.Command {
 	o := NewCreateOptions(genFlags)
 	var serverCmd = &cobra.Command{
 		Use:   "server",

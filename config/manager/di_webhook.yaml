@@ -24,7 +24,7 @@ spec:
         - "--port=9443"
         - "--qps=100"
         - "--burst=200"
-        image: opendilab/di-orchestrator:v1.1.1
+        image: opendilab/di-orchestrator:v1.1.2
         imagePullPolicy: Always
         name: webhook
         securityContext:

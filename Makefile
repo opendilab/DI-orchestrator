@@ -1,7 +1,7 @@
 
 # di-operator version
 APP_VERSION ?= 0.1.0
-VERSION ?= v1.1.1
+VERSION ?= v1.1.2
 MASTER_VERSION := $(VERSION)
 
 COMMIT_SHORT_SHA=$(shell git log -n 1 | head -n 1 | sed -e 's/^commit //' | head -c 8)

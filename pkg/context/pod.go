@@ -43,7 +43,7 @@ func (c *Context) BuildPod(job *div2alpha1.DIJob, rank int, allocation []string,
 	pod.Spec.RestartPolicy = corev1.RestartPolicyNever
 	// set hostname and subdomain to enable service subdomain
 	pod.Spec.Hostname = pod.Name
-	pod.Spec.Subdomain = job.Name
+	pod.Spec.Subdomain = svcName(job.Name)
 
 	labels := diutil.GenLabels(*job)
 	labels[dicommon.LabelPod] = pod.Name
@@ -66,7 +66,7 @@ func (c *Context) BuildPod(job *div2alpha1.DIJob, rank int, allocation []string,
 	for num, task := range job.Spec.Tasks {
 		for i := 0; i < int(task.Replicas); i++ {
 			replicaName := diutil.ReplicaName(job.Name, job.Spec.Tasks[num].Name, i)
-			fqdn := diutil.PodFQDN(replicaName, job.Name, job.Namespace, dicommon.GetServiceDomainName())
+			fqdn := diutil.PodFQDN(replicaName, pod.Spec.Subdomain, job.Namespace, dicommon.GetServiceDomainName())
 			fqdns = append(fqdns, fqdn)
 			if task.Type == job.Spec.Tasks[taskNum].Type {
 				internalFqdns = append(internalFqdns, fqdn)
@@ -286,5 +286,5 @@ func (c *Context) ListServices(ctx context.Context, opts *client.ListOptions) ([
 }
 
 func svcName(name string) string {
-	return fmt.Sprintf("dijob-%s", name)
+	return fmt.Sprintf("di-%s", name)
 }

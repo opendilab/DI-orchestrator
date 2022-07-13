@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -315,7 +314,7 @@ func (r *DIJobReconciler) createMissedReplicas(ctx context.Context, job *div2alp
 }
 func (r *DIJobReconciler) findMaxGlobalRank(job *div2alpha1.DIJob, pods []*corev1.Pod) (int, error) {
 	log := r.ctx.Log.WithName("findMaxGlobalRank").WithValues("job", diutil.NamespacedName(job.Namespace, job.Name))
-	maxGlobalRank := -1
+	maxGlobalRank := 0
 	for _, pod := range pods {
 		globalRank, err := strconv.Atoi(pod.Annotations[dicommon.AnnotationRank])
 		if err != nil {
@@ -327,10 +326,7 @@ func (r *DIJobReconciler) findMaxGlobalRank(job *div2alpha1.DIJob, pods []*corev
 			maxGlobalRank = globalRank
 		}
 	}
-	if maxGlobalRank < 0 {
-		err := errors.New("max global rank is a invalid number")
-		return -1, err
-	}
+
 	return maxGlobalRank, nil
 }
 

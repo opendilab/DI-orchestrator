@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 # tag for pytorch-operator image
-tag: v1.1.2
+tag: v1.1.3
 
 # tag for di-orchestrator image
 registry: opendilab

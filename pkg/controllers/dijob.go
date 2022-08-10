@@ -279,13 +279,18 @@ func (r *DIJobReconciler) createMissedReplicas(ctx context.Context, job *div2alp
 	for index, task := range job.Spec.Tasks {
 		localTrace := make([]bool, task.Replicas)
 		for _, pod := range pods {
-			if pod.Labels[dicommon.LabelTaskType] != string(task.Type) {
+			if pod.Labels[dicommon.LabelTaskName] != string(task.Name) {
 				continue
 			}
 			localRank, err := strconv.Atoi(pod.Annotations[dicommon.AnnotationTaskRank])
 			if err != nil {
 				log.Error(err, fmt.Sprintf("annotation %s is not a valid number, should mark job as restarting.",
 					pod.Annotations[dicommon.AnnotationTaskRank]))
+				return err
+			}
+			if localRank >= len(localTrace) {
+				err := fmt.Errorf("pod %s local rank is out of range", pod.Name)
+				log.Error(err, "get local rank")
 				return err
 			}
 			localTrace[localRank] = true

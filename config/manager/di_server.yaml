@@ -24,7 +24,7 @@ spec:
         - "--server-bind-address=:8081"
         - "--qps=100"
         - "--burst=200"
-        image: opendilab/di-orchestrator:v1.1.2
+        image: opendilab/di-orchestrator:v1.1.3
         imagePullPolicy: Always
         name: server
         envFrom:

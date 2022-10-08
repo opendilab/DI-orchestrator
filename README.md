@@ -65,4 +65,4 @@ Refers to [user-guide](./docs/architecture.md). For Chinese version, please refe
 
 Refers to [developer-guide](./docs/developer-guide.md).
 
-Contact us throw <opendilab.contact@gmail.com>
+Contact us: <opendilab@pjlab.org.cn>

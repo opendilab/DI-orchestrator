@@ -149,7 +149,7 @@ type Policy interface {
 ```
 用户可根据自身需求实现自己的调度算法。
 
-当`job.spec.preemptible==false`时，Allocator将不会对该任务进行调度，只会根据`job.spec.minReplicas`为该任务分配固定数目的workers，分配结果写到`job.status.replicas`。不过，用户可以通过修改`job.status.replicas`来变更该任务的workers数目。
+当`job.spec.preemptible==false`时，Allocator将不会对该任务进行调度，只会根据`job.spec.tasks[].replicas`表示的所有tasks的replicas总和为该任务分配固定数目的workers，分配结果写到`job.status.replicas`。不过，用户可以通过修改`job.status.replicas`来变更该任务的workers数目。
 > Note：不能直接通过`kubectl apply`或者`kubectl edit`命令直接修改`job.status.replicas`，因为`job.status`被定义为SubResource，对于DIJob的所有的PUT和POST请求都会忽略`job.status`字段，见[Kubernetes API Conversion](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status)。可以执行`go run ./hack/update_replicas.go --ns [your-job-namespace] --n [your-job-name] --r [expected-replicas]`实现修改replicas的操作。
 #### Controller控制循环
 Controller控制循环用于调谐DIJob的状态，包括生命周期管理、workers的创建和删除等，如前文所述状态转移图。
@@ -183,8 +183,8 @@ job_id由`namespace.name.generation`三元组构成。
 
 1. 用户提交DIJob到K8s集群中。
 2. Allocator进行初始分配：
-   1. 对不允许抢占的job，根据`job.spec.minReplicas`修改`job.status.replicas`的值。
-   2. 对允许抢占的job，根据`job.spec.minReplicas`修改`job.status.allocation`的值，`job.status.allocation`是一个节点list，表示每个replicas放置的节点。
+   1. 对不允许抢占的job，由用户定义replicas数，allocator不做修改。
+   2. 对允许抢占的job，根据job task资源占用修改`job.status.allocation`的值，`job.status.allocation`是一个节点list，表示每个replicas放置的节点。（目前调度policy还未实现）
 3. Controller获取K8s集群中job的变更。
 4. Controller创建相应数目的replicas。
    1. 对不允许抢占的job，根据`job.status.replicas`创建对应数目的replicas。

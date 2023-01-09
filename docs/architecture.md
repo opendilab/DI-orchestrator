@@ -26,9 +26,6 @@ type DIJobSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Group is a collection of DIJobs.
-	Group string `json:"group,omitempty"`
-
 	// Priority labels the priority of DIJob.
 	// +kubebuilder:default=normal
 	// +kubebuilder:validation:Enum=normal;high
@@ -46,6 +43,9 @@ type DIJobSpec struct {
 	// BackoffLimit defines the restart limit for DIJob.
 	// +kubebuilder:default=3
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
+
+	// Volumes defines the shared volumes for all tasks.
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// Provides flexible support for different components(collector, learner, evaluator) in DI-Engine
 	// +kubebuilder:validation:Required
@@ -150,7 +150,7 @@ type Policy interface {
 }
 ```
 
-When `job.spec.preemptible==false`, Allocator will not schedule the job, but will only allocate a fixed number of workers to the job according to `job.spec.minReplicas`, and the allocation result will be written to `job.status .replicas`. However, you can change the number of workers for the job by modifying `job.status.replicas`.
+When `job.spec.preemptible==false`, Allocator will not schedule the job, but will only allocate a fixed number of workers to the job according to `job.spec.tasks[].replicas`, and the allocation result will be written to `job.status .replicas`. However, you can change the number of workers for the job by modifying `job.status.replicas`.
 
 > Note: You cannot directly modify `job.status.replicas` through `kubectl apply` or `kubectl edit` commands, because `job.status` is defined as a SubResource. `job.status` is ignored for all PUT and POST requests of DIJob. See [Kubernetes API Conversion](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status). You can execute `go run ./hack/update_replicas.go --ns [your-job-namespace] --n [your-job-name] --r [expected-replicas]` to modify replicas.
 
@@ -187,8 +187,8 @@ Jobs submitted run in the cluster according to the process in the following figu
 
 1. User submits DIJob to K8s cluster.
 2. Allocator makes initial allocation:
-   1. For jobs that are not preemptible, modify the value of `job.status.replicas` according to `job.spec.minReplicas`.
-   2. For jobs that are preemptible, modify the value of `job.status.allocation` according to `job.spec.minReplicas`. `job.status.allocation` is a list of nodes, indicating the nodes where each replica is placed.
+   1. For jobs that are not preemptible, `job.status.replicas` will not be updated, instead defined by users themselves.
+   2. For jobs that are preemptible, modify the value of `job.status.allocation` according to the resources of job tasks. `job.status.allocation` is a list of nodes, indicating the nodes where each replica is placed. (This logic is not implemented yet)
 3. Controller obtains the changes of the job in the K8s cluster.
 4. Controller creates the corresponding number of replicas.
    1. For jobs that are not preemptible, create the corresponding number of replicas according to `job.status.replicas`.

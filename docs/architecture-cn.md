@@ -27,9 +27,6 @@ type DIJobSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Group is a collection of DIJobs.
-	Group string `json:"group,omitempty"`
-
 	// Priority labels the priority of DIJob.
 	// +kubebuilder:default=normal
 	// +kubebuilder:validation:Enum=normal;high
@@ -47,6 +44,9 @@ type DIJobSpec struct {
 	// BackoffLimit defines the restart limit for DIJob.
 	// +kubebuilder:default=3
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
+
+	// Volumes defines the shared volumes for all tasks.
+	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
 	// Provides flexible support for different components(collector, learner, evaluator) in DI-Engine
 	// +kubebuilder:validation:Required
